@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legend Review</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2230;--muted:#6b7280;--line:#e2e5ea;--accent:#2457d6;--accent-soft:#eaf0ff;
+      --err:#b42318;--err-soft:#fdecea;--warn:#9a5b00;--warn-soft:#fff4e0;--ok:#067647;--ok-soft:#e7f6ee}
+@media (prefers-color-scheme:dark){:root{--bg:#13161b;--card:#1c2027;--ink:#e7e9ec;--muted:#9aa3b2;--line:#2d323b;
+      --accent:#7ea4ff;--accent-soft:#1d2a47;--err:#ff8a80;--err-soft:#3a1f1d;--warn:#ffc46b;--warn-soft:#3a2d17;--ok:#6ee7a8;--ok-soft:#173326}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}
+.app{display:grid;grid-template-columns:280px 1fr;height:100vh}
+aside{border-right:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;min-height:0}
+aside .head{padding:14px 14px 8px}aside h1{font-size:16px;margin:0 0 8px}aside h1 a{color:var(--muted);font-size:12px;font-weight:400;margin-left:6px}
+aside input{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+.filters{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.filters button{font-size:12px;padding:2px 8px}
+#logs{overflow:auto;flex:1;padding:4px 0}
+.log{padding:6px 14px;cursor:pointer;font-size:12.5px;word-break:break-all;display:flex;gap:6px;align-items:baseline}
+.log:hover{background:var(--accent-soft)}.log.on{background:var(--accent-soft);font-weight:600}.log.noimg{opacity:.45;cursor:default}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--line)}.dot.good{background:var(--ok)}.dot.problems{background:var(--err)}.dot.partial{background:var(--warn)}
+main{overflow:auto;padding:16px 20px;min-width:0}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.bar .title{font-weight:600;font-size:15px;word-break:break-all;flex:1;min-width:200px}
+button{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);font-weight:600}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.seg{display:inline-flex}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}
+.meta{color:var(--muted);font-size:12.5px}
+.layers{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0}
+.layers label{display:flex;gap:4px;align-items:center;cursor:pointer}.sw{display:inline-block;width:12px;height:3px}
+.stage{position:relative;border:1px solid var(--line);border-radius:8px;overflow:auto;background:#fff;max-height:62vh}
+.stage .inner{position:relative;transform-origin:0 0}
+.stage img{display:block;image-rendering:auto}.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.zoom{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;margin-top:14px}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}.app{grid-template-columns:220px 1fr}}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:500;font-size:12px;position:sticky;top:0;background:var(--bg)}
+tr.hl td{background:var(--accent-soft)}tr.ign td{opacity:.6}
+.thumb{width:64px;height:22px;border:1px solid var(--line);background-repeat:no-repeat;background-color:#fff}
+.raw{color:var(--muted);font-size:11.5px;font-family:ui-monospace,monospace}
+.verd{display:flex;gap:2px;flex-wrap:wrap}.verd button{font-size:11px;padding:1px 6px;border-radius:4px}
+.verd button.v-ok.on{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.verd button.v-bad.on{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+td input{width:100%;min-width:90px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit;font-size:12.5px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.panel h3{margin:0 0 6px;font-size:13px}.panel textarea{width:100%;min-height:80px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;font-size:13px;resize:vertical}
+.panel + .panel{margin-top:12px}
+.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--warn-soft);color:var(--warn)}
+.pairs div{font-size:12.5px;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:3px 0}
+.empty{color:var(--muted);padding:40px;text-align:center}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}@keyframes s{to{transform:rotate(1turn)}}
+#saved{font-size:12.5px;color:var(--ok)}
+</style></head><body>
+<div class="app">
+<aside>
+  <div class="head"><h1>Legend review<a href="/">extractor</a></h1>
+    <input id="q" placeholder="Filter logs…">
+    <div class="filters" id="filt"><button data-f="all" class="on">all</button><button data-f="todo">not reviewed</button>
+      <button data-f="problems">problems</button><button data-f="good">good</button></div>
+  </div>
+  <div id="logs"></div>
+</aside>
+<main id="main"><div class="empty">Pick a log on the left.</div></main>
+</div>
+<template id="tpl">
+  <div class="bar">
+    <div class="title" id="title"></div>
+    <div class="seg" id="methods"><button data-m="old">old method</button><button data-m="grid">grid method</button></div>
+    <button id="rerun" title="recompute, ignoring the cache">Recompute</button>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div class="layers" id="layers"></div>
+  <div class="bar" style="margin:4px 0"><div class="zoom">Zoom <input type="range" id="zoom" min="0.5" max="4" step="0.25" value="1"><span id="zl">fit</span></div>
+    <span class="meta">Hover a row to see its swatch and text on the image. Click a box on the image to jump to its row.</span></div>
+  <div class="stage" id="stage"><div class="inner" id="inner"><img id="img" alt="legend crop"><svg id="svg"></svg></div></div>
+  <div class="cols">
+    <div>
+      <table><thead><tr><th>#</th><th>swatch</th><th>extracted label</th><th>verdict</th><th>correct label / note</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div>
+      <div class="panel"><h3>Overall</h3>
+        <div class="seg" id="status"><button data-s="good">all good</button><button data-s="partial">minor issues</button><button data-s="problems">broken</button></div>
+        <h3 style="margin-top:12px">Missing entries <span class="meta">(one per line, as written in the legend)</span></h3>
+        <textarea id="missing" placeholder="e.g. COAL&#10;NO SAMPLE"></textarea>
+        <h3 style="margin-top:10px">What's going wrong</h3>
+        <textarea id="notes" placeholder="e.g. labels in column 3 are shifted one row down; the title 'Rock Types' is read as an entry"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="primary" id="save">Save review</button><span id="saved"></span></div>
+        <div class="meta" style="margin-top:6px">Saved to <code>lithology-data/legend_review/</code>. All reviews: <a href="/api/legend/reviews" target="_blank">/api/legend/reviews</a></div>
+      </div>
+      <div class="panel"><h3>Most similar swatches <span class="meta">(the column classifier may confuse these)</span></h3><div class="pairs" id="pairs"></div></div>
+    </div>
+  </div>
+</template>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let LOGS=[],cur=null,method=localStorage.getItem('lr.method')||'grid',data=null,review=null,filter='all';
+const VERDICTS=[['ok','ok','v-ok'],['label','wrong label','v-bad'],['swatch','wrong swatch','v-bad'],['merged','merged w/ other','v-bad'],['bogus','not an entry','v-bad']];
+const LAYERS={old:[['words','OCR text','#888'],['swatches','swatch candidates','#2457d6'],['rejected','rejected blobs','#d33'],['links','swatch → label','#0a8'],['unowned','unused swatches','#e80']],
+              grid:[['words','full-legend OCR','#888'],['columns','columns','#a6f'],['cells','cells','#0a8'],['swatches','swatches','#2457d6'],['restored','restored swatches','#e80'],['pieces','cell text','#c0c'],['rejected','rejected blobs','#d33']]};
+const show=JSON.parse(localStorage.getItem('lr.layers')||'{}');
+const on=k=>show[method+k]??!['words','rejected','pieces'].includes(k);
+
+async function loadLogs(){LOGS=await (await fetch('/api/legend/logs')).json();renderLogs()}
+function renderLogs(){
+  const q=$('q').value.toLowerCase();
+  $('logs').innerHTML=LOGS.filter(l=>l.name.toLowerCase().includes(q)&&(filter==='all'||(filter==='todo'?!l.review:l.review===filter||(filter==='problems'&&l.review==='partial'))))
+    .map(l=>`<div class="log ${l.image_found?'':'noimg'} ${cur===l.name?'on':''}" data-n="${esc(l.name)}" title="${l.image_found?'':'image not found'}"><span class="dot ${l.review||''}"></span>${esc(l.name)}</div>`).join('');
+}
+$('q').oninput=renderLogs;
+$('filt').onclick=e=>{const b=e.target.closest('button');if(!b)return;filter=b.dataset.f;[...$('filt').children].forEach(x=>x.classList.toggle('on',x===b));renderLogs()};
+$('logs').onclick=e=>{const d=e.target.closest('.log');if(!d||d.classList.contains('noimg'))return;open(d.dataset.n)};
+
+async function open(name,force=false){
+  cur=name;renderLogs();history.replaceState(null,'','#'+encodeURIComponent(name));
+  const m=$('main');m.innerHTML='';m.append($('tpl').content.cloneNode(true));
+  $('title').textContent=name;
+  [...$('methods').children].forEach(b=>{b.classList.toggle('on',b.dataset.m===method);b.onclick=()=>{method=b.dataset.m;localStorage.setItem('lr.method',method);open(cur)}});
+  $('rerun').onclick=()=>open(cur,true);
+  $('meta').innerHTML='<span class="spin"></span>Running OCR on the legend…';
+  const [d,rv]=await Promise.all([fetch(`/api/legend/${encodeURIComponent(name)}?method=${method}${force?'&force=true':''}`).then(r=>r.json()),
+                                 fetch(`/api/legend/${encodeURIComponent(name)}/review`).then(r=>r.json())]);
+  if(cur!==name)return;
+  if(d.error){$('meta').textContent='Error: '+d.error;return}
+  data=d;review=rv||{};
+  const dbg=d.debug;
+  $('meta').innerHTML=`${d.entries.length} entries · ${dbg.words.length} OCR text boxes · ${dbg.swatches.length} swatches`+
+    (dbg.layout?` · layout: labels <b>${dbg.layout}</b> of swatches · ${dbg.columns.length} columns`:'')+
+    ` · crop ${dbg.crop_size[0]}×${dbg.crop_size[1]} px · computed ${esc(d.computed_at)} in ${d.seconds}s`+
+    (review.method&&review.method!==method?` · <span class="tag">saved review was made on the ${esc(review.method)} method</span>`:'');
+  $('layers').innerHTML=LAYERS[method].map(([k,l,c])=>`<label><input type="checkbox" data-k="${k}" ${on(k)?'checked':''}><span class="sw" style="background:${c}"></span>${l}</label>`).join('');
+  $('layers').onchange=e=>{show[method+e.target.dataset.k]=e.target.checked;localStorage.setItem('lr.layers',JSON.stringify(show));draw()};
+  const img=$('img');img.src=`/api/legend/${encodeURIComponent(name)}/crop.png?t=${Date.now()}`;
+  img.onload=()=>{fit();draw()};
+  $('zoom').oninput=()=>fit(+$('zoom').value);
+  renderRows();renderPairs();renderReview();
+}
+let scale=1;
+function fit(z){
+  const [W,H]=data.debug.crop_size,st=$('stage');
+  const base=Math.min((st.clientWidth-2)/W,1.0)||1;scale=z?base*z:base;
+  if(!z){$('zoom').value=1}
+  $('zl').textContent=Math.round(scale*100)+'%';
+  $('img').style.width=W*scale+'px';$('img').style.height=H*scale+'px';
+  $('inner').style.width=W*scale+'px';$('inner').style.height=H*scale+'px';
+  renderRows();
+}
+window.addEventListener('resize',()=>data&&fit(+$('zoom').value||undefined));
+
+function rect(b,c,{dash,w=1.5,fill='none',cls='',tip='',op=1}={}){
+  return `<rect x="${b[0]}" y="${b[1]}" width="${Math.max(1,b[2]-b[0])}" height="${Math.max(1,b[3]-b[1])}" fill="${fill}" stroke="${c}"
+    stroke-width="${w}" vector-effect="non-scaling-stroke" ${dash?'stroke-dasharray="4 3"':''} class="${cls}" opacity="${op}"><title>${esc(tip)}</title></rect>`}
+function center(b){return[(b[0]+b[2])/2,(b[1]+b[3])/2]}
+function draw(hl=-1){
+  const d=data.debug,[W,H]=d.crop_size,svg=$('svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);let s='';
+  const L=k=>on(k);
+  if(L('rejected'))for(const r of d.rejected)s+=rect(r.box,'#d33',{dash:1,w:1,tip:'rejected: '+r.why,op:.7});
+  if(L('words'))for(const w of d.words)s+=rect(w.box,'#888',{w:1,tip:'OCR: '+w.text});
+  if(method==='old'){
+    const owned=new Set(d.links.map(l=>l.swatch));
+    if(L('swatches'))d.swatches.forEach((b,i)=>{if(owned.has(i))s+=rect(b,'#2457d6',{tip:'swatch '+i})});
+    if(L('unowned'))for(const i of d.unowned_swatches){const cl=(d.claims||[]).find(c=>c.swatch===i);
+      s+=rect(d.swatches[i],'#e80',{dash:1,tip:`unused swatch ${i}`+(cl&&cl.word!=null?` (wanted "${d.words[cl.word].text}" but a closer swatch took it)`:' (no label near it)')})}
+    if(L('links'))for(const l of d.links){const[a,b]=[center(d.swatches[l.swatch]),center(d.words[l.word].box)];
+      s+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#0a8" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`}
+    if(L('links'))for(const o of d.orphans){if(o.joined_to==null){s+=rect(d.words[o.word].box,'#d33',{dash:1,tip:'text not used: '+d.words[o.word].text});continue}
+      const[a,b]=[center(d.words[o.joined_to].box),center(d.words[o.word].box)];
+      s+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#c0c" stroke-width="1.5" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"><title>continuation joined to "${esc(d.words[o.joined_to].text)}"</title></line>`}
+  }else{
+    if(L('columns'))for(const c of d.columns)s+=`<rect x="${c.x0}" y="0" width="${c.x1-c.x0}" height="${H}" fill="#a6f" opacity=".08"/>`;
+    if(L('cells'))d.cells.forEach(c=>s+=rect(c.cell,c.skip?'#d33':'#0a8',{dash:!!c.skip,w:1,tip:c.skip?'cell skipped: '+c.skip:'cell: '+c.raw_text}));
+    if(L('swatches'))for(const b of d.swatches)s+=rect(b,'#2457d6',{tip:'swatch'});
+    if(L('restored'))for(const b of d.restored)s+=rect(b,'#e80',{w:2,tip:'restored swatch (not found as a blob)'});
+    if(L('pieces'))for(const c of d.cells)for(const p of c.pieces)s+=rect(p.box,'#c0c',{w:1,tip:'cell OCR: '+p.text});
+  }
+  if(hl>=0){const e=data.entries[hl];s+=rect(e.swatch,'#ff0',{w:3,fill:'rgba(255,230,0,.25)'});
+    const tb=textBox(hl);if(tb)s+=rect(tb,'#ff0',{w:3,fill:'rgba(255,230,0,.15)'})}
+  // clickable entry swatches
+  data.entries.forEach((e,i)=>s+=`<rect x="${e.swatch[0]}" y="${e.swatch[1]}" width="${e.swatch[2]-e.swatch[0]}" height="${e.swatch[3]-e.swatch[1]}" fill="transparent" style="cursor:pointer" data-i="${i}"><title>${esc(e.label)}</title></rect>`);
+  svg.innerHTML=s;
+}
+function textBox(i){
+  const d=data.debug,e=data.entries[i];
+  if(method==='grid'){const c=d.cells.find(c=>c.swatch.join()===e.swatch.join());if(c&&c.pieces.length){const p=c.pieces.map(p=>p.box);
+    return[Math.min(...p.map(b=>b[0])),Math.min(...p.map(b=>b[1])),Math.max(...p.map(b=>b[2])),Math.max(...p.map(b=>b[3]))]}return null}
+  const si=d.swatches.findIndex(b=>b[0]===e.swatch[0]&&b[1]===e.swatch[1]);const l=d.links.find(l=>l.swatch===si);if(!l)return null;
+  const ws=[l.word,...d.orphans.filter(o=>o.joined_to===l.word).map(o=>o.word)].map(w=>d.words[w].box);
+  return[Math.min(...ws.map(b=>b[0])),Math.min(...ws.map(b=>b[1])),Math.max(...ws.map(b=>b[2])),Math.max(...ws.map(b=>b[3]))];
+}
+document.addEventListener('click',e=>{const r=e.target.closest('#svg rect[data-i]');if(!r)return;const tr=document.querySelector(`#rows tr[data-i="${r.dataset.i}"]`);
+  if(tr){tr.scrollIntoView({block:'center',behavior:'smooth'});highlight(+r.dataset.i)}});
+
+const ents=()=>review.method===method?(review.entries||[]):[];
+function entryReview(i){const e=data.entries[i];return ents().find(r=>r.i===i&&r.label===e.label)||ents().find(r=>r.label===e.label&&r.raw_text===e.raw_text)||{}}
+function renderRows(){
+  if(!data||!$('rows'))return;
+  const [W,H]=data.debug.crop_size,src=$('img').src;
+  $('rows').innerHTML=data.entries.map((e,i)=>{const r=entryReview(i);const[x0,y0,x1,y1]=e.swatch;const k=Math.min(62/Math.max(1,x1-x0),20/Math.max(1,y1-y0));
+    return `<tr data-i="${i}" class="${e.ignored?'ign':''}"><td>${i+1}</td>
+    <td><div class="thumb" style="background-image:url('${src}');background-size:${W*k}px ${H*k}px;background-position:${-x0*k}px ${-y0*k}px;width:${(x1-x0)*k+2}px;height:${(y1-y0)*k+2}px"></div></td>
+    <td><b>${esc(e.label)}</b>${e.ignored?` <span class="tag">${esc(e.ignored)}</span>`:''}${e.raw_text!==e.label?`<div class="raw">OCR: ${esc(e.raw_text)}</div>`:''}</td>
+    <td><div class="verd">${VERDICTS.map(([v,l,c])=>`<button class="${c} ${r.verdict===v?'on':''}" data-v="${v}">${l}</button>`).join('')}</div></td>
+    <td><input data-fix value="${esc(r.fix||'')}" placeholder="${esc(e.label)}"></td></tr>`}).join('');
+}
+function highlight(i){document.querySelectorAll('#rows tr').forEach(t=>t.classList.toggle('hl',+t.dataset.i===i));draw(i)}
+document.addEventListener('mouseover',e=>{const tr=e.target.closest('#rows tr');if(tr)highlight(+tr.dataset.i)});
+document.addEventListener('click',e=>{const b=e.target.closest('.verd button');if(!b)return;const tr=b.closest('tr');
+  const on=!b.classList.contains('on');tr.querySelectorAll('.verd button').forEach(x=>x.classList.remove('on'));b.classList.toggle('on',on);
+  if(on&&b.dataset.v!=='ok')tr.querySelector('input').focus();dirty()});
+document.addEventListener('input',e=>{if(e.target.matches('[data-fix],#missing,#notes'))dirty()});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'&&data){e.preventDefault();save()}});
+function dirty(){const s=$('saved');if(s)s.textContent=''}
+
+function renderPairs(){
+  $('pairs').innerHTML=(data.closest_pairs||[]).map(p=>`<div><span>${esc(data.entries[p.a].label)} ↔ ${esc(data.entries[p.b].label)}</span><span class="meta">${p.dist.toFixed(3)}</span></div>`).join('')||'<span class="meta">—</span>';
+}
+function renderReview(){
+  [...$('status').children].forEach(b=>{b.classList.toggle('on',b.dataset.s===review.status);
+    b.onclick=()=>{const was=b.classList.contains('on');[...$('status').children].forEach(x=>x.classList.remove('on'));if(!was)b.classList.add('on');dirty()}});
+  $('missing').value=review.missing||'';$('notes').value=review.notes||'';
+  $('save').onclick=save;
+  if(review.saved_at)$('saved').textContent='saved '+review.saved_at;
+}
+async function save(){
+  const entries=[...document.querySelectorAll('#rows tr')].map(tr=>{const i=+tr.dataset.i,e=data.entries[i];
+    const v=tr.querySelector('.verd button.on');return{i,label:e.label,raw_text:e.raw_text,verdict:v?v.dataset.v:null,fix:tr.querySelector('input').value.trim()}})
+    .filter(r=>r.verdict||r.fix);
+  const st=document.querySelector('#status button.on');
+  let status=st?st.dataset.s:null;
+  if(!status&&entries.length)status=entries.some(r=>r.verdict&&r.verdict!=='ok')||$('missing').value.trim()?'problems':'good';
+  const body={method,status,entries,missing:$('missing').value,notes:$('notes').value};
+  const r=await fetch(`/api/legend/${encodeURIComponent(cur)}/review`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){$('saved').textContent='save failed';return}
+  review={...body,saved_at:new Date().toLocaleString()};$('saved').textContent='saved ✓';
+  const l=LOGS.find(l=>l.name===cur);if(l){l.review=status;renderLogs()}
+}
+loadLogs().then(()=>{const h=decodeURIComponent(location.hash.slice(1));if(h&&LOGS.some(l=>l.name===h))open(h)});
+</script>
+</body></html>

@@ -43,6 +43,7 @@ class Job:
         self.page: Path | None = None
         self.image = None  # PIL image of the page (kept for zooms)
         self.overview: Path | None = None
+        self.overview_layout: dict | None = None
         self.finished = threading.Event()
 
 
@@ -77,6 +78,7 @@ class JobManager:
                 log("drawing")
                 job.overview = drawing.draw(job.page, job.annotation_path, job.result,
                                             drawing.default_scale(job.image.height), job.tmp, tif=True)
+                job.overview_layout = drawing.read_layout(job.overview)
                 log(f"{len(job.result['intervals'])} intervals")
                 job.status = "done"
         except Exception as e:
@@ -86,12 +88,12 @@ class JobManager:
             job.finished.set()
 
     def annotated_image(self, job: Job, scale: float | None = None, y_range=None, tif=False) -> Path:
-        """Draw (part of) the job's log. Returns the PNG preview path, or with tif=True the
-        high-resolution TIF (`scale` then sets the TIF's size; default full resolution)."""
+        """Draw (part of) the job's log. Returns the PNG preview path (`scale` sets its size), or with
+        tif=True the full-resolution TIF."""
         if tif:
-            out = job.tmp / f"annotated_{scale or 'full'}.tif"
+            out = job.tmp / "annotated_full.tif"
             if not out.exists():
-                drawing.render_tif(job.image, job.annotation_path, job.result, out, scale=scale, y_range=y_range)
+                drawing.render_tif(job.image, job.annotation_path, job.result, out, y_range=y_range)
             return out
         scale = scale or drawing.default_scale(job.image.height)
         return drawing.draw(job.page, job.annotation_path, job.result, scale, job.tmp,

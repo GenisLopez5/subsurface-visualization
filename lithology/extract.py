@@ -337,7 +337,9 @@ def clean_label(text: str) -> str:
     return " ".join(words)
 
 
-def parse_legend(img, box, verbose=False):
+def parse_legend(img, box, verbose=False, debug: dict | None = None):
+    """Legend entries. If `debug` is a dict, it is filled with the intermediate steps (OCR words,
+    swatch candidates, rejected blobs, swatch->label links, continuation joins), in legend-crop pixels."""
     lx0, ly0, lx1, ly1 = box
     arr = crop_rgb(img, box)
     H, W = arr.shape[:2]
@@ -361,10 +363,14 @@ def parse_legend(img, box, verbose=False):
     th_med = float(np.median([w["box"][3] - w["box"][1] for w in words])) if words else 10.0
     min_side = max(6, 0.5 * th_med)  # smaller blobs are leftovers of letters, not swatches
     comps = []
+    rejected = []
     for sl in ndimage.find_objects(lab):
         y0, y1, x0, x1 = sl[0].start, sl[0].stop, sl[1].start, sl[1].stop
         w, h = x1 - x0, y1 - y0
         if w < min_side or h < min_side or w > 0.6 * W or h > 0.6 * H:  # specks, or the legend's outer frame
+            if debug is not None and max(w, h) >= 4:
+                rejected.append({"box": [int(x0), int(y0), int(x1), int(y1)],
+                                 "why": "too big (frame?)" if w > 0.6 * W or h > 0.6 * H else "too small"})
             continue
         comps.append([x0, y0, x1, y1])
 
@@ -397,6 +403,9 @@ def parse_legend(img, box, verbose=False):
             wi = best[1]
             if wi not in owner or best[0] < owner[wi][0]:
                 owner[wi] = (best[0], ci)
+        if debug is not None:
+            debug.setdefault("claims", []).append({"swatch": ci, "word": int(best[1]) if best else None,
+                                                   "dist": float(best[0]) if best else None})
 
     # labels without a swatch are continuation lines/words of a neighbouring label ("Sand and" / "Sandstone")
     # Each orphan joins the closest text piece (owner word or an already-joined orphan), top to bottom.
@@ -419,6 +428,8 @@ def parse_legend(img, box, verbose=False):
         if best:
             names[best[1]] += " " + words[oi]["text"]
             pieces.append((words[oi]["box"], best[1]))
+        if debug is not None:
+            debug.setdefault("orphans", []).append({"word": int(oi), "joined_to": int(best[1]) if best else None})
 
     entries = []
     for wi, (_, ci) in owner.items():
@@ -436,6 +447,18 @@ def parse_legend(img, box, verbose=False):
                 "feature": feat,
             }
         )
+    if debug is not None:
+        debug.update({
+            "crop_box": [int(v) for v in box], "crop_size": [int(W), int(H)], "upscale": up,
+            "background": [int(v) for v in bg], "min_side": float(min_side),
+            "words": [{"box": [float(v) for v in w["box"]], "text": w["text"]} for w in words],
+            "swatches": [[int(v) for v in c] for c in comps],
+            "rejected": rejected,
+            "links": [{"word": int(wi), "swatch": int(ci), "dist": float(d)} for wi, (d, ci) in owner.items()],
+            "unowned_swatches": [i for i in range(len(comps)) if i not in {ci for _, ci in owner.values()}],
+        })
+        debug.setdefault("orphans", [])
+        debug.setdefault("claims", [])
     if verbose:
         print(f"[legend] {len(words)} text boxes, {len(comps)} swatch candidates, {len(entries)} entries:", file=sys.stderr)
         for e in entries:
