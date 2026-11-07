@@ -1,12 +1,36 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 build/
 dist/
 .venv/
-# working folder (uploads, cache, temp files)
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# working folder (uploads, extraction cache, temp files, v1 upload spool)
 lithology-data/
+
 # data never goes into the repo
 *.tif
 *.tiff
 *.pdf
+dataset/
+results/
+debug/
+
+# secrets (DATABASE_URL etc.); .env.example is the template to copy
+.env
+.env.*
+!.env.example
+*credentials*.txt
+
+# editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.log

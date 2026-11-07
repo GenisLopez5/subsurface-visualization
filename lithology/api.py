@@ -21,6 +21,9 @@ For the web UI (asynchronous, with progress)
     POST /api/batch/{id}/stop
     GET  /api/batch/{id}/picture/{i}
 
+For frontends (files and results stored in Postgres; see files_api.py)
+    /api/v1/...                       uploads, batches, files, downloads, previews, health
+
 Desktop helpers (only with --desktop, when the server runs on the user's machine)
     POST /api/desktop/pick-folder     native folder dialog (zenity)
     POST /api/desktop/open            open a file/folder in the default app
@@ -30,6 +33,7 @@ Interactive docs: /docs
 """
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import shutil
@@ -39,6 +43,8 @@ import zipfile
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from .annotations import IMAGE_EXT, AnnotationNotFound, AnnotationStore, ImageStore, load_annotation, resolve_annotation
@@ -56,8 +62,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = AnnotationStore(s.annotation_dirs)
     images = ImageStore(s.image_dirs)
     jobs = JobManager(s)
-    app = FastAPI(title="Lithology extraction API", version="0.1.0",
-                  description="Mud-log image -> lithology intervals (CSV) + annotated image.")
+    hooks = {}
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app):
+        await run_in_threadpool(hooks["start"])  # DB connect + schema + worker (v1 file API)
+        yield
+        hooks["stop"]()
+
+    app = FastAPI(title="Lithology extraction API", version="0.2.0", lifespan=lifespan,
+                  description="Mud-log image -> lithology intervals (CSV) + annotated image.\n\n"
+                              "**/api/v1**: file management for frontends (uploads, status, results in Postgres).")
+    if s.cors_origins:
+        app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"],
+                           allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag"])
+    from . import files_api
+
+    hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store)
     app.state.settings, app.state.jobs = s, jobs
 
     # ------------------------------------------------------------------ helpers

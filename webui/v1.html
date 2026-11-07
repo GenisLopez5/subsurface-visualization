@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1 API test</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 16px; color: #222; background: #fff; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  fieldset { border: 1px solid #ccc; margin: 0 0 16px; padding: 10px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #eee; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; }
+  .uploading, .queued { color: #996; } .processing { color: #06c; } .done { color: #080; }
+  .error, .needs_annotation { color: #c00; }
+  a, button.link { margin-right: 6px; }
+  button.link { background: none; border: 0; color: #06c; cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+  textarea { width: 100%; font: 12px monospace; }
+  pre { background: #f5f5f5; padding: 8px; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+  img { max-width: 100%; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<h1>/api/v1 test page</h1>
+<div id="health">health: …</div>
+
+<fieldset>
+  <legend>Upload</legend>
+  <p><input type="file" id="files" multiple accept=".tif,.tiff,.pdf,.png,.jpg,.jpeg,.json"></p>
+  <p>Batch name (optional): <input id="name"></p>
+  <p>Annotations JSON (optional, e.g. from the box algorithm):<br><textarea id="ann" rows="3" placeholder='{"bounding_boxes": {...}}  or  {"log.tif": {...}}'></textarea></p>
+  <button id="up">Upload</button>
+  <pre id="upOut" hidden></pre>
+</fieldset>
+
+<fieldset>
+  <legend>Files (refreshes every 2 s)</legend>
+  <button id="delSel">Delete selected</button>
+  <table>
+    <thead><tr><th><input type="checkbox" id="all"></th><th>name</th><th>status</th><th>computed</th><th>boxes from</th><th>intervals</th><th>actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</fieldset>
+
+<fieldset id="previewBox" hidden>
+  <legend>Preview <button class="link" id="closePrev">close</button></legend>
+  <img id="prev" alt="">
+</fieldset>
+
+<script>
+const API = '/api/v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const selected = new Set();
+
+async function health() {
+  try { const h = await (await fetch(API + '/health')).json();
+    $('health').textContent = `health: db ${h.db}, worker ${h.worker_alive ? 'alive' : 'down'}, queued ${h.queued ?? '-'}, ` +
+      `uploads pending ${h.uploads_pending ?? '-'}` + (h.processing ? `, processing ${h.processing.name} (${h.processing.last_log})` : '');
+  } catch (e) { $('health').textContent = 'health: server not reachable'; }
+}
+
+async function refresh() {
+  let d;
+  try { d = await (await fetch(API + '/files?limit=200')).json(); } catch { return; }
+  if (!d.items) { $('rows').innerHTML = `<tr><td colspan="7">${esc(JSON.stringify(d))}</td></tr>`; return; }
+  $('rows').innerHTML = d.items.map(f => {
+    const dl = Object.keys(f.files).map(k => `<a href="${API}/files/${f.id}/download/${k}">${k}</a>`).join('');
+    const pv = Object.keys(f.preview).map(k => `<button class="link" data-prev="${f.preview[k]}">view ${k === 'original' ? 'original' : 'result'}</button>`).join('');
+    const fix = f.status === 'needs_annotation' || f.status === 'error'
+      ? `<button class="link" data-ann="${f.id}">set boxes…</button>` : '';
+    return `<tr>
+      <td><input type="checkbox" data-sel="${f.id}" ${selected.has(f.id) ? 'checked' : ''}></td>
+      <td>${esc(f.name)}<br><small>${f.id}</small></td>
+      <td class="${f.status}" title="${esc(f.error || f.note || '')}">${f.status}${f.error ? ' ⓘ' : ''}</td>
+      <td>${f.computed ? 'yes' : 'no'}</td>
+      <td>${esc(f.annotation_source || '-')}</td>
+      <td>${f.stats?.intervals ?? ''}</td>
+      <td>${dl}${pv}${fix}<button class="link" data-re="${f.id}">reprocess</button><button class="link" data-del="${f.id}">delete</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7">no files yet</td></tr>';
+}
+
+$('up').onclick = async () => {
+  const fd = new FormData();
+  for (const f of $('files').files) fd.append('files', f);
+  if ($('name').value.trim()) fd.append('name', $('name').value.trim());
+  if ($('ann').value.trim()) fd.append('annotations', $('ann').value.trim());
+  $('up').disabled = true; $('upOut').hidden = false; $('upOut').textContent = 'uploading…';
+  try {
+    const r = await fetch(API + '/uploads', { method: 'POST', body: fd });
+    const j = await r.json();
+    $('upOut').textContent = r.ok
+      ? `batch ${j.batch.id}\n` + j.files.map(f => `${f.id}  ${f.status}  ${f.name}`).join('\n') +
+        (j.rejected.length ? `\nrejected: ${JSON.stringify(j.rejected)}` : '') +
+        (j.unused_annotations.length ? `\nunused JSONs: ${j.unused_annotations.join(', ')}` : '')
+      : `${r.status}: ${JSON.stringify(j.detail ?? j)}`;
+  } catch (e) { $('upOut').textContent = 'failed: ' + e; }
+  $('up').disabled = false; $('files').value = ''; refresh();
+};
+
+$('rows').onclick = async e => {
+  const t = e.target;
+  if (t.dataset.sel) { t.checked ? selected.add(t.dataset.sel) : selected.delete(t.dataset.sel); return; }
+  if (t.dataset.prev) { $('prev').src = t.dataset.prev + '?width=1200'; $('previewBox').hidden = false; return; }
+  if (t.dataset.del) { await fetch(`${API}/files/${t.dataset.del}`, { method: 'DELETE' }); selected.delete(t.dataset.del); }
+  if (t.dataset.re) { const r = await fetch(`${API}/files/${t.dataset.re}/reprocess`, { method: 'POST' });
+    if (!r.ok) console.log('reprocess:', await r.text()); }
+  if (t.dataset.ann) {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+    inp.onchange = async () => {
+      const fd = new FormData(); fd.append('file', inp.files[0]);
+      const r = await fetch(`${API}/files/${t.dataset.ann}/annotation`, { method: 'PUT', body: fd });
+      if (!r.ok) $('upOut').hidden = false, $('upOut').textContent = 'set boxes: ' + await r.text();
+      refresh();
+    };
+    inp.click(); return;
+  }
+  refresh();
+};
+
+$('all').onchange = e => { document.querySelectorAll('[data-sel]').forEach(c => {
+  c.checked = e.target.checked; c.checked ? selected.add(c.dataset.sel) : selected.delete(c.dataset.sel); }); };
+$('delSel').onclick = async () => {
+  if (!selected.size) return;
+  await fetch(`${API}/files?ids=${[...selected].join(',')}`, { method: 'DELETE' });
+  selected.clear(); $('all').checked = false; refresh();
+};
+$('closePrev').onclick = () => { $('previewBox').hidden = true; $('prev').removeAttribute('src'); };
+
+health(); refresh();
+setInterval(() => { health(); refresh(); }, 2000);
+</script>
+</body>
+</html>

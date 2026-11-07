@@ -28,12 +28,21 @@ def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
-def load_annotation(path) -> dict:
-    ann = json.loads(Path(path).read_text())
+def validate_annotation(ann) -> dict:
+    """Check an annotation dict: bounding_boxes with the three required boxes, each [x0, y0, x1, y1]."""
     boxes = ann.get("bounding_boxes") if isinstance(ann, dict) else None
     if not isinstance(boxes, dict) or any(k not in boxes for k in REQUIRED_BOXES):
-        raise ValueError(f"not an annotation file (needs bounding_boxes with {', '.join(REQUIRED_BOXES)})")
+        raise ValueError(f"not an annotation (needs bounding_boxes with {', '.join(REQUIRED_BOXES)})")
+    for k in REQUIRED_BOXES:
+        b = boxes[k]
+        if not (isinstance(b, (list, tuple)) and len(b) == 4 and all(isinstance(v, (int, float)) for v in b)
+                and b[0] < b[2] and b[1] < b[3]):
+            raise ValueError(f"bounding box {k} must be [x0, y0, x1, y1] with x0 < x1 and y0 < y1")
     return ann
+
+
+def load_annotation(path) -> dict:
+    return validate_annotation(json.loads(Path(path).read_text()))
 
 
 def _name_keys(*names: str) -> set[str]:
@@ -128,3 +137,62 @@ def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector
     out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
     out.write_text(json.dumps(ann, indent=2))
     return out, "bounding boxes detected automatically"
+
+
+# ---------------------------------------------------------------------------------------------
+# Annotation for an uploaded image (the /api/v1 file API). Sources, first match wins:
+#   uploaded  a JSON file sent in the same upload, paired by its image_name or by file name
+#   provided  annotation JSON sent as data (e.g. by an external box-extraction algorithm)
+#   dataset   an existing JSON from the annotation folders (AnnotationStore)
+#   detector  the configured BoxDetector (LITHO_DETECTOR="module:object")
+
+def annotation_matches(ann: dict, image_name: str, json_name: str = "") -> bool:
+    return bool(_name_keys(Path(image_name).name) & _name_keys(ann.get("image_name", ""), json_name))
+
+
+def load_detector(spec: str | None) -> BoxDetector | None:
+    """'package.module:object'. The object may be a detector instance, a class (instantiated with no
+    arguments) or a plain function image_path -> annotation dict."""
+    if not spec:
+        return None
+    import importlib
+    import inspect
+
+    mod, _, attr = spec.partition(":")
+    obj = getattr(importlib.import_module(mod), attr or "detector")
+    if inspect.isclass(obj):
+        obj = obj()
+    if not hasattr(obj, "detect") and callable(obj):
+        fn = obj
+
+        class _Fn:
+            def detect(self, image_path):
+                return fn(image_path)
+        obj = _Fn()
+    return obj
+
+
+def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[tuple[str, dict]],
+                              provided: dict | None, store: AnnotationStore | None,
+                              detector: BoxDetector | None = None) -> tuple[dict | None, str | None, str]:
+    """(annotation, source, note) for one uploaded image; (None, None, reason) when nothing fits.
+    `uploaded`: (json file name, annotation) pairs from the same upload. `provided`: an annotation
+    already chosen for this image from the request data."""
+    for json_name, ann in uploaded:
+        if annotation_matches(ann, image_name, json_name):
+            return ann, "uploaded", json_name
+    if provided is not None:
+        return validate_annotation(provided), "provided", ""
+    if store is not None:
+        try:
+            path, how = resolve_annotation(image_path, store)
+            ann = load_annotation(path)
+            return ann, "dataset", path.name + (f" ({how})" if how else "")
+        except AnnotationNotFound:
+            pass
+    if detector is not None:
+        try:
+            return validate_annotation(detector.detect(Path(image_path))), "detector", ""
+        except Exception as e:  # a failing detector just means "no annotation yet"
+            return None, None, f"detector failed: {type(e).__name__}: {e}"
+    return None, None, "no annotation JSON uploaded, provided or found in the dataset"

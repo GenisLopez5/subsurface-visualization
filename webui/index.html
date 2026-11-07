@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lithology Extractor</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2230;--muted:#6b7280;--line:#e2e5ea;--accent:#2457d6;--accent-soft:#eaf0ff;
+      --err:#b42318;--err-soft:#fdecea;--warn:#9a5b00;--warn-soft:#fff4e0;--ok:#067647}
+@media (prefers-color-scheme:dark){:root{--bg:#13161b;--card:#1c2027;--ink:#e7e9ec;--muted:#9aa3b2;--line:#2d323b;
+      --accent:#7ea4ff;--accent-soft:#1d2a47;--err:#ff8a80;--err-soft:#3a1f1d;--warn:#ffc46b;--warn-soft:#3a2d17;--ok:#6ee7a8}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:32px 16px}h1{font-size:22px;margin:0 0 20px}
+.drop{background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:44px 20px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .big{font-size:18px;font-weight:600}.drop .small{color:var(--muted);font-size:13px;margin-top:6px}
+.drop.need{border-color:var(--warn);background:var(--warn-soft)}.drop.need .big{color:var(--warn)}
+.drop.error{border-color:var(--err);background:var(--err-soft)}.drop.error .big{color:var(--err)}
+.drop.busy{cursor:default;border-style:solid}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;
+      animation:s 0.8s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes s{to{transform:rotate(1turn)}}
+.pick{margin:12px 2px 0;color:var(--muted);font-size:13px;display:flex;gap:8px;align-items:center}
+select,input[type=number]{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit}
+.pick select{flex:1;min-width:0}
+details.log{margin-top:10px;text-align:left}details.log summary{cursor:pointer;color:var(--muted);font-size:13px;text-align:center}
+#log{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;max-height:200px;overflow:auto;color:var(--muted);margin:8px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:20px}
+.title{font-weight:600;font-size:17px;word-break:break-all}.meta{color:var(--muted);font-size:13px;margin-top:2px}
+.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:14px}.actions a{color:var(--accent);text-decoration:none;cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:6px 14px;font:inherit;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.zoom{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}.zoom input{width:96px}
+button.go{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 14px;font:inherit;cursor:pointer}
+.imgwrap{overflow:auto;max-height:75vh;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:12px}
+.imgwrap img{display:block}#zimg{max-width:none}#oimg{max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:right}
+th:nth-child(3),td:nth-child(3){text-align:left}.tbl{max-height:50vh;overflow:auto}
+details summary{cursor:pointer}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}.top h1{margin:0}
+.pathrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pathrow input{flex:1;min-width:0;background:var(--bg);color:var(--ink);
+  border:1px solid var(--line);border-radius:6px;padding:7px 10px;font:13px ui-monospace,monospace}.pathrow label{flex:1}
+button.ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.prog{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:12px 0 6px}.prog div{height:100%;width:0;background:var(--accent);transition:width .4s}
+.st-done{color:var(--ok)}.st-error{color:var(--err)}.st-running{color:var(--accent);font-weight:600}.st-skipped{color:var(--muted)}
+#bTbl td:first-child,#bTbl th:first-child{text-align:left;word-break:break-all}#bTbl a{color:var(--accent);cursor:pointer;margin-left:8px}
+#bLog{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;max-height:240px;overflow:auto;color:var(--muted)}
+.f{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+.f:last-child{border-bottom:0}.f .k{color:var(--muted);min-width:170px}.f code{flex:1;min-width:0;word-break:break-all;font-size:12px}
+.f a{color:var(--accent);cursor:pointer;font-size:13px}ul{margin:6px 0 0;padding-left:20px;font-size:14px}
+</style></head><body><main>
+<div class="top"><h1>Lithology extractor</h1>
+  <div class="seg" id="modes"><button id="mSingle" class="on">Single file</button><button id="mBatch">Batch</button></div></div>
+<section id="single">
+
+<div class="drop" id="drop" tabindex="0">
+  <div class="big" id="dBig">Drop a JSON, PDF or TIF</div>
+  <div class="small" id="dSmall">or click to browse</div>
+  <details class="log" id="logBox" hidden><summary>Log</summary><pre id="log"></pre></details>
+  <input type="file" id="file" multiple accept=".json,.pdf,.tif,.tiff,.png,.jpg,.jpeg" hidden>
+</div>
+<div class="pick">Dataset <select id="ds"><option value="">-</option></select></div>
+
+<div id="results" hidden>
+  <div class="card">
+    <div class="title" id="rTitle"></div>
+    <div class="meta" id="rMeta"></div>
+    <div class="actions"><a id="dlj">Download JSON</a><a id="dlc">Download CSV</a><a id="again">Run again</a></div>
+    <details style="margin-top:10px"><summary class="meta" style="display:inline">Legend</summary><ul id="rLegend"></ul></details>
+  </div>
+  <div class="card">
+    <div class="bar">
+      <div class="seg"><button id="tZoom" class="on">Zoom</button><button id="tAll">Whole log</button></div>
+      <div class="zoom" id="zctl">depth <input type="number" id="ztop"> to <input type="number" id="zbot"><button class="go" id="zgo">Show</button></div>
+    </div>
+    <div class="imgwrap" id="zwrap"><img id="zimg" alt="zoomed result"></div>
+    <div class="imgwrap" id="owrap" hidden><img id="oimg" alt="whole log"></div>
+  </div>
+  <div class="card"><b>Files</b>
+    <div id="files"></div></div>
+  <div class="card"><details><summary id="tSum">Intervals</summary><div class="tbl"><table id="tbl"></table></div></details></div>
+</div>
+</section>
+
+<section id="batch" hidden>
+  <div class="card" style="margin-top:0">
+    <div class="meta" style="margin-bottom:8px">Folder with an image subfolder and a JSON subfolder.</div>
+    <div class="pathrow"><input id="bPath" placeholder="/path/to/folder" spellcheck="false"><button class="go" id="bBrowse">Browse…</button></div>
+    <div id="bScan" class="meta" style="margin-top:12px"></div>
+    <div class="pathrow" id="bStartRow" hidden style="margin-top:12px">
+      <label class="meta"><input type="checkbox" id="bRedo"> Reprocess existing results</label>
+      <button class="go" id="bStart">Start</button></div>
+  </div>
+  <div class="card" id="bRun" hidden>
+    <div class="bar"><b id="bState">Running</b><button class="ghost" id="bStop">Stop</button></div>
+    <div class="prog"><div id="bBar"></div></div>
+    <div class="meta" id="bNow"></div>
+    <div class="f" style="margin-top:8px"><span class="k">Output folder</span><code id="bOut"></code>
+      <a data-copy="" id="bOutCopy">Copy</a><a data-open="" id="bOutOpen">Open</a></div>
+    <div class="tbl" style="margin-top:8px"><table id="bTbl"></table></div>
+    <details class="log"><summary>Log</summary><pre id="bLog"></pre></details>
+  </div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let job=null,timer=null,keep=null,busy=false;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function dropState(kind,big,small){const d=$('drop');d.className='drop'+(kind?' '+kind:'');
+  $('dBig').innerHTML=big;$('dSmall').innerHTML=small||'';}
+function idle(){keep=null;dropState('','Drop a JSON, PDF or TIF','or click to browse')}
+
+fetch('/api/dataset').then(r=>r.json()).then(items=>{for(const it of items){if(!it.image_found)continue;
+  const o=document.createElement('option');o.value=it.path;o.textContent=`${it.name}  [${it.split}]`;$('ds').appendChild(o)}});
+
+const drop=$('drop');
+drop.onclick=e=>{if(!busy&&e.target.tagName!=='SUMMARY'&&!e.target.closest('details'))$('file').click()};
+drop.onkeydown=e=>{if(e.key==='Enter'&&!busy)$('file').click()};
+drop.ondragover=e=>{e.preventDefault();if(!busy)drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');if(!busy&&e.dataTransfer.files.length)start({files:e.dataTransfer.files})};
+$('file').onchange=e=>{if(e.target.files.length)start({files:e.target.files});e.target.value=''};
+$('ds').onchange=()=>{if($('ds').value)start({dataset:$('ds').value})};
+$('again').onclick=async()=>{if(busy||!job)return;const j=await (await fetch(`/api/jobs/${job}/rerun`,{method:'POST'})).json();track(j)};
+
+async function start(opts){
+  if(busy)return;busy=true;
+  const fd=new FormData();const files=[...(opts.files||[])];files.forEach(f=>fd.append('file',f));
+  if(keep&&!opts.dataset)fd.append('keep',keep);if(opts.dataset)fd.append('dataset',opts.dataset);
+  const names=files.map(f=>f.name).concat(keep&&!opts.dataset?[keep]:[]).join(' + ')||opts.dataset.split('/').pop();
+  dropState('busy',`<span class="spin"></span>${files.some(f=>f.size>5e6)?'Uploading':'Starting'} ${esc(names)}`,'');
+  $('logBox').hidden=true;$('log').textContent='';
+  let r,j;try{r=await fetch('/api/jobs',{method:'POST',body:fd});j=await r.json()}catch(e){j={error:'could not reach the server'};r={ok:false}}
+  if(!r.ok){busy=false;
+    if(j.need){keep=j.keep;dropState('need',esc(j.error),`Drop the ${j.need==='json'?'JSON':'image or PDF'} · <a href="#" id="cancel">cancel</a>`);
+      $('cancel').onclick=e=>{e.preventDefault();e.stopPropagation();idle()}}
+    else{keep=null;dropState('error',esc(j.error),'')}
+    return}
+  keep=null;track(j)}
+function track(j){busy=true;job=j.id;
+  dropState('busy',`<span class="spin"></span>Processing ${esc(j.image)}`,'');$('logBox').hidden=false;
+  clearInterval(timer);timer=setInterval(poll,1500);poll()}
+
+async function poll(){const j=await (await fetch('/api/jobs/'+job)).json();
+  $('log').textContent=j.log.join('\n');$('log').scrollTop=1e9;
+  const msg=[...j.log].reverse().find(l=>!l.startsWith('  '))||'';
+  if(j.status==='running'){$('dSmall').textContent=msg.replace(/^\[\w+\]\s*/,'');return}
+  clearInterval(timer);busy=false;
+  if(j.status==='error'){dropState('error','Error',esc(j.error));return}
+  idle();show(j)}
+
+function show(j){const s=j.summary;$('results').hidden=false;
+  $('rTitle').textContent=s.image;
+  $('rMeta').innerHTML=`${s.n_intervals} intervals${s.depth_range?` · ${s.depth_range[0]}–${s.depth_range[1]}`:''} · ${esc(s.depth_fit)}`;
+  $('rLegend').innerHTML=s.legend.map(l=>`<li>${esc(l)}</li>`).join('');
+  $('dlj').href=`/api/jobs/${job}/result.json`;$('dlc').href=`/api/jobs/${job}/result.csv`;
+  $('oimg').src=`/api/jobs/${job}/overview.png?t=${Date.now()}`;
+  $('tSum').textContent=`All intervals (${j.intervals.length})`;
+  $('tbl').innerHTML='<tr><th>top</th><th>bottom</th><th>lithology</th><th>top_y</th><th>bottom_y</th><th>conf.</th></tr>'+
+    j.intervals.map(r=>`<tr><td>${r.top_depth}</td><td>${r.bottom_depth}</td><td>${esc(r.lithology)}</td><td>${r.top_y}</td><td>${r.bottom_y}</td><td>${r.confidence}</td></tr>`).join('');
+  if(s.depth_range){const a=s.depth_range[0],b=s.depth_range[1];$('ztop').value=Math.round(a);$('zbot').value=Math.round(Math.min(b,a+Math.max(100,(b-a)/10)));zoom()}
+  files=j.files;renderFiles();
+  tab('zoom');$('results').scrollIntoView({behavior:'smooth'})}
+let files={};
+function renderFiles(){$('files').innerHTML=Object.entries(files).map(([k,v])=>`<div class="f"><span class="k">${esc(k)}</span>
+  <code>${esc(v)}</code><a data-copy="${esc(v)}">Copy</a><a data-open="${esc(v)}">Open</a></div>`).join('')}
+$('files').onclick=async e=>{const a=e.target;
+  if(a.dataset.copy){try{await navigator.clipboard.writeText(a.dataset.copy);a.textContent='Copied'}catch{a.textContent='Copy failed'}setTimeout(()=>a.textContent='Copy',1500)}
+  if(a.dataset.open){const fd=new FormData();fd.append('path',a.dataset.open);const r=await fetch('/api/desktop/open',{method:'POST',body:fd});
+    a.textContent=r.ok?'Opened':'Failed';setTimeout(()=>a.textContent='Open',1500)}};
+async function zoom(){const r=await fetch(`/api/jobs/${job}/zoom.png?top=${$('ztop').value}&bottom=${$('zbot').value}&scale=0.5`);
+  if(!r.ok)return;const old=$('zimg').src;$('zimg').src=URL.createObjectURL(await r.blob());if(old.startsWith('blob:'))URL.revokeObjectURL(old);
+  const p=r.headers.get('X-File-Path');if(p){files['Zoom image']=p;
+  renderFiles()}}
+function tab(t){$('tZoom').classList.toggle('on',t==='zoom');$('tAll').classList.toggle('on',t==='all');
+  $('zwrap').hidden=t!=='zoom';$('zctl').style.visibility=t==='zoom'?'visible':'hidden';$('owrap').hidden=t!=='all'}
+$('zgo').onclick=zoom;$('tZoom').onclick=()=>tab('zoom');$('tAll').onclick=()=>tab('all');
+['ztop','zbot'].forEach(id=>$(id).onkeydown=e=>{if(e.key==='Enter')zoom()});
+
+// ---------- mode switch ----------
+function mode(m){$('mSingle').classList.toggle('on',m==='single');$('mBatch').classList.toggle('on',m==='batch');
+  $('single').hidden=m!=='single';$('batch').hidden=m!=='batch';try{localStorage.setItem('mode',m)}catch{}}
+$('mSingle').onclick=()=>mode('single');$('mBatch').onclick=()=>mode('batch');
+try{if(localStorage.getItem('mode')==='batch')mode('batch')}catch{}
+
+// ---------- batch ----------
+let bid=null,btimer=null;
+async function post(url,data){const fd=new FormData();for(const[k,v]of Object.entries(data||{}))fd.append(k,v);
+  const r=await fetch(url,{method:'POST',body:fd});return [r.ok,await r.json()]}
+$('bBrowse').onclick=async()=>{$('bBrowse').disabled=true;
+  const[ok,j]=await post('/api/desktop/pick-folder',{start:$('bPath').value});$('bBrowse').disabled=false;
+  if(!ok){$('bScan').innerHTML=`<span class="st-error">${esc(j.error)}</span>`;return}
+  if(j.path){$('bPath').value=j.path;scan()}};
+$('bPath').onkeydown=e=>{if(e.key==='Enter')scan()};$('bPath').onchange=scan;
+async function scan(){const path=$('bPath').value.trim();if(!path)return;$('bStartRow').hidden=true;
+  $('bScan').innerHTML='<span class="spin"></span>Scanning';
+  const[ok,j]=await post('/api/batch/scan',{path});
+  if(!ok){$('bScan').innerHTML=`<span class="st-error">${esc(j.error)}</span>`;return}
+  const done=j.pairs.filter(p=>p.done).length,short=p=>p.split('/').pop();
+  $('bScan').innerHTML=`JSON: <b>${esc(short(j.json_folder))}/</b> · Images: <b>${esc(short(j.image_folder))}/</b> · <b>${j.pairs.length}</b> pairs${done?` (${done} already processed)`:''}
+    ${j.json_without_image.length?`<br><span class="st-error">No image for:</span> ${j.json_without_image.map(esc).join(', ')}`:''}
+    ${j.images_without_json.length?`<br>No JSON for: ${j.images_without_json.map(esc).join(', ')}`:''}
+    <br>Output: <code>${esc(j.results_folder)}</code>`;
+  $('bStartRow').hidden=!j.pairs.length}
+$('bStart').onclick=async()=>{const[ok,j]=await post('/api/batch',{path:$('bPath').value.trim(),force:$('bRedo').checked?'1':'0'});
+  if(!ok){$('bScan').innerHTML+=`<br><span class="st-error">${esc(j.error)}</span>`;return}
+  bid=j.id;$('bRun').hidden=false;$('bStart').disabled=true;$('bStop').disabled=false;clearInterval(btimer);btimer=setInterval(bpoll,2000);bpoll()};
+$('bStop').onclick=async()=>{if(!bid)return;await post(`/api/batch/${bid}/stop`);$('bStop').disabled=true;$('bStop').textContent='Stopping…'};
+async function bpoll(){const j=await (await fetch('/api/batch/'+bid)).json();
+  $('bBar').style.width=(100*j.finished/j.n)+'%';
+  $('bState').textContent=j.status==='running'?`Running · ${j.finished} / ${j.n}`:j.status==='done'?`Done · ${j.n} logs`:
+    j.status==='stopped'?`Stopped · ${j.finished} / ${j.n}`:'Error: '+(j.error||'');
+  const cur=j.items.find(i=>i.status==='running');
+  $('bNow').textContent=cur?`${cur.log}: ${(j.log[j.log.length-1]||'').trim()}`:'';
+  $('bOut').textContent=j.results_folder;$('bOutCopy').dataset.copy=j.results_folder;$('bOutOpen').dataset.open=j.results_folder;
+  $('bTbl').innerHTML='<tr><th>log</th><th>status</th><th>intervals</th><th>px/ft</th><th></th></tr>'+j.items.map((it,i)=>{
+    const cls='st-'+(it.status||'').split(' ')[0];
+    const links=it.files&&it.files.tif?`<a data-open="${esc(it.files.tif)}">image</a><a data-open="${esc(it.files.csv)}">csv</a><a href="/api/batch/${bid}/picture/${i}" target="_blank" style="text-decoration:none">view</a>`:'';
+    return `<tr><td>${esc(it.log)}</td><td class="${cls}" title="${esc(it.error||'')}">${esc(it.status)}${it.error?' ⓘ':''}</td>
+      <td>${it.intervals??''}</td><td>${it.px_per_depth_unit??''}</td><td>${links}</td></tr>`}).join('');
+  $('bLog').textContent=j.log.join('\n');
+  if(j.status!=='running'){clearInterval(btimer);$('bStart').disabled=false;$('bStop').disabled=true;$('bStop').textContent='Stop';scan()}}
+// copy / open links anywhere in the batch card
+$('bRun').onclick=async e=>{const a=e.target;
+  if(a.dataset.copy!==undefined&&a.dataset.copy){try{await navigator.clipboard.writeText(a.dataset.copy);a.textContent='Copied'}catch{a.textContent='Copy failed'}setTimeout(()=>a.textContent='Copy',1500)}
+  if(a.dataset.open){const t=a.textContent;const[ok]=await post('/api/desktop/open',{path:a.dataset.open});a.textContent=ok?'opened':'failed';setTimeout(()=>a.textContent=t,1500)}};
+</script></body></html>

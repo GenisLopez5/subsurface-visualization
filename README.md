@@ -15,9 +15,14 @@ python3 -m venv .venv
 ## Run the API
 
 ```bash
-.venv/bin/python -m lithology serve --annotations /path/to/bbox_annotation --port 8000
+cp .env.example .env    # then fill in DATABASE_URL (for /api/v1)
+.venv/bin/python -m lithology serve --annotations /path/to/bbox_annotation --ui webui --port 8000
 # interactive API docs: http://127.0.0.1:8000/docs
 ```
+
+`webui/` holds two pages: `index.html` (the original UI: single log, zoom, batch on a server folder;
+uses `/api/...`, local files) and `v1.html` (a minimal test page for the `/api/v1` file API: upload,
+status by file, downloads, previews, delete; everything stored in Postgres).
 
 | flag | meaning |
 |---|---|
@@ -61,6 +66,58 @@ r.raise_for_status()
 z = zipfile.ZipFile(io.BytesIO(r.content))
 ```
 
+## File API for frontends: `/api/v1`
+
+Uploads, processing status and results, all stored in Postgres (e.g. Tiger Data). Set
+`DATABASE_URL=postgres://user:pass@host:port/db?sslmode=require` in the environment or in a `.env`
+file (looked up from the current folder upwards; never commit it). Without it, `/api/v1` answers 503
+and everything else still works. Browser frontends on other origins: set `LITHO_CORS_ORIGINS`
+(comma-separated, default `http://localhost:3000,http://localhost:5173`, `*` for any).
+
+The flow is upload, poll by id, then download:
+
+```bash
+# 1. upload one image or many (+ their JSONs if you have them). Returns at once, with an id per file
+curl -F files=@log1.tif -F files=@log2.tif -F files=@log1.json -F name="my batch" \
+     http://127.0.0.1:8000/api/v1/uploads
+# 2. ask whether they have finished
+curl "http://127.0.0.1:8000/api/v1/status?ids=<id1>,<id2>"
+#    -> [{"id": ..., "status": "done", "computed": true, ...}, ...]
+# 3. download the results
+curl -OJ http://127.0.0.1:8000/api/v1/files/<id>/download/result_tif
+curl -OJ http://127.0.0.1:8000/api/v1/files/<id>/download/result_csv
+```
+
+File status: `uploading` → `queued` (or `needs_annotation`) → `processing` → `done` | `error`.
+`computed` is true once the result TIF and CSV are stored. Every file response also has
+`outputs` (which of `original`, `annotation`, `result_tif`, `result_csv`, `result_json` exist) and their URLs.
+
+| | |
+|---|---|
+| `POST /api/v1/uploads` | multipart `files` (images `.tif/.tiff/.pdf/.png/.jpg` and optional JSONs), optional `name` and `annotations`. Returns the batch, the files with their ids, `rejected` files and `unused_annotations`. |
+| `GET /api/v1/status?ids=a,b,c` | light status of many files, for polling |
+| `GET /api/v1/files/{id}` | full detail: status, error, stats, outputs, download and preview URLs |
+| `GET /api/v1/files?status=&batch_id=&q=&limit=&offset=` | list/search files |
+| `GET /api/v1/files/{id}/download/{kind}` | `original`, `annotation`, `result_tif`, `result_csv` or `result_json` (`?inline=true` to show instead of download) |
+| `GET /api/v1/files/{id}/preview/{kind}?width=1200` | PNG of `original` or `result_tif` for an `<img>` (browsers can't show TIFs) |
+| `PUT /api/v1/files/{id}/annotation` | set/replace the bounding boxes (JSON body, or a JSON `file` in multipart) and process again |
+| `POST /api/v1/files/{id}/reprocess?force=` | compute again (`force=true` also ignores the extraction cache) |
+| `DELETE /api/v1/files/{id}` · `DELETE /api/v1/files?ids=a,b` | delete files (any status, even while processing) with all their data |
+| `GET /api/v1/batches` · `GET /api/v1/batches/{id}` · `DELETE /api/v1/batches/{id}` | uploads with counts per status / with their files / delete everything in one |
+| `GET /api/v1/health` | database, worker, queue length, what is processing now |
+
+Where each image's bounding boxes come from (first match wins), recorded in `annotation_source`:
+`uploaded` (a JSON in the same upload, paired by `image_name` or file name), `provided` (the
+`annotations` form field: one annotation object, `{"<image file name>": annotation}` or a list
+matched by `image_name`, e.g. from a box-extraction algorithm), `dataset` (existing JSONs from
+`--annotations` folders), `detector` (see below). With none of them the file waits in
+`needs_annotation` until `PUT .../annotation`.
+
+Uploads are spooled to disk and stored in Postgres in the background, so the request returns at once.
+Processing runs one file at a time from a queue kept in the database, so queued and interrupted files
+are picked up again after a restart. Limit per file: `LITHO_MAX_UPLOAD_MB` (200).
+Tables: `litho_batches`, `litho_files`, `litho_blobs` (created automatically).
+
 ## Other endpoints
 
 Used by the web UI. Full list with parameters at `/docs`.
@@ -87,7 +144,7 @@ Job state is kept in memory and is lost on restart. Results on disk and the cach
 
 Batch: the folder holds an image sub-folder and a JSON sub-folder (any names). It writes:
 
-- `results/<log>.csv`, `results/<log>.png` and `results/summary.csv`
+- `results/<log>.csv`, `results/<log>.tif` (full resolution) and `results/summary.csv`
 - `debug/<log>.json`: depth labels read, legend entries, per-interval confidence
 
 Logs that already have results are skipped.
@@ -99,19 +156,23 @@ Logs that already have results are skipped.
 | `extract.py` | the algorithm: depth calibration (OCR + robust line fit), legend parsing, column segmentation and matching |
 | `annotations.py` | where the bounding boxes come from: `AnnotationStore` (existing JSONs), `BoxDetector` interface, `resolve_annotation()` |
 | `notebook_viz.py` | the challenge notebook's drawing functions, copied verbatim (regenerate from the notebook, don't edit) |
-| `drawing.py` | calls the notebook's `visualize_results` from temp files (page, JSON, CSV); PNG/TIF output |
+| `drawing.py` | PNG previews with the notebook's `visualize_results`; full-resolution TIF with `render_tif` |
 | `pipeline.py` | one log end to end, with an extraction cache |
 | `batch.py` | folder scan, image/JSON pairing, batch run |
 | `jobs.py` | background jobs (one extraction at a time) |
 | `api.py` | FastAPI app |
+| `files_api.py` | `/api/v1` file API for frontends |
+| `db.py` | Postgres storage (batches, files, blobs) and the processing queue |
+| `worker.py` | background upload storage and processing for `/api/v1` |
 | `config.py` | settings |
 
 ### Adding automatic bounding-box detection
 
 Implement `annotations.BoxDetector`: `detect(image_path) -> dict`, returning the same format as the
 JSONs (`width`, `height`, `bounding_boxes` with `depth_column`, `interpreted_lithology_column`,
-`lithology_legend`). Then pass it to `resolve_annotation(..., detector=...)` in `api.py`. Existing JSONs
-are still used first, and the detector runs only when none matches. No other code needs to change.
+`lithology_legend`). For `/api/v1`, set `LITHO_DETECTOR=package.module:object` (an instance, a class or a
+plain function `image_path -> dict`). Uploaded, provided and existing JSONs are still used first, and
+the detector runs only when none matches. No other code needs to change.
 
 ## How the extraction works
 
