@@ -53,7 +53,8 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.err { background: var(--err-soft); color: var(--err); }
 .job-pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.icon-btn { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; width: 30px; height: 28px; cursor: pointer; }
+.icon-btn, button.icon-btn { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; width: 30px; height: 28px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
 #banner .bar { padding: 10px 20px; background: var(--err-soft); color: var(--err); border-bottom: 1px solid var(--line); }
 main { max-width: 1500px; margin: 0 auto; padding: 18px 20px 60px; }
 
@@ -248,3 +249,16 @@ ol.how .t { font-weight: 650; }
 select[size] { padding: 4px; font-family: var(--mono); font-size: 12.5px; }
 select[size] option { padding: 3px 6px; border-radius: 4px; }
 select[size] optgroup { font-family: system-ui, sans-serif; color: var(--muted); font-style: normal; }
+
+/* lightbox */
+img.zoomable { cursor: zoom-in; }
+#lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(15,15,14,.88); display: flex; flex-direction: column; }
+#lightbox .lb-bar { display: flex; gap: 10px; align-items: center; padding: 10px 16px; color: #ecebe6; }
+#lightbox .lb-title { font-weight: 650; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lightbox .lb-hint { color: #9c9b94; }
+#lightbox .btn { background: #2a2a28; color: #ecebe6; border-color: #44433f; }
+#lightbox .lb-body { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 0 16px 16px; }
+#lightbox .lb-body img { background: #fff; border-radius: 6px; cursor: zoom-in; max-width: none; margin: auto; }
+#lightbox .lb-body img.fit { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; cursor: zoom-in; }
+#lightbox .lb-body img:not(.fit) { cursor: zoom-out; }
+@media (max-width: 760px) { #lightbox .lb-hint { display: none; } }

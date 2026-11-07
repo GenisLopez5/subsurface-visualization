@@ -1126,6 +1126,57 @@ def get_tiles(rid: str, name: str):
         return m
 
 
+def image_for(d: Path, stem: str, summary: Optional[dict]) -> Optional[Path]:
+    """The original scan of a log: from the run's own files, or the path recorded in summary.json."""
+    for folder in (d / "work", d / "data"):
+        jp = folder / f"{stem}.json"
+        if jp.is_file():
+            try:
+                name = json.loads(jp.read_text()).get("image_name")
+            except (OSError, json.JSONDecodeError):
+                name = None
+            cands = ([folder / name] if name else []) + [p for p in sorted(folder.glob(stem + ".*"))
+                                                           if p.suffix.lower() in IMAGE_EXT]
+            for c in cands:
+                if c.is_file():
+                    return c
+    rec = next((r for r in (summary or {}).get("logs", []) if r["stem"] == stem), None)
+    if rec and rec.get("image") and Path(rec["image"]).is_file():
+        return Path(rec["image"])
+    return None
+
+
+@app.get("/api/runs/{rid}/original-legend/{stem}")
+def original_legend(rid: str, stem: str):
+    """The legend exactly as printed on the scan: the JSON's lithology_legend box cropped from the original image
+    (cached in tiles/)."""
+    d = run_path(rid)
+    try:
+        stem = safe_name(stem)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    out = d / "tiles" / f"{stem}__original_legend.png"
+    if not out.is_file():
+        summary = None
+        if (d / "outputs" / "summary.json").is_file():
+            summary = json.loads((d / "outputs" / "summary.json").read_text())
+        boxes = annotation_for(d, stem, summary)
+        img = image_for(d, stem, summary)
+        if not boxes or "lithology_legend" not in boxes or img is None:
+            raise HTTPException(404, "no legend box or original image for this log")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with TILE_LOCK:
+            if img.suffix.lower() == ".pdf":
+                from lithology import extract as LX
+                page = LX.load_page(img, json.loads(next((d / f / f"{stem}.json" for f in ("work", "data")
+                                                          if (d / f / f"{stem}.json").is_file())).read_text()))
+            else:
+                page = Image.open(img)
+            x0, y0, x1, y1 = (int(v) for v in boxes["lithology_legend"])
+            page.crop((max(0, x0), max(0, y0), min(page.width, x1), min(page.height, y1))).convert("RGB").save(out)
+    return FileResponse(out, headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/api/runs/{rid}/download")
 def download(rid: str, what: str = "csv"):
     """Zip of the results: 'csv' = every <stem>.csv + summary.json; 'all' = also every PNG."""

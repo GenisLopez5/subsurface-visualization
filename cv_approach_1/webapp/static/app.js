@@ -1115,7 +1115,7 @@ async function viewLog(id, stem) {
   const cl = (cid) => (r && r.clusters ? r.clusters[String(cid)] : null);
   const hasMetrics = r && r.metrics;
   const tabs = [["intervals", `Intervals <span class="count">${rows.length}</span>`], ["clusters", "Clusters"], ["legend", `Legend <span class="count">${r ? r.swatches.length : "–"}</span>`],
-    ["depth", "Depth"], ["info", "Info"], ...(hasMetrics ? [["acc", "Accuracy"]] : [])];
+    ["origlegend", "Original legend"], ["depth", "Depth"], ["info", "Info"], ...(hasMetrics ? [["acc", "Accuracy"]] : [])];
   let tab = store.get("logTab", "intervals");
   if (!tabs.some((t) => t[0] === tab)) tab = "intervals";
   let img = store.get("viewerImg", "column_png");
@@ -1226,15 +1226,22 @@ async function viewLog(id, stem) {
       <dl class="kv" style="margin-top:12px"><dt>${r.method === "lithology" ? "Lithologies found" : "k (clusters)"}</dt><dd>${r.k}</dd>${r.silhouette != null ? `<dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd>` : ""}<dt>Transition clusters removed</dt><dd>${(r.transition_clusters_removed || []).length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
     legend: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       ${r.swatches.length ? "" : `<div class="notice warn"><strong>No legend swatches found.</strong> Every cluster is named "Unknown". The swatch finder expects same-size framed squares with a readable name below or to the right.</div>`}
-      ${d.files.legend_png ? `<img class="legend-img" src="${file(d.files.legend_png)}" alt="Detected legend swatches">` : ""}
+      ${d.files.legend_png ? `<img class="legend-img zoomable" data-big="${file(d.files.legend_png)}" data-title="Detected legend swatches" src="${file(d.files.legend_png)}" alt="Detected legend swatches" title="Click to enlarge">` : ""}
       ${r.swatches.length ? `<table class="data" style="margin-top:10px"><thead><tr><th>Swatch name (OCR)</th><th>Looks like</th></tr></thead><tbody>
         ${r.swatches.map((w) => `<tr><td>${esc(w.name)}${w.ignored ? ` <span class="muted small">(ignored: ${esc(w.ignored)})</span>` : ""}</td><td class="${w.look_alikes.length ? "no" : "muted"}">${esc(w.look_alikes.join(", ") || "–")}</td></tr>`).join("")}</tbody></table>` : ""}`,
     depth: () => !r ? `<div class="muted">Available when the run has finished.</div>` : !r.depth ? `<div class="notice warn"><strong>No depth found.</strong> OCR could not read at least two consistent depth labels, so depths are empty.</div>` : `
-      ${d.files.depth_png ? `<img class="depth-img" src="${file(d.files.depth_png)}" alt="Depth calibration">` : ""}
+      ${d.files.depth_png ? `<img class="depth-img zoomable" data-big="${file(d.files.depth_png)}" data-title="Depth calibration" src="${file(d.files.depth_png)}" alt="Depth calibration" title="Click to enlarge">` : ""}
       <dl class="kv" style="margin-top:10px"><dt>Equation</dt><dd class="mono">depth = ${r.depth.a.toFixed(6)} · y + ${fmtNum(r.depth.b, 2)}</dd>
         <dt>Labels used / read</dt><dd>${r.depth.n_used} / ${r.depth.n_read}</dd>${r.depth.model ? `<dt>Model</dt><dd>${esc(r.depth.model)} · rms ${fmtNum(r.depth.rms_px, 2)} px</dd>` : ""}
         <dt>Depth range</dt><dd>${rows.length && rows[0].top_depth != null ? `${fmtNum(rows[0].top_depth, 1)} → ${fmtNum(rows[rows.length - 1].bottom_depth, 1)}` : "–"}</dd>
         <dt>Scale</dt><dd>${fmtNum(1 / r.depth.a, 1)} px per depth unit</dd></dl>`,
+    origlegend: () => {
+      const src = `/api/runs/${id}/original-legend/${enc(stem)}`;
+      const box = d.boxes && d.boxes.lithology_legend;
+      return `<div class="small muted" style="margin-bottom:8px">The legend exactly as printed on the scan (the JSON's <code>lithology_legend</code> box${box ? `: x ${box[0]}–${box[2]}, y ${box[1]}–${box[3]}` : ""}). Compare it with the <b>Legend</b> tab to spot missing or misread names. Click to enlarge.</div>
+        <img class="legend-img zoomable" data-big="${src}" data-title="Original legend (from the scan)" src="${src}" alt="Original legend" title="Click to enlarge"
+          onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'notice warn',textContent:'Original legend not available (no legend box or original image).'}))">`;
+    },
     info: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       <dl class="kv"><dt>Colour scan</dt><dd>${r.colour_scan ? "yes (fill colour used)" : "no"}</dd>
         <dt>Method</dt><dd>${esc(r.method || "cv")}${r.legend_method ? ` · legend: ${esc(r.legend_method)}` : ""}</dd>
@@ -1278,3 +1285,28 @@ window.addEventListener("hashchange", route);
 refreshHealth();
 setInterval(refreshHealth, 3000);
 route();
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Lightbox: click any .zoomable image to see it big (click = fit / actual size, Esc or ✕ closes)
+// ---------------------------------------------------------------------------------------------------------------------
+function openLightbox(src, title) {
+  closeLightbox();
+  const box = document.createElement("div");
+  box.id = "lightbox";
+  box.innerHTML = `<div class="lb-bar"><span class="lb-title">${esc(title || "")}</span><span class="small lb-hint">click the image: fit ↔ actual size · Esc to close</span>
+    <a class="btn" href="${esc(src)}" target="_blank" rel="noopener">Open in new tab ↗</a><button class="btn" id="lbClose" aria-label="Close">✕</button></div>
+    <div class="lb-body"><img src="${esc(src)}" alt="${esc(title || "")}" class="fit"></div>`;
+  document.body.appendChild(box);
+  document.body.style.overflow = "hidden";
+  const img = $("img", box);
+  img.onclick = (e) => { e.stopPropagation(); img.classList.toggle("fit"); };
+  $(".lb-body", box).onclick = (e) => { if (e.target === e.currentTarget) closeLightbox(); };
+  $("#lbClose").onclick = closeLightbox;
+}
+function closeLightbox() { const b = $("#lightbox"); if (b) { b.remove(); document.body.style.overflow = ""; } }
+document.addEventListener("click", (e) => {
+  const z = e.target.closest("img.zoomable");
+  if (z) openLightbox(z.dataset.big || z.src, z.dataset.title || z.alt);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
+window.addEventListener("hashchange", closeLightbox);
