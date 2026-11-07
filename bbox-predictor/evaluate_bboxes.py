@@ -24,7 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--iou-threshold", type=float, default=0.8)
     parser.add_argument("--no-previews", action="store_true", help="Skip bounded visual comparisons")
+    parser.add_argument("--chunk-previews", action="store_true", help="Include raw/selected chunk detections and retries in the visual review")
     args = parser.parse_args(argv)
+    if args.no_previews and args.chunk_previews:
+        parser.error("--chunk-previews cannot be combined with --no-previews")
     try:
         report = evaluate_backend(
             args.manifest,
@@ -39,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
             conf=args.conf,
             iou_threshold=args.iou_threshold,
             save_previews=not args.no_previews,
+            debug_previews=args.chunk_previews,
         )
     except (OSError, ValueError, KeyError, RuntimeError, ImportError) as exc:
         parser.exit(2, f"Evaluation failed: {exc}\n")

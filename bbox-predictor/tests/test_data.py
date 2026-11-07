@@ -115,6 +115,15 @@ def test_load_annotation_rejects_outside_or_wrong_dimensions(tmp_path):
         load_annotation(path)
 
 
+def test_load_annotation_rejects_columns_with_different_vertical_extents(tmp_path):
+    data = annotation()
+    data["bounding_boxes"]["interpreted_lithology_column"][1] += 1
+    path = tmp_path / "annotation.json"
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="share ymin/ymax"):
+        load_annotation(path)
+
+
 def test_truncated_tiff_pixels_fail_with_actionable_io_error(tmp_path):
     path = tmp_path / "truncated.tif"
     Image.new("RGB", (32, 64), "white").save(path)

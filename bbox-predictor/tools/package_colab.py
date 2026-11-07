@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 from pathlib import Path
 import sys
 import zipfile
@@ -11,9 +13,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from bbox_detector.common import find_dataset
+from bbox_detector.inference import POSTPROCESS_VERSION
 
 
 SOURCE_FILES = (
+    "docs/legend_multiview.md", "docs/legend_multiview_policy.json", "tools/evaluate_legend_multiview.py",
     "README.md", "docs/classical.md", "docs/legend.md", "docs/legend_optimization.md", "docs/legend_review.json", "docs/legend_policy.json", "requirements.txt", "requirements-cv.txt", "requirements-dev.txt", "pytest.ini",
     "prepare_dataset.py", "train_bboxes.py", "predict_bboxes.py", "evaluate_bboxes.py",
     "tools/package_colab.py", "tools/build_templates.py", "tools/benchmark_bboxes.py", "tools/train_legend.py", "tools/evaluate_legend.py",
@@ -22,13 +26,21 @@ SOURCE_FILES = (
 )
 
 
+def build_manifest() -> dict:
+    inference_path = ROOT / "bbox_detector" / "inference.py"
+    return {
+        "postprocess_version": POSTPROCESS_VERSION,
+        "inference_sha256": hashlib.sha256(inference_path.read_bytes()).hexdigest(),
+        "inference_path": "bbox_detector/inference.py",
+    }
+
+
 def package_colab(dataset: str | Path | None, output: str | Path, *, include_data: bool = True) -> Path:
     output = Path(output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     sources = [(ROOT / name, name) for name in SOURCE_FILES]
     sources += [(p, str(p.relative_to(ROOT))) for directory in ("bbox_detector", "tests") for p in sorted((ROOT / directory).glob("*.py"))]
     if include_data:
-        import json
         dataset = find_dataset(dataset)
         for annotation in sorted((dataset / "bbox_annotation").glob("*.json")):
             data = json.loads(annotation.read_text())
@@ -47,6 +59,7 @@ def package_colab(dataset: str | Path | None, output: str | Path, *, include_dat
                 # TIFF input is already compressed; avoid costly recompression of ~1 GB.
                 compression = zipfile.ZIP_STORED if source.suffix.lower() in {".tif", ".tiff"} else zipfile.ZIP_DEFLATED
                 archive.write(source, name, compress_type=compression)
+            archive.writestr("build_manifest.json", json.dumps(build_manifest(), indent=2) + "\n")
         temporary.replace(output)
     finally:
         temporary.unlink(missing_ok=True)

@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--device", default=None, help="For example cpu or 0")
     parser.add_argument("--diagnostics", type=Path, help="Optional separate JSON explaining matches or refinements")
+    parser.add_argument("--preview-dir", type=Path, help="Optional visual review with final boxes and per-chunk detector evidence")
     parser.add_argument("--max-shift-px", type=int, default=12, help="Hybrid maximum native-pixel edge adjustment")
     parser.add_argument("--max-shift-fraction", type=float, default=0.15, help="Hybrid maximum adjustment as a fraction of column width")
     args = parser.parse_args(argv)
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Prediction failed: diagnostics must differ from input files and output", file=sys.stderr)
         return 2
     details = {"backend": args.backend}
+    trace: dict = {}
     try:
         if args.base_prediction is not None:
             prediction = json.loads(args.base_prediction.read_text())
@@ -78,7 +80,15 @@ def main(argv: list[str] | None = None) -> int:
             prediction = ClassicalDetector(args.templates).predict_document(args.image, diagnostics=details)
         else:
             try:
-                prediction = predict_document(args.image, weights=args.weights, imgsz=args.imgsz, confidence=args.conf, device=args.device, diagnostics=details)
+                prediction = predict_document(
+                    args.image,
+                    weights=args.weights,
+                    imgsz=args.imgsz,
+                    confidence=args.conf,
+                    device=args.device,
+                    diagnostics=details,
+                    trace=trace if args.preview_dir is not None else None,
+                )
             except InferenceError as exc:
                 if not args.legend_weights or not all(name in exc.partial_boxes for name in ("depth_column", "interpreted_lithology_column")):
                     raise
@@ -106,10 +116,31 @@ def main(argv: list[str] | None = None) -> int:
             details["legend"] = legend_details
         if set(prediction.get("bounding_boxes", {})) != {"depth_column", "interpreted_lithology_column", "lithology_legend"}:
             raise InferenceError("Prediction did not resolve all three regions", partial_boxes=prediction.get("bounding_boxes", {}))
+        if args.preview_dir is not None:
+            from bbox_detector.evaluation import save_prediction_review
+
+            save_prediction_review(
+                args.image,
+                prediction["bounding_boxes"],
+                args.preview_dir,
+                trace=trace or None,
+            )
         write_json(args.output, prediction)
         if args.diagnostics is not None:
             write_json(args.diagnostics, details)
     except (RuntimeError, ValueError, OSError, ImportError) as exc:
+        if args.preview_dir is not None and trace:
+            try:
+                from bbox_detector.evaluation import save_prediction_review
+
+                save_prediction_review(
+                    args.image,
+                    trace.get("final_boxes", {}),
+                    args.preview_dir,
+                    trace=trace,
+                )
+            except (RuntimeError, ValueError, OSError, ImportError) as preview_error:
+                details["preview_error"] = str(preview_error)
         if args.diagnostics is not None:
             details.update(error=str(exc), status="error")
             if isinstance(exc, InferenceError):

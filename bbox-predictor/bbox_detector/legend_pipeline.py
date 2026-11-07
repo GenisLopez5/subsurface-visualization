@@ -21,8 +21,11 @@ class LegendPolicy:
     max_gap_fraction: float = .05
     imgsz: int = 2048
     confidence: float = .05
+    multiview_retry: bool = False
 
     def __post_init__(self):
+        if not isinstance(self.multiview_retry, bool):
+            raise ValueError("multiview_retry must be boolean")
         if self.strategy not in {"baseline", "specialist", "fragments", "frame", "fragments_frame"}:
             raise ValueError("Unknown legend policy strategy")
         if not all(math.isfinite(v) for v in (self.min_relative_confidence, self.min_vertical_iou, self.max_gap_fraction, self.confidence)):
@@ -136,6 +139,14 @@ def apply_legend_policy(image_path, base_prediction, policy: LegendPolicy, *,
             frame_refiner = refine_legend_frame
         seed = frame_refiner(image_path, seed, column_top=top, diagnostics=geometry)
     band_details = {}
+    multiview_details = {}
+    if policy.multiview_retry and geometry.get("reason") in {"no_supported_frame", "ambiguous_frames"}:
+        if detector is None:
+            raise ValueError("Multiview retry requires a live legend detector")
+        from .legend_multiview import refine_legend_multiview
+        seed = refine_legend_multiview(image_path, seed, column_top=top, detector=detector,
+                                      imgsz=policy.imgsz, confidence=policy.confidence,
+                                      device=device, diagnostics=multiview_details)
     if band_detector is not None:
         seed = refine_legend_band(image_path, seed, column_top=top, detector=band_detector,
                                   imgsz=band_imgsz, confidence=policy.confidence,
@@ -145,5 +156,6 @@ def apply_legend_policy(image_path, base_prediction, policy: LegendPolicy, *,
     result["bounding_boxes"] = {name: boxes[name] for name in CLASS_NAMES}
     if diagnostics is not None:
         diagnostics.update(policy=policy.to_dict(), legend_specialist=details, frame=geometry,
-                           band_refiner=band_details, elapsed_seconds=time.perf_counter()-started)
+                           multiview=multiview_details, band_refiner=band_details,
+                           elapsed_seconds=time.perf_counter()-started)
     return result

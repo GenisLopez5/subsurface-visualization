@@ -73,8 +73,16 @@ python predict_bboxes.py \
   --image /ruta/document.tif \
   --weights artifacts/training/detector/weights/best.pt \
   --output artifacts/predictions/document.json \
+  --preview-dir artifacts/previews/document \
   --device cpu
 ```
+
+`--preview-dir` és opcional i no modifica el JSON públic. Genera un overview,
+zooms de capçalera/top/middle/bottom/llegenda, una imatge per chunk,
+`chunks_contact_sheet.jpg`, `trace.json` i un `index.html`. Les deteccions
+seleccionades es pinten en blau/taronja/lila, les descartades en gris, els
+reintents en groc, la caixa anterior al shared-Y discontínua i la final en
+magenta. Sense aquesta opció no es conserva la traça detallada.
 
 La sortida té aquest contracte:
 
@@ -105,6 +113,12 @@ python evaluate_bboxes.py \
   --weights artifacts/training/detector/weights/best.pt \
   --output artifacts/validation --device 0
 ```
+
+L'avaluació crea `visual_review/index.html`, ordenat pel pitjor error de vora Y,
+amb zooms que es poden inspeccionar sense dependre de l'overview comprimit. Afegeix
+`--chunk-previews` quan s'avalua directament amb pesos per incloure la traça i
+les imatges de tots els chunks. Amb `--predictions`, només es poden reconstruir
+les caixes finals perquè els JSON antics no contenen les deteccions crues.
 
 Es creen `report.json`, `per_document.csv`, JSON de prediccions i comparacions visuals amb anotació verda i predicció magenta. Les mètriques inclouen IoU per classe (mitjana, mediana i percentil 10), errors absoluts de cada vora, regions absents i percentatge de documents amb **les tres regions amb IoU ≥ 0,8**. Les prediccions absents o fallides continuen al denominador amb IoU zero. L’error de vores només es calcula per parelles presents i es mostra juntament amb el nombre de parelles.
 

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from PIL import Image
 
 from bbox_detector.common import CLASS_NAMES
-from bbox_detector.evaluation import aggregate_metrics, box_iou, document_metrics, evaluate_manifest, save_comparisons
+from bbox_detector.evaluation import aggregate_metrics, box_iou, document_metrics, evaluate_manifest, save_comparisons, save_prediction_review
 
 
 def three_boxes() -> dict[str, list[int]]:
@@ -110,6 +110,33 @@ class ComparisonTests(unittest.TestCase):
                 self.assertLessEqual(image.width, 1200)
                 self.assertLessEqual(image.height, 1800)
 
+    def test_prediction_review_writes_trace_chunks_contact_sheet_and_html(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_path = root / "page.tif"
+            Image.new("RGB", (100, 200), "white").save(image_path)
+            boxes = three_boxes()
+            trace = {
+                "schema_version": 1,
+                "postprocess_version": "shared-column-y-v1",
+                "width": 100,
+                "height": 200,
+                "tiles": [{"tile_id": 0, "box": [0, 0, 100, 100], "retry": False, "detection_ids": [0, 1]}],
+                "detections": [
+                    {"id": 0, "class_id": 0, "class_name": CLASS_NAMES[0], "box": [10, 50, 20, 100], "confidence": 0.9, "tile_id": 0, "retry": False, "selected": True},
+                    {"id": 1, "class_id": 0, "class_name": CLASS_NAMES[0], "box": [70, 10, 90, 90], "confidence": 0.95, "tile_id": 0, "retry": False, "selected": False},
+                ],
+                "boxes_before_shared_y": boxes,
+                "final_boxes": boxes,
+            }
+            output = root / "review"
+            paths = save_prediction_review(image_path, boxes, output, truth=boxes, trace=trace)
+            self.assertEqual(len(paths), 6)
+            for name in ("trace.json", "chunks_contact_sheet.jpg", "index.html", "chunks/chunk_0000.jpg"):
+                self.assertTrue((output / name).is_file(), name)
+            saved = json.loads((output / "trace.json").read_text())
+            self.assertEqual(saved["postprocess_version"], "shared-column-y-v1")
+
 
 class EvaluationIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -158,6 +185,29 @@ class EvaluationIntegrationTests(unittest.TestCase):
             self.assertEqual(image.suffix, ".tif")
             self.assertEqual(set(kwargs), {"weights", "device", "imgsz", "confidence"})
         self.assertEqual(len(report["documents"][0]["comparison_previews"]), 6)
+        self.assertTrue((self.root / "evaluation" / "visual_review" / "index.html").is_file())
+        self.assertTrue((self.root / "evaluation" / "visual_review" / "page0" / "index.html").is_file())
+
+    def test_debug_previews_pass_trace_and_render_chunks(self) -> None:
+        def fake_predictor(image, **kwargs):
+            trace = kwargs["trace"]
+            trace.update({
+                "schema_version": 1,
+                "postprocess_version": "shared-column-y-v1",
+                "width": 100,
+                "height": 200,
+                "tiles": [{"tile_id": 0, "box": [0, 0, 100, 100], "retry": True, "detection_ids": []}],
+                "detections": [],
+                "boxes_before_shared_y": self.truth,
+                "final_boxes": self.truth,
+            })
+            return {"image_name": image.name, "width": 100, "height": 200, "bounding_boxes": self.truth}
+
+        output = self.root / "debug_evaluation"
+        report = evaluate_manifest(self.manifest, None, output, predictor=fake_predictor, debug_previews=True)
+        self.assertTrue(report["settings"]["debug_previews"])
+        self.assertTrue((output / "visual_review" / "page0" / "chunks" / "chunk_0000.jpg").is_file())
+        self.assertTrue((output / "visual_review" / "page0" / "chunks_contact_sheet.jpg").is_file())
 
     def test_inference_error_preserves_partial_boxes_and_scores_missing(self) -> None:
         class FakeInferenceError(RuntimeError):

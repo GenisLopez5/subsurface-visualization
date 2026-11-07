@@ -44,7 +44,7 @@ Cada execució es guarda a
 - `training/`: pesos i logs del detector de llegenda.
 - `comparison.json`: resum del baseline i de cada confiança.
 - `final_best/report.json`: mètriques finals per document.
-- `final_best/comparisons/`: anotació verda i predicció magenta.
+- `final_best/visual_review/`: galeria navegable amb anotació verda i predicció magenta.
 - `legend_specialist.zip`: pesos, informe i codi necessari per continuar.
 
 El criteri principal és el nombre de documents on les tres regions obtenen

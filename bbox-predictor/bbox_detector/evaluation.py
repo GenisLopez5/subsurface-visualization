@@ -7,6 +7,7 @@ after inference for scoring and visual comparisons, never as detector input.
 from __future__ import annotations
 
 import csv
+import html
 import json
 import math
 import numbers
@@ -16,6 +17,7 @@ import statistics
 import threading
 import time
 from typing import Any, Callable, Mapping, Sequence
+from urllib.parse import quote
 
 from .common import CLASS_NAMES, open_scan, read_crop, write_json
 
@@ -206,6 +208,7 @@ def _draw_comparison(
     region: Sequence[int],
     title: str,
     canvas_width: int = 900,
+    before_shared_y: Mapping[str, Sequence[float]] | None = None,
 ) -> Any:
     from PIL import Image, ImageDraw
 
@@ -217,7 +220,7 @@ def _draw_comparison(
     font = _font()
     draw.text((10, 8), title, fill="black", font=font)
     draw.text((10, 31), "Green: annotation    Magenta: prediction", fill="black", font=font)
-    draw.text((10, 51), "D: depth    L: interpreted lithology    K: lithology legend", fill="black", font=_font(12))
+    draw.text((10, 51), "D: depth  L: interpreted lithology  K: legend  Dashed blue/orange: before shared-Y", fill="black", font=_font(12))
     x0, y0, x1, y1 = region
     scale_x = raster.width / (x1 - x0)
     scale_y = raster.height / (y1 - y0)
@@ -243,6 +246,20 @@ def _draw_comparison(
             label = f"{prefix} {dict(zip(CLASS_NAMES, ('D', 'L', 'K')))[name]}"
             label_y = max(header_height, coords[1] + (16 if prefix == "P" else 0))
             draw.text((coords[0] + 3, label_y), label, fill=color, font=_font(12), stroke_width=1, stroke_fill="white")
+    for name, box in (before_shared_y or {}).items():
+        if name not in CLASS_NAMES[:2]:
+            continue
+        left, top = max(box[0], x0), max(box[1], y0)
+        right, bottom = min(box[2], x1), min(box[3], y1)
+        if right <= left or bottom <= top:
+            continue
+        coords = (
+            image_left + (left - x0) * scale_x,
+            header_height + (top - y0) * scale_y,
+            image_left + (right - x0) * scale_x - 1,
+            header_height + (bottom - y0) * scale_y - 1,
+        )
+        _dashed_rectangle(draw, coords, fill={CLASS_NAMES[0]: "#0077cc", CLASS_NAMES[1]: "#e87500"}[name], width=2)
     return canvas
 
 
@@ -254,6 +271,7 @@ def save_comparisons(
     *,
     max_width: int = 1200,
     max_height: int = 1800,
+    before_shared_y: Mapping[str, Sequence[float]] | None = None,
 ) -> list[str]:
     """Save an overview and informative crops without decoding a full RGB page.
 
@@ -282,7 +300,7 @@ def save_comparisons(
             crop = read_crop(scan, (0, source_top, width, source_bottom), size=(overview_width, target_bottom - target_top))
             overview.paste(crop, (0, target_top))
             crop.close()
-        composed = _draw_comparison(overview, truth, predictions, region=(0, 0, width, height), title="Full document comparison", canvas_width=min(900, max_width))
+        composed = _draw_comparison(overview, truth, predictions, region=(0, 0, width, height), title="Full document comparison", canvas_width=min(900, max_width), before_shared_y=before_shared_y)
         target = output / "overview.jpg"
         composed.save(target, quality=90)
         paths.append(str(target))
@@ -305,7 +323,7 @@ def save_comparisons(
             size = (max(1, round(width * crop_scale)), max(1, round(tile_height * crop_scale)))
             region = (0, top, width, top + tile_height)
             crop = read_crop(scan, region, size=size)
-            composed = _draw_comparison(crop, truth, predictions, region=region, title=f"{label}: original y={top}..{top + tile_height}", canvas_width=min(900, max_width))
+            composed = _draw_comparison(crop, truth, predictions, region=region, title=f"{label}: original y={top}..{top + tile_height}", canvas_width=min(900, max_width), before_shared_y=before_shared_y)
             target = output / f"{label}.jpg"
             composed.save(target, quality=92)
             paths.append(str(target))
@@ -338,7 +356,7 @@ def save_comparisons(
         legend_scale = min(max_width / region_width, (max_height - 72) / region_height, 1.0)
         legend_size = (max(1, round(region_width * legend_scale)), max(1, round(region_height * legend_scale)))
         crop = read_crop(scan, legend_region, size=legend_size)
-        composed = _draw_comparison(crop, truth, predictions, region=legend_region, title=title, canvas_width=min(900, max_width))
+        composed = _draw_comparison(crop, truth, predictions, region=legend_region, title=title, canvas_width=min(900, max_width), before_shared_y=before_shared_y)
         target = output / "legend.jpg"
         composed.save(target, quality=92)
         paths.append(str(target))
@@ -347,12 +365,256 @@ def save_comparisons(
     return paths
 
 
+_TRACE_COLORS = {
+    CLASS_NAMES[0]: "#0077cc",
+    CLASS_NAMES[1]: "#e87500",
+    CLASS_NAMES[2]: "#7a3db8",
+}
+_TRACE_LABELS = dict(zip(CLASS_NAMES, ("D", "L", "K")))
+
+
+def _dashed_rectangle(draw: Any, box: Sequence[float], *, fill: str, width: int = 2, dash: int = 8) -> None:
+    left, top, right, bottom = box
+    for start in range(round(left), round(right), dash * 2):
+        draw.line((start, top, min(start + dash, right), top), fill=fill, width=width)
+        draw.line((start, bottom, min(start + dash, right), bottom), fill=fill, width=width)
+    for start in range(round(top), round(bottom), dash * 2):
+        draw.line((left, start, left, min(start + dash, bottom)), fill=fill, width=width)
+        draw.line((right, start, right, min(start + dash, bottom)), fill=fill, width=width)
+
+
+def _trace_box_on_crop(box: Sequence[float], region: Sequence[int], size: tuple[int, int], header: int) -> tuple[float, float, float, float] | None:
+    x0, y0, x1, y1 = region
+    left, top = max(box[0], x0), max(box[1], y0)
+    right, bottom = min(box[2], x1), min(box[3], y1)
+    if right <= left or bottom <= top:
+        return None
+    scale_x, scale_y = size[0] / (x1 - x0), size[1] / (y1 - y0)
+    return (
+        (left - x0) * scale_x,
+        header + (top - y0) * scale_y,
+        max((left - x0) * scale_x, (right - x0) * scale_x - 1),
+        max(header + (top - y0) * scale_y, header + (bottom - y0) * scale_y - 1),
+    )
+
+
+def _save_chunk_previews(
+    image_path: str | Path,
+    trace: Mapping[str, Any],
+    output: Path,
+    *,
+    max_width: int = 1000,
+) -> list[Path]:
+    """Render every processed crop from a JSON-safe inference trace."""
+    from PIL import Image, ImageDraw
+
+    tiles = trace.get("tiles")
+    detections = trace.get("detections")
+    if not isinstance(tiles, list) or not isinstance(detections, list):
+        return []
+    by_id = {item.get("id"): item for item in detections if isinstance(item, Mapping)}
+    pre_shared = trace.get("boxes_before_shared_y") if isinstance(trace.get("boxes_before_shared_y"), Mapping) else {}
+    final_boxes = trace.get("final_boxes") if isinstance(trace.get("final_boxes"), Mapping) else {}
+    chunk_dir = output / "chunks"
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    with open_scan(image_path) as scan:
+        for tile in tiles:
+            if not isinstance(tile, Mapping) or not isinstance(tile.get("box"), list) or len(tile["box"]) != 4:
+                continue
+            region = tuple(int(value) for value in tile["box"])
+            source_width, source_height = region[2] - region[0], region[3] - region[1]
+            scale = min(max_width / source_width, 1.0)
+            size = (max(1, round(source_width * scale)), max(1, round(source_height * scale)))
+            crop = read_crop(scan, region, size=size)
+            header = 92
+            canvas = Image.new("RGB", (crop.width, crop.height + header), "white")
+            canvas.paste(crop, (0, header))
+            crop.close()
+            draw = ImageDraw.Draw(canvas)
+            retry = bool(tile.get("retry"))
+            tile_id = int(tile.get("tile_id", len(paths)))
+            raw = [by_id[item_id] for item_id in tile.get("detection_ids", []) if item_id in by_id]
+            accepted = sum(bool(item.get("selected")) for item in raw)
+            draw.text((10, 8), f"chunk {tile_id:04d}  native y={region[1]}..{region[3]}  {'RETRY' if retry else 'scan'}", fill="#9a6500" if retry else "black", font=_font())
+            draw.text((10, 32), f"raw detections={len(raw)}  selected={accepted}  rejected={len(raw) - accepted}", fill="black", font=_font(12))
+            draw.text((10, 53), "Blue: depth  Orange: lithology  Purple: legend  Gray: rejected  Magenta: final", fill="black", font=_font(12))
+            draw.text((10, 72), "Dashed: aggregate before shared-Y  Yellow frame: retry", fill="black", font=_font(12))
+            if retry:
+                draw.rectangle((1, header, canvas.width - 2, canvas.height - 2), outline="#f0b400", width=4)
+            for item in raw:
+                coords = _trace_box_on_crop(item.get("box", []), region, size, header)
+                if coords is None:
+                    continue
+                class_name = str(item.get("class_name", "unknown"))
+                color = _TRACE_COLORS.get(class_name, "#555555") if item.get("selected") else "#777777"
+                draw.rectangle(coords, outline=color, width=3 if item.get("selected") else 2)
+                label = f"{'A' if item.get('selected') else 'R'} {_TRACE_LABELS.get(class_name, '?')} {float(item.get('confidence', 0)):.2f}"
+                draw.text((coords[0] + 3, max(header, coords[1] + 2)), label, fill=color, font=_font(11), stroke_width=1, stroke_fill="white")
+            for name, box in pre_shared.items():
+                if name not in CLASS_NAMES[:2]:
+                    continue
+                coords = _trace_box_on_crop(box, region, size, header)
+                if coords is not None:
+                    _dashed_rectangle(draw, coords, fill=_TRACE_COLORS[name], width=2)
+            for name, box in final_boxes.items():
+                coords = _trace_box_on_crop(box, region, size, header)
+                if coords is not None:
+                    draw.rectangle(coords, outline="#dc0085", width=2)
+            target = chunk_dir / f"chunk_{tile_id:04d}.jpg"
+            canvas.save(target, quality=88)
+            canvas.close()
+            paths.append(target)
+    return paths
+
+
+def _save_contact_sheet(chunk_paths: Sequence[Path], trace: Mapping[str, Any], target: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    if not chunk_paths:
+        return
+    detections = {item.get("id"): item for item in trace.get("detections", []) if isinstance(item, Mapping)}
+    final_boxes = trace.get("final_boxes") if isinstance(trace.get("final_boxes"), Mapping) else {}
+    endpoints = [box[index] for name, box in final_boxes.items() if name in CLASS_NAMES[:2] for index in (1, 3)]
+
+    def priority(tile: Mapping[str, Any]) -> tuple[int, int]:
+        items = [detections[item_id] for item_id in tile.get("detection_ids", []) if item_id in detections]
+        contains_endpoint = any(tile["box"][1] <= value <= tile["box"][3] for value in endpoints)
+        rank = 0 if tile.get("retry") else 1 if any(not item.get("selected") for item in items) else 2 if contains_endpoint else 3
+        return rank, int(tile.get("tile_id", 0))
+
+    tiles = [item for item in trace.get("tiles", []) if isinstance(item, Mapping)]
+    ordered_ids = [int(item.get("tile_id", 0)) for item in sorted(tiles, key=priority)[:24]]
+    by_id = {int(path.stem.split("_")[-1]): path for path in chunk_paths}
+    selected = [by_id[item_id] for item_id in ordered_ids if item_id in by_id]
+    if not selected:
+        return
+    thumb_size = (260, 280)
+    columns = 4
+    rows = math.ceil(len(selected) / columns)
+    header = 54
+    sheet = Image.new("RGB", (columns * thumb_size[0], header + rows * thumb_size[1]), "white")
+    draw = ImageDraw.Draw(sheet)
+    draw.text((10, 8), "Priority chunks: retries, rejected detections, shared-Y endpoints, then scan order", fill="black", font=_font(14))
+    draw.text((10, 31), "Open chunks/ for every processed crop.", fill="black", font=_font(12))
+    for index, path in enumerate(selected):
+        with Image.open(path) as image:
+            thumbnail = image.copy()
+        thumbnail.thumbnail((thumb_size[0] - 8, thumb_size[1] - 8))
+        x = (index % columns) * thumb_size[0] + (thumb_size[0] - thumbnail.width) // 2
+        y = header + (index // columns) * thumb_size[1] + (thumb_size[1] - thumbnail.height) // 2
+        sheet.paste(thumbnail, (x, y))
+        thumbnail.close()
+    sheet.save(target, quality=88)
+    sheet.close()
+
+
+def save_prediction_review(
+    image_path: str | Path,
+    predictions: Mapping[str, Sequence[float]],
+    output_dir: str | Path,
+    *,
+    truth: Mapping[str, Sequence[float]] | None = None,
+    trace: Mapping[str, Any] | None = None,
+    before_shared_y: Mapping[str, Sequence[float]] | None = None,
+) -> list[str]:
+    """Save final comparisons plus optional chunk-level inference evidence."""
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    trace_payload = dict(trace or {})
+    original_boxes = before_shared_y or (
+        trace_payload.get("boxes_before_shared_y")
+        if isinstance(trace_payload.get("boxes_before_shared_y"), Mapping)
+        else None
+    )
+    paths = save_comparisons(image_path, truth or {}, predictions, output, before_shared_y=original_boxes)
+    chunk_paths: list[Path] = []
+    contact_generated = False
+    if trace_payload:
+        inference_final = trace_payload.get("final_boxes")
+        if inference_final != predictions:
+            trace_payload["inference_final_boxes"] = inference_final
+        trace_payload["final_boxes"] = {name: list(box) for name, box in predictions.items()}
+        write_json(output / "trace.json", trace_payload)
+        chunk_paths = _save_chunk_previews(image_path, trace_payload, output)
+        contact = output / "chunks_contact_sheet.jpg"
+        _save_contact_sheet(chunk_paths, trace_payload, contact)
+        contact_generated = bool(chunk_paths) and contact.is_file()
+    images = [Path(path).name for path in paths]
+    if contact_generated:
+        images.append("chunks_contact_sheet.jpg")
+    chunk_links = sorted(chunk_paths)
+    sections = "".join(f'<a href="{quote(name)}"><img src="{quote(name)}" alt="{html.escape(name)}"></a>' for name in images)
+    chunks = "".join(f'<li><a href="chunks/{quote(path.name)}">{html.escape(path.name)}</a></li>' for path in chunk_links)
+    unavailable = "" if trace_payload else "<p>Chunk trace unavailable: this review was generated from precomputed final boxes.</p>"
+    page = f"""<!doctype html><html><head><meta charset="utf-8"><title>{html.escape(Path(image_path).name)}</title>
+<style>body{{font-family:sans-serif;max-width:1200px;margin:auto;padding:20px}}img{{max-width:100%;max-height:700px;border:1px solid #ccc;margin:8px}}ul{{columns:4}}</style></head>
+<body><h1>{html.escape(Path(image_path).name)}</h1>{unavailable}<div>{sections}</div><h2>All chunks</h2><ul>{chunks}</ul></body></html>"""
+    (output / "index.html").write_text(page, encoding="utf-8")
+    return paths
+
+
+def write_visual_review_index(output_dir: str | Path, documents: Sequence[Mapping[str, Any]]) -> Path:
+    """Create a worst-Y-first static index for an evaluation run."""
+    output = Path(output_dir)
+
+    def y_score(document: Mapping[str, Any]) -> float:
+        values = []
+        for name in CLASS_NAMES[:2]:
+            region = document["metrics"]["regions"][name]
+            errors = region.get("edge_absolute_error_px")
+            if errors is None:
+                return float("inf")
+            values.extend((float(errors["ymin"]), float(errors["ymax"])))
+        return max(values, default=0.0)
+
+    cards = []
+    for document in sorted(documents, key=y_score, reverse=True):
+        stem = Path(document["image_name"]).stem
+        score = y_score(document)
+        score_label = "missing" if math.isinf(score) else f"{score:.1f}px"
+        previews = document.get("comparison_previews", [])
+        images = (
+            f'<a href="{quote(stem)}/column_top.jpg"><img src="{quote(stem)}/column_top.jpg" alt="column top"></a>'
+            f'<a href="{quote(stem)}/column_bottom.jpg"><img src="{quote(stem)}/column_bottom.jpg" alt="column bottom"></a>'
+            if previews else "<p>Visual preview unavailable; inspect the document errors in report.json.</p>"
+        )
+        cards.append(
+            f'<article><h2><a href="{quote(stem)}/index.html">{html.escape(document["image_name"])}</a></h2>'
+            f'<p>Status: {html.escape(str(document["status"]))} · worst column Y error: {score_label}</p>'
+            f'{images}</article>'
+        )
+    page = """<!doctype html><html><head><meta charset="utf-8"><title>Bounding-box visual review</title>
+<style>body{font-family:sans-serif;max-width:1400px;margin:auto;padding:20px}article{border-top:2px solid #ddd;margin-top:24px}img{width:48%;max-height:550px;object-fit:contain;border:1px solid #ccc}</style></head>
+<body><h1>Bounding-box visual review</h1><p>Documents are ordered by their worst depth/lithology Y-edge error.</p>""" + "".join(cards) + "</body></html>"
+    target = output / "visual_review" / "index.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(page, encoding="utf-8")
+    return target
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as stream:
         value = json.load(stream)
     if not isinstance(value, dict):
         raise ValueError(f"Expected a JSON object in {path}")
     return value
+
+
+def _before_shared_y_from_diagnostics(value: Any) -> Mapping[str, Sequence[float]] | None:
+    pending = [value]
+    seen: set[int] = set()
+    while pending:
+        item = pending.pop()
+        if not isinstance(item, Mapping) or id(item) in seen:
+            continue
+        seen.add(id(item))
+        shared = item.get("shared_column_vertical_extent")
+        if isinstance(shared, Mapping) and isinstance(shared.get("original_boxes"), Mapping):
+            return shared["original_boxes"]
+        for key in ("yolo", "inference"):
+            pending.append(item.get(key))
+    return None
 
 
 def _checked_boxes(
@@ -415,6 +677,7 @@ def evaluate_manifest(
     conf: float = 0.25,
     iou_threshold: float = 0.8,
     save_previews: bool = True,
+    debug_previews: bool = False,
 ) -> dict[str, Any]:
     """Evaluate final boxes on one manifest split and persist an auditable report.
 
@@ -459,6 +722,7 @@ def evaluate_manifest(
         payload: Mapping[str, Any] = {}
         previews: list[str] = []
         diagnostics: Any = None
+        trace: dict[str, Any] = {}
         width, height = int(record["width"]), int(record["height"])
         image_path = _record_path(record, "image_path", dataset_root)
         with _MemorySampler() as memory:
@@ -470,7 +734,10 @@ def evaluate_manifest(
                     payload = _read_json(prediction_path)
                 else:
                     assert predictor is not None
-                    payload = predictor(image_path, weights=weights, device=device, imgsz=imgsz, confidence=conf)
+                    options = {"weights": weights, "device": device, "imgsz": imgsz, "confidence": conf}
+                    if debug_previews:
+                        options["trace"] = trace
+                    payload = predictor(image_path, **options)
                 if not isinstance(payload, Mapping):
                     raise ValueError("Predictor must return a JSON-like object")
                 if payload.get("image_name", image_name) != image_name:
@@ -513,7 +780,14 @@ def evaluate_manifest(
             write_json(output / "predictions" / f"{stem}.json", prediction_artifact)
             if save_previews:
                 try:
-                    previews = save_comparisons(image_path, expected, predicted, output / "comparisons" / stem)
+                    previews = save_prediction_review(
+                        image_path,
+                        predicted,
+                        output / "visual_review" / stem,
+                        truth=expected,
+                        trace=trace if debug_previews else None,
+                        before_shared_y=_before_shared_y_from_diagnostics(diagnostics),
+                    )
                 except Exception as exc:
                     errors.append(f"Comparison preview {type(exc).__name__}: {exc}")
         document = {
@@ -530,13 +804,15 @@ def evaluate_manifest(
             "comparison_previews": [str(Path(path).relative_to(output)) for path in previews],
         }
         documents.append(document)
+    if save_previews:
+        write_visual_review_index(output, documents)
     report = {
         "manifest": str(manifest_path),
         "split": split,
         "prediction_source": "precomputed" if predictions_dir is not None else "model",
         "weights": str(weights) if weights is not None else None,
         "predictions_dir": str(Path(predictions_dir).resolve()) if predictions_dir is not None else None,
-        "settings": {"imgsz": imgsz, "confidence": conf, "device": device, "iou_threshold": iou_threshold},
+        "settings": {"imgsz": imgsz, "confidence": conf, "device": device, "iou_threshold": iou_threshold, "debug_previews": debug_previews},
         "metric_notes": {
             "coordinates": "Original image pixels; xyxy with exclusive maxima",
             "missing_predictions": "Zero IoU; included in every document and class denominator",

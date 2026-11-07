@@ -31,6 +31,8 @@ class RegionEstimate:
     box: Box | None
     detections: tuple[Detection, ...] = ()
     missing_boundaries: tuple[str, ...] = ()
+    top_detections: tuple[Detection, ...] = ()
+    bottom_detections: tuple[Detection, ...] = ()
 
     @property
     def resolved(self) -> bool:
@@ -143,7 +145,7 @@ def _column(detections: list[Detection], width: int, height: int) -> RegionEstim
         # reversed or empty combination never counts as a resolved region.
         y1, y2 = start, end
         missing = ("top", "bottom")
-    return RegionEstimate((x1, y1, x2, y2), tuple(run), missing)
+    return RegionEstimate((x1, y1, x2, y2), tuple(run), missing, tuple(tops), tuple(bottoms))
 
 
 def _iou(a: Box, b: Box) -> float:

@@ -97,14 +97,46 @@ def test_columns_share_union_of_vertical_extents_and_keep_independent_x(tmp_path
     assert result["bounding_boxes"][CLASS_NAMES[0]] == [10, 20, 20, 230]
     assert result["bounding_boxes"][CLASS_NAMES[1]] == [40, 20, 50, 230]
     assert diagnostics["shared_column_vertical_extent"] == {
+        "strategy": "shared-column-y-v1",
         "applied": True,
         "top": 20,
         "bottom": 230,
+        "top_sources": [CLASS_NAMES[1]],
+        "bottom_sources": [CLASS_NAMES[1]],
         "original_boxes": {
             CLASS_NAMES[0]: [10, 30, 20, 210],
             CLASS_NAMES[1]: [40, 20, 50, 230],
         },
     }
+
+
+def test_optional_trace_marks_selected_run_and_rejected_outlier(tmp_path):
+    image = _image(tmp_path)
+    boxes = _regions()
+
+    class NoisyDetector(GeometricDetector):
+        def predict(self, image, *, imgsz, confidence, device):
+            call = self.calls
+            yield from super().predict(image, imgsz=imgsz, confidence=confidence, device=device)
+            if call == 0:
+                yield RawDetection(0, (45, 8, 60, 50), 0.99)
+
+    trace = {}
+    result = predict_document(
+        image,
+        detector=NoisyDetector(document_tiles(100, 250), boxes),
+        imgsz=64,
+        trace=trace,
+    )
+    assert result["bounding_boxes"][CLASS_NAMES[0]] == [10, 20, 20, 230]
+    assert result["bounding_boxes"][CLASS_NAMES[1]][1::2] == [20, 230]
+    assert trace["postprocess_version"] == "shared-column-y-v1"
+    assert trace["boxes_before_shared_y"][CLASS_NAMES[0]] == [10, 20, 20, 230]
+    assert trace["final_boxes"] == result["bounding_boxes"]
+    outlier = next(item for item in trace["detections"] if item["confidence"] == 0.99)
+    assert not outlier["selected"]
+    assert trace["estimates"][CLASS_NAMES[0]]["support_tiles"]
+    assert trace["estimates"][CLASS_NAMES[0]]["boundary_support"]["top"]["tile_ids"]
 
 
 def test_censored_boundaries_recovered_from_overlapping_interiors(tmp_path):

@@ -109,9 +109,10 @@ def make_predictor(
         imgsz: int = default_imgsz,
         confidence: float = default_conf,
         diagnostics: dict | None = None,
+        trace: dict | None = None,
     ) -> dict[str, Any]:
         yolo_details: dict[str, Any] = {}
-        prediction = predict_document(image_path, detector=detector, device=device, imgsz=imgsz, confidence=confidence, diagnostics=yolo_details)
+        prediction = predict_document(image_path, detector=detector, device=device, imgsz=imgsz, confidence=confidence, diagnostics=yolo_details, trace=trace)
         if backend == "hybrid":
             refinement_details: dict[str, Any] = {}
             prediction = refine_prediction(image_path, prediction, diagnostics=refinement_details)
@@ -138,6 +139,7 @@ def evaluate_backend(
     conf: float = 0.25,
     iou_threshold: float = 0.8,
     save_previews: bool = True,
+    debug_previews: bool = False,
     predictor: Callable[..., Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Select a backend while reusing the existing full-document metric contract."""
@@ -146,7 +148,7 @@ def evaluate_backend(
     if predictions_dir is not None:
         if weights is not None or templates is not None or predictor is not None:
             raise ValueError("Precomputed predictions cannot be combined with weights, templates, or a predictor")
-        report = evaluate_manifest(manifest_path, None, output_dir, split=split, predictions_dir=predictions_dir, device=device, imgsz=imgsz, conf=conf, iou_threshold=iou_threshold, save_previews=save_previews)
+        report = evaluate_manifest(manifest_path, None, output_dir, split=split, predictions_dir=predictions_dir, device=device, imgsz=imgsz, conf=conf, iou_threshold=iou_threshold, save_previews=save_previews, debug_previews=debug_previews)
     else:
         if backend == "classical":
             if templates is None:
@@ -164,7 +166,7 @@ def evaluate_backend(
                 prediction = selected(image_path, diagnostics=diagnostics, **options)
                 return {**prediction, "diagnostics": diagnostics}
 
-        report = evaluate_manifest(manifest_path, None, output_dir, split=split, predictor=predictor, device=device, imgsz=imgsz, conf=conf, iou_threshold=iou_threshold, save_previews=save_previews)
+        report = evaluate_manifest(manifest_path, None, output_dir, split=split, predictor=predictor, device=device, imgsz=imgsz, conf=conf, iou_threshold=iou_threshold, save_previews=save_previews, debug_previews=debug_previews)
     report["backend"] = backend
     report["weights"] = str(weights) if weights is not None else None
     report["templates"] = str(Path(templates).resolve()) if templates is not None else None

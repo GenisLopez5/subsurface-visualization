@@ -103,6 +103,13 @@ def load_annotation(path: str | Path) -> dict[str, Any]:
         x1, y1, x2, y2 = box
         if not (0 <= x1 < x2 <= data["width"] and 0 <= y1 < y2 <= data["height"]):
             raise ValueError(f"{cls} outside image or empty in {path}: {box}")
+    depth = boxes[CLASS_NAMES[0]]
+    lithology = boxes[CLASS_NAMES[1]]
+    if (depth[1], depth[3]) != (lithology[1], lithology[3]):
+        raise ValueError(
+            f"Column annotations must share ymin/ymax in {path}: "
+            f"{CLASS_NAMES[0]}={depth}, {CLASS_NAMES[1]}={lithology}"
+        )
     return data
 
 

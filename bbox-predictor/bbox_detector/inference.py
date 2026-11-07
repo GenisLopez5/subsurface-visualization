@@ -13,6 +13,8 @@ from PIL import Image
 from .aggregation import Detection, RegionEstimate, aggregate_detections
 from .common import CLASS_NAMES, Box, clamp_box, document_tiles, open_scan, read_crop
 
+POSTPROCESS_VERSION = "shared-column-y-v1"
+
 
 @dataclass(frozen=True)
 class RawDetection:
@@ -109,10 +111,85 @@ def share_column_vertical_extent(boxes: dict[str, list[int]]) -> dict | None:
     for name in column_names:
         boxes[name] = [original[name][0], top, original[name][2], bottom]
     return {
+        "strategy": POSTPROCESS_VERSION,
         "applied": any(boxes[name] != original[name] for name in column_names),
         "top": top,
         "bottom": bottom,
+        "top_sources": [name for name in column_names if original[name][1] == top],
+        "bottom_sources": [name for name in column_names if original[name][3] == bottom],
         "original_boxes": original,
+    }
+
+
+def _serialize_trace(
+    detections: list[Detection],
+    estimates: dict[str, RegionEstimate],
+    tiles: list[dict],
+    original_boxes: dict[str, list[int]],
+    final_boxes: dict[str, list[int]],
+    shared_extent: dict | None,
+    width: int,
+    height: int,
+) -> dict:
+    """Return JSON-safe evidence for optional visual debugging."""
+    detection_ids = {id(item): index for index, item in enumerate(detections)}
+    selected_ids = {
+        detection_ids[id(item)]
+        for estimate in estimates.values()
+        for item in estimate.detections
+        if id(item) in detection_ids
+    }
+    serialized_detections = []
+    by_tile: dict[int, list[int]] = {}
+    for index, item in enumerate(detections):
+        serialized_detections.append({
+            "id": index,
+            "class_id": item.class_id,
+            "class_name": CLASS_NAMES[item.class_id],
+            "box": list(item.box),
+            "confidence": item.confidence,
+            "tile_id": item.tile_id,
+            "retry": item.retry,
+            "selected": index in selected_ids,
+        })
+        by_tile.setdefault(item.tile_id, []).append(index)
+    serialized_tiles = []
+    for item in tiles:
+        serialized_tiles.append({**item, "detection_ids": by_tile.get(item["tile_id"], [])})
+    serialized_estimates = {}
+    for name, estimate in estimates.items():
+        ids = [detection_ids[id(item)] for item in estimate.detections if id(item) in detection_ids]
+        top_ids = [detection_ids[id(item)] for item in estimate.top_detections if id(item) in detection_ids]
+        bottom_ids = [detection_ids[id(item)] for item in estimate.bottom_detections if id(item) in detection_ids]
+        serialized_estimates[name] = {
+            "box": list(estimate.box) if estimate.box is not None else None,
+            "resolved": estimate.resolved,
+            "missing_boundaries": list(estimate.missing_boundaries),
+            "selected_detection_ids": ids,
+            "support_tiles": sorted({detections[index].tile_id for index in ids}),
+            "retry_tiles": sorted({detections[index].tile_id for index in ids if detections[index].retry}),
+            "boundary_support": {
+                "top": {
+                    "detection_ids": top_ids,
+                    "tile_ids": sorted({detections[index].tile_id for index in top_ids}),
+                },
+                "bottom": {
+                    "detection_ids": bottom_ids,
+                    "tile_ids": sorted({detections[index].tile_id for index in bottom_ids}),
+                },
+            },
+        }
+    return {
+        "schema_version": 1,
+        "postprocess_version": POSTPROCESS_VERSION,
+        "width": width,
+        "height": height,
+        "tiles": serialized_tiles,
+        "detections": serialized_detections,
+        "estimates": serialized_estimates,
+        "boxes_before_shared_y": original_boxes,
+        "shared_column_vertical_extent": shared_extent,
+        "final_boxes": final_boxes,
     }
 
 
@@ -126,12 +203,15 @@ def predict_document(
     device: str | None = None,
     overlap: float = 0.5,
     diagnostics: dict | None = None,
+    trace: dict | None = None,
 ) -> dict:
     """Return the team's three-region JSON schema, or raise InferenceError.
 
     ``detector`` is injectable for tests and local model integrations.  Its boxes
     refer to the supplied, resized RGB crop; inverse scaling happens here.
     ``diagnostics`` is an optional output mapping, kept outside the public JSON.
+    ``trace`` optionally receives JSON-safe per-tile evidence for visual review;
+    it is never added to the prediction payload.
     """
     if isinstance(imgsz, bool) or not isinstance(imgsz, int) or imgsz < 32:
         raise ValueError("imgsz must be an integer of at least 32")
@@ -147,14 +227,21 @@ def predict_document(
             raise ValueError("Provide trained weights or an injected detector")
         detector = UltralyticsDetector(weights)
     started = time.perf_counter()
-    details = {"image_name": image_path.name, "scan_tiles": 0, "retry_tiles": 0}
+    details = {
+        "image_name": image_path.name,
+        "postprocess_version": POSTPROCESS_VERSION,
+        "scan_tiles": 0,
+        "retry_tiles": 0,
+    }
     detections: list[Detection] = []
+    processed_tiles: list[dict] = []
     with open_scan(image_path) as scan:
         width, height = scan.size
         tiles = document_tiles(width, height, overlap=overlap)
 
         def detect(tile: tuple[int, int, int, int], *, retry: bool = False) -> None:
             tile_id = details["scan_tiles"] + details["retry_tiles"]
+            processed_tiles.append({"tile_id": tile_id, "box": list(tile), "retry": retry})
             source_width, source_height = tile[2] - tile[0], tile[3] - tile[1]
             size = (imgsz, max(1, round(source_height * imgsz / source_width)))
             with read_crop(scan, tile, size=size) as crop:
@@ -210,6 +297,7 @@ def predict_document(
             unresolved[name] = ["invalid_box"]
         else:
             boxes[name] = bounded
+    boxes_before_shared_y = {name: box[:] for name, box in boxes.items()}
     shared_extent = share_column_vertical_extent(boxes)
     details.update({
         "width": width,
@@ -221,6 +309,17 @@ def predict_document(
     })
     if diagnostics is not None:
         diagnostics.update(details)
+    if trace is not None:
+        trace.update(_serialize_trace(
+            detections,
+            estimates,
+            processed_tiles,
+            boxes_before_shared_y,
+            {name: box[:] for name, box in boxes.items()},
+            shared_extent,
+            width,
+            height,
+        ))
     if unresolved:
         summary = ", ".join(f"{name} ({'/'.join(boundaries)})" for name, boundaries in unresolved.items())
         raise InferenceError(f"Unresolved regions after recentered retry: {summary}", partial_boxes=boxes, diagnostics=details)
