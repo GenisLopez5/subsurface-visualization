@@ -1,0 +1,7 @@
+# Colab already supplies a CUDA-enabled PyTorch. For local CPU use, see README.
+ultralytics==8.3.228
+Pillow>=10.4,<13
+numpy>=1.26,<3
+PyYAML>=6.0,<7
+pyvips[binary]==3.0.0
+pyvips-binary==8.18.7
