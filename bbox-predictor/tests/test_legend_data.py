@@ -48,3 +48,34 @@ def test_legend_dataset_uses_train_variants_complete_boxes_and_negatives(tmp_pat
             assert label == ""
     config = json.loads((tmp_path / "legend" / "dataset.yaml").read_text())
     assert config["names"] == ["lithology_legend"]
+
+
+def test_band_crops_keep_complete_labels_aspect_and_negative_separation(tmp_path):
+    dataset = tmp_path / "source"
+    (dataset / "images").mkdir(parents=True)
+    (dataset / "bbox_annotation").mkdir()
+    for name in ("one.tif", "two.tif"):
+        Image.new("RGB", (100, 700), "white").save(dataset / "images" / name)
+        (dataset / "bbox_annotation" / f"{Path(name).stem}.json").write_text(json.dumps(_annotation(name)))
+    prepare_dataset(dataset, tmp_path / "audit", materialize=False)
+    result = prepare_legend_dataset(tmp_path / "audit/manifest.json", tmp_path / "bands", imgsz=64, crop_mode="band")
+    assert result["crop_mode"] == "band"
+    assert not (set(result["source_groups"]["train"]) & set(result["source_groups"]["val"]))
+    rectangular = False
+    for sample in result["samples"]:
+        x1, y1, x2, y2 = sample["tile"]
+        assert x1 == 0 and x2 == 100
+        with Image.open(sample["image_path"]) as image:
+            assert max(image.size) == 64
+            assert abs(image.width / image.height - (x2-x1)/(y2-y1)) < .04
+            rectangular |= image.width != image.height
+        label = Path(sample["label_path"]).read_text().strip()
+        if sample["kind"] == "positive":
+            _, cx, cy, bw, bh = map(float, label.split())
+            reconstructed = [(cx-bw/2)*100, y1+(cy-bh/2)*(y2-y1),
+                             (cx+bw/2)*100, y1+(cy+bh/2)*(y2-y1)]
+            assert all(abs(a-b) < 1e-5 for a, b in zip(reconstructed, [20,20,80,80]))
+        else:
+            assert not label
+            assert y2 <= 20 or y1 >= 80
+    assert rectangular

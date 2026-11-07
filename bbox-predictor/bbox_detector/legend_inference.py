@@ -84,7 +84,11 @@ def _iou(first: list[float], second: list[float]) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def merge_aligned_legend_fragments(groups: list[dict], *, width: int, height: int) -> list[int]:
+def merge_aligned_legend_fragments(
+    groups: list[dict], *, width: int, height: int,
+    min_relative_confidence: float = 0.5, min_vertical_iou: float = 0.7,
+    max_gap_fraction: float = 0.05,
+) -> list[int]:
     """Join connected legend pieces in the selected candidate's horizontal band.
 
     Keep candidates with at least half the seed confidence, vertical interval
@@ -94,6 +98,9 @@ def merge_aligned_legend_fragments(groups: list[dict], *, width: int, height: in
     """
     if not groups:
         raise ValueError("Cannot reconstruct a legend without candidate groups")
+    if not (0 < min_relative_confidence <= 1 and 0 < min_vertical_iou <= 1
+            and 0 <= max_gap_fraction < 1):
+        raise ValueError("Invalid fragment reconstruction thresholds")
     seed = groups[0]["best_box"]
     merged = list(seed)
     remaining = list(groups[1:])
@@ -105,9 +112,9 @@ def merge_aligned_legend_fragments(groups: list[dict], *, width: int, height: in
             overlap = max(0, min(seed[3], box[3]) - max(seed[1], box[1]))
             extent = max(seed[3], box[3]) - min(seed[1], box[1])
             gap = max(0, merged[0] - box[2], box[0] - merged[2])
-            if (group["best_confidence"] >= 0.5 * groups[0]["best_confidence"]
-                    and extent > 0 and overlap / extent >= 0.7
-                    and gap <= 0.05 * width):
+            if (group["best_confidence"] >= min_relative_confidence * groups[0]["best_confidence"]
+                    and extent > 0 and overlap / extent >= min_vertical_iou
+                    and gap <= max_gap_fraction * width):
                 merged = [min(merged[0], box[0]), min(merged[1], box[1]),
                           max(merged[2], box[2]), max(merged[3], box[3])]
                 added = True

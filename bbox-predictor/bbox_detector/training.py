@@ -26,6 +26,7 @@ def training_options(
     workers: int = 2,
     seed: int = 42,
     max_hours: float | None = None,
+    rect: bool = False,
 ) -> dict:
     """Keep geometry and readable text intact while varying scale/illumination."""
     if not run_name or Path(run_name).name != run_name:
@@ -47,6 +48,7 @@ def training_options(
         "batch": batch,
         "workers": workers,
         "seed": seed,
+        "rect": rect,
         "deterministic": True,
         "pretrained": True,
         "optimizer": "AdamW",
@@ -159,6 +161,7 @@ def train_model(
     workers: int = 2,
     seed: int = 42,
     max_hours: float | None = None,
+    rect: bool = False,
     model_factory: Callable | None = None,
 ) -> dict:
     """Train once, retrying fresh at half batch only for CUDA memory failures.
@@ -170,7 +173,7 @@ def train_model(
     if Path(model).suffix != ".pt":
         raise ValueError("Use pretrained .pt weights, for example yolo11s.pt")
     options = training_options(data, output, run_name=run_name, epochs=epochs, patience=patience, imgsz=imgsz,
-                               batch=batch, device=device, workers=workers, seed=seed, max_hours=max_hours)
+                               batch=batch, device=device, workers=workers, seed=seed, max_hours=max_hours, rect=rect)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     if model_factory is None:

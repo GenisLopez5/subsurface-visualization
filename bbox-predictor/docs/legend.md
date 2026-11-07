@@ -1,5 +1,11 @@
 # Detector especialitzat de llegenda
 
+La continuació amb recuperació del marc i bandes és a
+[legend_optimization.md](legend_optimization.md). La configuració nova arriba
+a IoU mitjana **0,9433** i **9/10** llegendes a IoU ≥ 0,9 en desenvolupament,
+reutilitzant els mateixos pesos. Utilitza el nou notebook
+`notebooks/legend_optimize_colab.ipynb` per reproduir-la.
+
 El model general ja resol bé `depth_column` i
 `interpreted_lithology_column`. Aquest pipeline conserva aquestes prediccions,
 comparteix el seu `ymin/ymax` i entrena un segon YOLO d'una sola classe per a

@@ -6,6 +6,12 @@ També hi ha una alternativa **OpenCV sense xarxes neuronals** i un backend **h�
 
 La llegenda és el principal coll d'ampolla del model general. El notebook [legend_colab.ipynb](notebooks/legend_colab.ipynb) entrena un detector d'una sola classe sobre capçaleres i el compara amb els JSON de validació existents, sense tornar a entrenar les columnes. Consulta [les instruccions del detector de llegenda](docs/legend.md).
 
+La reconstrucció de fragments i marcs completa les llegendes amb els pesos
+existents: **IoU mitjana 0,9433, 9/10 llegendes amb IoU ≥ 0,9** al benchmark de
+desenvolupament. Consulta [la pipeline de llegendes](docs/legend_optimization.md)
+i [legend_optimize_colab.ipynb](notebooks/legend_optimize_colab.ipynb), que també
+prepara els dos entrenaments opcionals sobre bandes.
+
 ## Estructura
 
 - `bbox_detector/`: implementació reutilitzable.

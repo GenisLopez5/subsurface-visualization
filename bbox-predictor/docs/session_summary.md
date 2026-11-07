@@ -210,3 +210,47 @@ paquet de codi `artifacts/legend_specialist_review/source_bundle.zip`.
 El pas següent és inspeccionar les llegendes encara parcials, especialment
 XOM/G08037/Critter Creek, abans d'invertir en més entrenaments. No cal tornar
 a entrenar les columnes per provar la reconstrucció.
+
+## Implementació posterior: fragments, marc i títols
+
+S'ha implementat el pla d'optimització a `bbox-predictor/`, la ubicació actual
+del projecte. Les 51 llegendes s'han revisat visualment i classificat com a
+taules amples/compactes i marcs rectangulars/arrodonits/absents, sense canviar
+les anotacions originals. La revisió amb hashes és a `docs/legend_review.json`.
+
+El benchmark compara els tres referents, sis unions de fragments, marcs i sis
+combinacions. La configuració seleccionada és `combined_c0.30_y0.60`:
+confiança absoluta 0,05, relativa 0,30, IoU vertical 0,60, separació màxima 5%,
+recuperació del marc i de la fila de títols. Es distribueix a
+`docs/legend_policy.json`. Les columnes es conserven exactament.
+
+Resultats sobre els mateixos 10 documents de desenvolupament:
+
+- IoU mitjana de llegenda **0,943346**, davant de 0,635828 del punt de partida.
+- **9/10** llegendes amb IoU ≥ 0,8 i **9/10** amb IoU ≥ 0,9.
+- **9/10** documents amb les tres regions a IoU ≥ 0,8.
+- Cap regressió respecte de la reconstrucció anterior.
+- Freeman continua parcial, a IoU aproximadament **0,779**, i no té marc.
+
+Una reproducció amb el checkpoint real, sense reutilitzar deteccions, dona
+exactament les mateixes caixes. Mitjana **15,8 s/document** en CPU per a
+l'especialista + geometria, excloent el detector general i la càrrega del model.
+Els informes també guarden memòria RSS, vores i temps per document.
+Les regressions dels experiments descartats tenen comparacions visuals.
+
+La implementació nova es pot executar amb `--legend-weights` i
+`--legend-config` al CLI principal, incloent recuperació quan el model general
+només resol les columnes. `--base-prediction` reutilitza els JSON existents.
+No hi ha dependència d'anotacions ni de noms de fitxer a inferència.
+
+S'han preparat 276 bandes: 246 train i 30 val, mateix split per família.
+`tools/train_legend_bands.py` i el notebook nou
+`notebooks/legend_optimize_colab.ipynb` executen opcionalment dos entrenaments
+rectangulars 1024/1536, consecutius i amb la resta de paràmetres fixats.
+No s'han entrenat en local perquè no hi ha GPU; la geometria ja supera la fita
+de 8/10. Els pesos lliurats continuen sent els de l'especialista existent.
+
+La suite completa passa amb **138 tests**, s'ha comprovat la sintaxi de tots
+els notebooks i s'ha validat el dataset real de bandes. Les instruccions
+actuals són a `docs/legend_optimization.md`; els resultats són a
+`artifacts/legend_optimization/final/` i la reproducció real a `live/`.

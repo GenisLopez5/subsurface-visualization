@@ -1,0 +1,924 @@
+{
+  "note": "51 legends visually reviewed using bounded annotated crops/contact sheets. No original annotations changed. Format labels are evaluation metadata only; never inference inputs.",
+  "documents": [
+    {
+      "index": 0,
+      "image_name": "0000000009_d-582_0000020435-0001_log01_fe_1in_md.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1988,
+        1513,
+        3080,
+        2655
+      ],
+      "annotation_sha256": "4aa82d9152c6842f49355428d28a251a5a8ec35ce7199183e4aaa6af69fe9b75",
+      "preview": "gallery/00.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 1,
+      "image_name": "0000000009_d-582_0000020435-0001_log02_fe_5in_md.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1925,
+        1513,
+        3017,
+        2655
+      ],
+      "annotation_sha256": "bda39f2e8691071374b81227ae3cc572387fa1a062a4b34cd5cb4b40de5e49a0",
+      "preview": "gallery/01.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 2,
+      "image_name": "0000000009_d-582_0000020435-0001_log03_chromatograph_ratio.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1923,
+        1513,
+        3015,
+        2655
+      ],
+      "annotation_sha256": "4a2e61cbfc5fe1dfe7f84d9ac8b3da0a2d95da55181e3a75b7da8a24e53bfd02",
+      "preview": "gallery/02.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 3,
+      "image_name": "0000000009_d-582_0000020435-0001_log04_fe_5in_md.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1924,
+        1513,
+        3016,
+        2655
+      ],
+      "annotation_sha256": "aec765d7f64d93f69b426e4f3ab5b8764d594ef3d83c4efe5e0bd7b50ca9accc",
+      "preview": "gallery/03.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 4,
+      "image_name": "0000000009_d-582_0000020435-0001_log05_chromatograph_ratio.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1937,
+        1513,
+        3029,
+        2655
+      ],
+      "annotation_sha256": "9499c300aee5596e49dd7b03b0e0bc9eb06fe65ef16c237afe73c755f0fd8e6e",
+      "preview": "gallery/04.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 5,
+      "image_name": "0000000009_d-582_0000020435-0001_log06_fe_5in_md.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1943,
+        1513,
+        3035,
+        2655
+      ],
+      "annotation_sha256": "d94215f9f18aa6f68b525ce071c59bf272b549d18caa602c72c7890e1f007ea0",
+      "preview": "gallery/05.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 6,
+      "image_name": "0000000009_d-582_0000020435-0001_log07_chromatograph_ratio.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1938,
+        1513,
+        3030,
+        2655
+      ],
+      "annotation_sha256": "85e3b12cba57ba9da09d01ba2298076be64ae1a77304f05d1e6cd8e0fc64752c",
+      "preview": "gallery/06.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 7,
+      "image_name": "0000000009_d-582_0000020435-0001_log08_fe_5in_md.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1925,
+        1513,
+        3017,
+        2655
+      ],
+      "annotation_sha256": "be5a9099aff9764c5c5d1cb7d379ac242f7ce052e7f8b73ee3175491d109063d",
+      "preview": "gallery/07.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 8,
+      "image_name": "0000000009_d-582_0000020435-0001_log09_chromatograph_ratio.tif",
+      "group": "family:d582",
+      "split": "train",
+      "legend_box": [
+        1907,
+        1513,
+        2999,
+        2655
+      ],
+      "annotation_sha256": "8626e385735522774fdc77380c621e54930ca4a4779216591cb31e4ead3f9de6",
+      "preview": "gallery/08.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Compact monochrome legend; faint or empty lower symbol boxes are present in the original scan. Annotation retained."
+    },
+    {
+      "index": 9,
+      "image_name": "60807402860000_gb506#2_md_mudlog.tif",
+      "group": "document:60807402860000_gb506#2_md_mudlog",
+      "split": "train",
+      "legend_box": [
+        12,
+        596,
+        1525,
+        1003
+      ],
+      "annotation_sha256": "ddb0f80562211a14b5a850541a1b61ccfcdce9dcf078b574d89e57373e4b8fcc",
+      "preview": "gallery/09.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 10,
+      "image_name": "60808400140000_hadrian 2_masterlog_2in_10000-21962.tif",
+      "group": "document:60808400140000_hadrian 2_masterlog_2in_10000-21962",
+      "split": "train",
+      "legend_box": [
+        3,
+        840,
+        1653,
+        1133
+      ],
+      "annotation_sha256": "768794dbfda8d28ca958bdda4a08ff25a735b794fecf37148161a8882e490cd6",
+      "preview": "gallery/10.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 11,
+      "image_name": "60811404100000_gc743_dc141_st00bp00_mudlog_1in_md_9209_17052-rev.tif",
+      "group": "document:60811404100000_gc743_dc141_st00bp00_mudlog_1in_md_9209_17052-rev",
+      "split": "train",
+      "legend_box": [
+        79,
+        599,
+        1615,
+        1002
+      ],
+      "annotation_sha256": "c0101a3af0caade5c9f231c034afc2f37edf86755a32b303a510757679140213",
+      "preview": "gallery/11.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 12,
+      "image_name": "60811405120000_1inch tvd mudlog.tif",
+      "group": "document:60811405120000_1inch tvd mudlog",
+      "split": "train",
+      "legend_box": [
+        12,
+        596,
+        1525,
+        1003
+      ],
+      "annotation_sha256": "5579ea82b8d7c4a9e05de64d8c4da6973050ad4c161dcc142d4d896b88dfcfd2",
+      "preview": "gallery/12.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 13,
+      "image_name": "60811405350100_shenzi-sb203-st00bp01_mudlog_4320-27400.tif",
+      "group": "document:60811405350100_shenzi-sb203-st00bp01_mudlog_4320-27400",
+      "split": "train",
+      "legend_box": [
+        122,
+        898,
+        2432,
+        1505
+      ],
+      "annotation_sha256": "fede49390d8a6c2d8dffebc7a505aa7d4e59cebbf73cc2fbbe968383924d49f5",
+      "preview": "gallery/13.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 14,
+      "image_name": "60811405800000_608114058000_g16786_001_00_00_md5_mud_show_2.tif",
+      "group": "family:mdn1",
+      "split": "train",
+      "legend_box": [
+        2,
+        599,
+        1532,
+        1002
+      ],
+      "annotation_sha256": "4c74689112ae95488b6078e39c164f1c52fc4ea3c1768410fe1d5187dd4f346c",
+      "preview": "gallery/14.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 15,
+      "image_name": "60811405800100_mdn-1_st00bp01_5 inch tvdmudlog_4560ft-22998ft.tif",
+      "group": "family:mdn1",
+      "split": "train",
+      "legend_box": [
+        2,
+        599,
+        1532,
+        1002
+      ],
+      "annotation_sha256": "745666447d333a0a22a95212d945aac9bf4b4a36c4a2b69d7776af24e5fd61da",
+      "preview": "gallery/15.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 16,
+      "image_name": "60811405800300_mdn-1_st01bp01_5 inch tvdmudlog_4560ft to 20251ft.tif",
+      "group": "family:mdn1",
+      "split": "train",
+      "legend_box": [
+        60,
+        452,
+        1210,
+        768
+      ],
+      "annotation_sha256": "708956645870e9af2cc81cdf10d98807de4cdf09bc976f6c8a8207ceddcd9bde",
+      "preview": "gallery/16.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 17,
+      "image_name": "60811405800500_608114058005_g16786_001_03_00_tvd5_mud.tif",
+      "group": "family:mdn1",
+      "split": "train",
+      "legend_box": [
+        2,
+        599,
+        1532,
+        1002
+      ],
+      "annotation_sha256": "761786d8ba83a75173d11fc51b37d17a0456950b811daee5c902efeb330dbbcf",
+      "preview": "gallery/17.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 18,
+      "image_name": "60811406050000_608114060500_g31765 001 st00 bp00__master log_5640-28740_5 in_md.tif",
+      "group": "family:ardennes",
+      "split": "val",
+      "legend_box": [
+        2,
+        600,
+        1538,
+        1021
+      ],
+      "annotation_sha256": "edfdd4c44f4e28a456463d669b3ff59ec5d25ac67cb63866e1458ba6d467d6b2",
+      "preview": "gallery/18.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 19,
+      "image_name": "60811406050100_ardennes_ocs-g31765 001 st00 bp01__master log_5640-36552_5 in_md.tif",
+      "group": "family:ardennes",
+      "split": "val",
+      "legend_box": [
+        2,
+        600,
+        1538,
+        1021
+      ],
+      "annotation_sha256": "f90c5ac1d79baf1e5b3cb17642d38c4304a266bdd21cc601a913c7349ce8dddc",
+      "preview": "gallery/19.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 20,
+      "image_name": "60811407300100_bp_gc743_15607_dc222_st00bp01_mudlog_1md_10700-22872.tif",
+      "group": "document:60811407300100_bp_gc743_15607_dc222_st00bp01_mudlog_1md_10700-22872",
+      "split": "val",
+      "legend_box": [
+        447,
+        498,
+        1213,
+        1147
+      ],
+      "annotation_sha256": "2dee8000364f2a5362c79ca4a6739285518b0c97bccf44b0a68e92bc8c0f4663",
+      "preview": "gallery/20.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 21,
+      "image_name": "60811407570000_bp_gc743_15607_dc802_st00bp00_mudlog_5md_6900-17643.tif",
+      "group": "document:60811407570000_bp_gc743_15607_dc802_st00bp00_mudlog_5md_6900-17643",
+      "split": "val",
+      "legend_box": [
+        447,
+        499,
+        1211,
+        1145
+      ],
+      "annotation_sha256": "0825ed9843247ba532e0def6d21b99f4daa4f7c11fc9ea186711958cc9a23a74",
+      "preview": "gallery/21.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 22,
+      "image_name": "608114075800 - Allegheny Attic GC297 #3 OCS-G 08876 003 ST00 BP00  Mud Log 3346ft-13925ft MD.tif",
+      "group": "document:608114075800 - allegheny attic gc297 #3 ocs-g 08876 003 st00 bp00  mud log 3346ft-13925ft md",
+      "split": "train",
+      "legend_box": [
+        477,
+        590,
+        1060,
+        1144
+      ],
+      "annotation_sha256": "da2639cd6722c49ad487d7c379615fc020c642470b2fa5836bff41b85a39b3ad",
+      "preview": "gallery/22.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 23,
+      "image_name": "60812400480000_ocs-g 26419 001 st00bp00_masterlog_7860-27400_5in_md_2.tif",
+      "group": "document:60812400480000_ocs-g 26419 001 st00bp00_masterlog_7860-27400_5in_md_2",
+      "split": "train",
+      "legend_box": [
+        2,
+        890,
+        1532,
+        1219
+      ],
+      "annotation_sha256": "d3fdd2801bd958dfa1df546217520fc9b98bd9db9c0968af6afe1a85c023c561",
+      "preview": "gallery/23.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 24,
+      "image_name": "60812400810000_ocs-g 16987 003 st00bp00_1inmd_mudlog_8921_15721.tif",
+      "group": "document:60812400810000_ocs-g 16987 003 st00bp00_1inmd_mudlog_8921_15721",
+      "split": "train",
+      "legend_box": [
+        59,
+        613,
+        1606,
+        1012
+      ],
+      "annotation_sha256": "dab8269f305182edd5cbe60f83108cfe5bb41a69445af2eaadddf4ad8c91109e",
+      "preview": "gallery/24.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 25,
+      "image_name": "60812401020000_xom_ocs-g_20351_ju103_st00bp00_mudlog_10200-30900ft_5in_tvd.tif",
+      "group": "document:60812401020000_xom_ocs-g_20351_ju103_st00bp00_mudlog_10200-30900ft_5in_tvd",
+      "split": "val",
+      "legend_box": [
+        79,
+        600,
+        1615,
+        1005
+      ],
+      "annotation_sha256": "74dfe045005ba27f45319decc8cb025dc7b7d9e464ac64a3da5b6f451d76bd26",
+      "preview": "gallery/25.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 26,
+      "image_name": "60817410140000_mc822#10 1-1200 mud log.tif",
+      "group": "family:mc822",
+      "split": "train",
+      "legend_box": [
+        2,
+        594,
+        1532,
+        1000
+      ],
+      "annotation_sha256": "1d5d0fd4056dec8c91edb15e740472a8ad309b4b81535ecdf729f6840a65fd7d",
+      "preview": "gallery/26.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 27,
+      "image_name": "60817410140100_mc822#10bp01 1-240 tvd mud log.tif",
+      "group": "family:mc822",
+      "split": "train",
+      "legend_box": [
+        2,
+        594,
+        1532,
+        1000
+      ],
+      "annotation_sha256": "ee6dd46e3a542ff188ba94c43fc1905e1452bb79984108fbb856bef82652d28b",
+      "preview": "gallery/27.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 28,
+      "image_name": "60817411400100_mc761_1_st1_mudlog_1md_17133_22886.tiff",
+      "group": "family:mc761",
+      "split": "train",
+      "legend_box": [
+        0,
+        1295,
+        1223,
+        1884
+      ],
+      "annotation_sha256": "0f5de7d4617fe233e9839c969e8943b080674cbe4dc52a37f870d14d6fdaa54c",
+      "preview": "gallery/28.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 29,
+      "image_name": "60817411400100_mc761_1_st1_mudlog_1tvd_17129_20968.tif",
+      "group": "family:mc761",
+      "split": "train",
+      "legend_box": [
+        0,
+        972,
+        918,
+        1400
+      ],
+      "annotation_sha256": "1e3152370a369f5fc9f39728cd02c8d4fe6d90105125c68f0100e322fe19eb95",
+      "preview": "gallery/29.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 30,
+      "image_name": "60817411400200_mc761_1_st1_bp01_mudlog_1md_17133_25775.tiff",
+      "group": "family:mc761",
+      "split": "train",
+      "legend_box": [
+        0,
+        1295,
+        1228,
+        1881
+      ],
+      "annotation_sha256": "466b7d0d2490736f7a83ac363b6de3d66816c7f41e1ef626cd87fee86a20d790",
+      "preview": "gallery/30.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 31,
+      "image_name": "60817411420000_mc_540_#1_st00_bp00_masterlog_3400-24195_5in_md.tif",
+      "group": "document:60817411420000_mc_540_#1_st00_bp00_masterlog_3400-24195_5in_md",
+      "split": "train",
+      "legend_box": [
+        2,
+        890,
+        1532,
+        1219
+      ],
+      "annotation_sha256": "cfcd67527966db3601d54552529ba0c7e5f5c0852df8be7c95b66bc6f5dc8cc8",
+      "preview": "gallery/31.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 32,
+      "image_name": "60817411700000_mc776-5_5in_md_combo_mud_log_20415_mms.tif",
+      "group": "document:60817411700000_mc776-5_5in_md_combo_mud_log_20415_mms",
+      "split": "val",
+      "legend_box": [
+        2,
+        594,
+        1532,
+        1000
+      ],
+      "annotation_sha256": "6593d82636fdfed23c6f15a7d9bacf1f3bf64bb70de6fce21a784f778854ec64",
+      "preview": "gallery/32.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 33,
+      "image_name": "60817412840000_mc_776_6_ml_mudlog_5757_23721_5in_md_final.tif",
+      "group": "document:60817412840000_mc_776_6_ml_mudlog_5757_23721_5in_md_final",
+      "split": "train",
+      "legend_box": [
+        2,
+        599,
+        1535,
+        1001
+      ],
+      "annotation_sha256": "afe3c851e16128dc630406240026d19b545f8d9f9e044bf7f8ca19fb28355a29",
+      "preview": "gallery/33.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 34,
+      "image_name": "60818400600100_608184006001_g08037_002_01_00_5 inch mudlog_13452ft-19912ft.tif",
+      "group": "document:60818400600100_608184006001_g08037_002_01_00_5 inch mudlog_13452ft-19912ft",
+      "split": "val",
+      "legend_box": [
+        2,
+        599,
+        1532,
+        1002
+      ],
+      "annotation_sha256": "7ad1d35154d49a3cb955d614acdb1500fe531f05f1131bcf4fe4b35e8379211f",
+      "preview": "gallery/34.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 35,
+      "image_name": "60818400650000_at0574_4_neptune_1inch_tvdmudlog_6300-17378.tif",
+      "group": "document:60818400650000_at0574_4_neptune_1inch_tvdmudlog_6300-17378",
+      "split": "train",
+      "legend_box": [
+        3,
+        1154,
+        2305,
+        1732
+      ],
+      "annotation_sha256": "0d8511e78439b24137234bd5b6b222a222939eb9c58e11140286866aa7d3a8d1",
+      "preview": "gallery/35.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 36,
+      "image_name": "Callaway 3-33 mudlog to TD.PDF.tif",
+      "group": "document:callaway 3-33 mudlog to td.pdf",
+      "split": "train",
+      "legend_box": [
+        26,
+        2081,
+        1248,
+        2381
+      ],
+      "annotation_sha256": "4d298528adb8227ab03abe6add497dde2c932354a7943762a37ba9866eeaf65d",
+      "preview": "gallery/36.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 37,
+      "image_name": "Critter Creek 201-1807H_Mud_PDF_Vertical.pdf.tif",
+      "group": "family:critter_creek",
+      "split": "val",
+      "legend_box": [
+        28,
+        2276,
+        1248,
+        2529
+      ],
+      "annotation_sha256": "889b47e59b9c8e61a72fc0fd52544ac362c4900194da55ffdfb2a40eeed171a3",
+      "preview": "gallery/37.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 38,
+      "image_name": "Critter Creek 202-1807H_Mud_Vertical_PDF.pdf.tif",
+      "group": "family:critter_creek",
+      "split": "val",
+      "legend_box": [
+        28,
+        2302,
+        1248,
+        2563
+      ],
+      "annotation_sha256": "3046609ee52a3fcfe653c07bc472adc7bf73cd739f94a32ff5fb727152b71298",
+      "preview": "gallery/38.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 39,
+      "image_name": "MC765_P011_ST00BP00_1inchMD_Depth_MudLog_3686-20707ft.tif",
+      "group": "family:mc765_p011",
+      "split": "train",
+      "legend_box": [
+        79,
+        904,
+        1621,
+        1327
+      ],
+      "annotation_sha256": "b0d3b463dce02a564cc7e579b6c2f029a12ac1c838991fcc793c12b60d0b8521",
+      "preview": "gallery/39.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 40,
+      "image_name": "MC765_P011_ST00BP00_5inchMD_Depth_MudLog_3686-20707ft.tif",
+      "group": "family:mc765_p011",
+      "split": "train",
+      "legend_box": [
+        79,
+        904,
+        1621,
+        1327
+      ],
+      "annotation_sha256": "089267d590c2097e2cf656f5cb3ffb7289fef88a18a2f7ed91925d8842593046",
+      "preview": "gallery/40.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 41,
+      "image_name": "MC765_P011_ST00BP00_5inchTVD_Depth_MudLog_3686-16495ft.tif",
+      "group": "family:mc765_p011",
+      "split": "train",
+      "legend_box": [
+        79,
+        904,
+        1621,
+        1327
+      ],
+      "annotation_sha256": "652af974b9555cb31f9bc617239e1aea6bc757bebece9fdb5e0efcba7fdad2df",
+      "preview": "gallery/41.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 42,
+      "image_name": "MC765_P011_ST00BP01_5inchMD_Depth_MudLog_18230-21150ft.tif",
+      "group": "family:mc765_p011",
+      "split": "train",
+      "legend_box": [
+        79,
+        904,
+        1621,
+        1327
+      ],
+      "annotation_sha256": "57e9ffbdac5edf7a66286690e203433c99192aa0c5b36969349d4635eb118171",
+      "preview": "gallery/42.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 43,
+      "image_name": "Mudlog-Trail Mtn1Palisades.tif",
+      "group": "document:mudlog-trail mtn1palisades",
+      "split": "train",
+      "legend_box": [
+        75,
+        691,
+        673,
+        1215
+      ],
+      "annotation_sha256": "5206010169e5f00b030cc10ea2a3616cc58b46d1ee3dd3371b1996c0dc206e42",
+      "preview": "gallery/43.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "compact_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 44,
+      "image_name": "Mudlog_MD_FREEMAN 3 24 ST.tif",
+      "group": "document:mudlog_md_freeman 3 24 st",
+      "split": "val",
+      "legend_box": [
+        4,
+        1184,
+        1272,
+        1632
+      ],
+      "annotation_sha256": "277d36a83a8086953da227ba7fddd1fd3201e605dd8748a5ad86abec43cc5d28",
+      "preview": "gallery/44.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "none",
+      "notes": "Unframed symbol list: preserve annotated content extent; do not require a rectangular border."
+    },
+    {
+      "index": 45,
+      "image_name": "Rio_Lavaca_1748_Unit_1_241_MUD.tif",
+      "group": "family:rio",
+      "split": "train",
+      "legend_box": [
+        34,
+        3299,
+        1667,
+        3644
+      ],
+      "annotation_sha256": "d24d6b4fd2951e3988eae9d8c006644173104a569f6ded5218c5972b9513b47d",
+      "preview": "gallery/45.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 46,
+      "image_name": "Rio_Nueces_3744_Unit_1_212_MUD_5IN.tif",
+      "group": "family:rio",
+      "split": "train",
+      "legend_box": [
+        34,
+        3299,
+        1667,
+        3644
+      ],
+      "annotation_sha256": "5322308ce496dd460151ac386a33662fed5e1c9922b5b1b96fec1defabc2382d",
+      "preview": "gallery/46.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 47,
+      "image_name": "Rio_Nueces_3744_Unit_1_222_5IN_MUD.tif",
+      "group": "family:rio",
+      "split": "train",
+      "legend_box": [
+        34,
+        3299,
+        1667,
+        3644
+      ],
+      "annotation_sha256": "a07bc15dd1f93be38711e74386caf938dde5c6bdf8b20d6f7444571bc7d3357d",
+      "preview": "gallery/47.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 48,
+      "image_name": "Rio_San_Gabriel_2829_Unit_2_272_MUD.tif",
+      "group": "family:rio",
+      "split": "train",
+      "legend_box": [
+        26,
+        2268,
+        1274,
+        2521
+      ],
+      "annotation_sha256": "6355e7d45049dee8a2fb30b9346f20d6ce60095cec2e158229c61a04615db2f2",
+      "preview": "gallery/48.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rounded",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 49,
+      "image_name": "Shell_08852_KE001_ST01BP00_1inTVD_MudLog_17564-20124ft.tif",
+      "group": "document:shell_08852_ke001_st01bp00_1intvd_mudlog_17564-20124ft",
+      "split": "train",
+      "legend_box": [
+        40,
+        891,
+        1612,
+        1127
+      ],
+      "annotation_sha256": "6a9e0bc271307f4c06d02a647450d141a9c9934757aace0c696075966cde89bc",
+      "preview": "gallery/49.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    },
+    {
+      "index": 50,
+      "image_name": "Shell_AC0336_OCS-G-36102_001_ST00BP01_5inchMD_MudLog_9100 ft -27770 ft.tif",
+      "group": "document:shell_ac0336_ocs-g-36102_001_st00bp01_5inchmd_mudlog_9100 ft -27770 ft",
+      "split": "train",
+      "legend_box": [
+        30,
+        668,
+        1208,
+        832
+      ],
+      "annotation_sha256": "fe376dd2239b5e3edce0a4b3853b53f38d5b8d9ad09bd870806849ebd741c5b2",
+      "preview": "gallery/50.jpg",
+      "review_status": "visually_reviewed_no_change",
+      "layout": "wide_table",
+      "frame": "rectangular",
+      "notes": "Complete annotated legend inspected, including title and last symbol row; no clear correction."
+    }
+  ],
+  "reviewed_at": "2026-11-07"
+}

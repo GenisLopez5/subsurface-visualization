@@ -15,6 +15,31 @@ from .common import load_annotation, open_scan, read_crop, write_json
 LEGEND_CLASS_NAMES = ("lithology_legend",)
 
 
+def _band_definitions(annotation: dict[str, Any], variants: int, negatives: bool):
+    """Complete positives with asymmetric margins; hard header/body negatives."""
+    width, height = annotation["width"], annotation["height"]
+    legend = annotation["bounding_boxes"]["lithology_legend"]
+    extent = legend[3] - legend[1]
+    definitions = []
+    margins = ((1.0, 1.0), (.35, 1.0), (1.0, .35), (.6, .6))
+    for index in range(variants):
+        above, below = margins[index % len(margins)]
+        top = max(0, math.floor(legend[1] - above * extent))
+        bottom = min(height, math.ceil(legend[3] + below * extent))
+        definitions.append(("positive", (0, top, width, bottom), index))
+    if negatives:
+        # Each negative has zero intersection with the sole annotated legend.
+        length = max(32, round(1.5 * extent))
+        candidates = [
+            (max(0, math.floor(legend[1]) - length), math.floor(legend[1])),
+            (math.ceil(legend[3]), min(height, math.ceil(legend[3]) + length)),
+        ]
+        for index, (top, bottom) in enumerate(candidates):
+            if bottom-top >= min(32, height):
+                definitions.append(("negative", (0, top, width, bottom), index))
+    return definitions
+
+
 def _positive_tops(annotation: dict[str, Any], variants: int) -> list[int]:
     width, height = annotation["width"], annotation["height"]
     crop_height = min(width, height)
@@ -62,12 +87,15 @@ def prepare_legend_dataset(
     imgsz: int = 2048,
     train_variants: int = 4,
     include_negatives: bool = True,
+    crop_mode: str = "square",
 ) -> dict[str, Any]:
     """Export complete legends at several header positions without split leakage."""
     if imgsz < 32 or imgsz % 32:
         raise ValueError("imgsz must be a positive multiple of 32")
     if train_variants < 1:
         raise ValueError("train_variants must be positive")
+    if crop_mode not in {"square", "band"}:
+        raise ValueError("crop_mode must be square or band")
     manifest_path = Path(manifest_path).expanduser().resolve()
     output = Path(output_dir).expanduser().resolve()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -92,24 +120,24 @@ def prepare_legend_dataset(
         stem += "_" + hashlib.sha256(record["image_name"].encode()).hexdigest()[:8]
         crop_height = min(annotation["width"], annotation["height"])
         definitions = [
-            ("positive", top, index)
+            ("positive", (0, top, annotation["width"], top + crop_height), index)
             for index, top in enumerate(_positive_tops(annotation, variants))
-        ]
+        ] if crop_mode == "square" else _band_definitions(annotation, variants, include_negatives)
         negative_top = _negative_top(annotation) if include_negatives else None
-        if negative_top is not None:
-            definitions.append(("negative", negative_top, 0))
+        if crop_mode == "square" and negative_top is not None:
+            definitions.append(("negative", (0, negative_top, annotation["width"], negative_top + crop_height), 0))
         with open_scan(record["image_path"]) as scan:
             if scan.size != (annotation["width"], annotation["height"]):
                 raise ValueError(f"Image/annotation dimensions disagree: {record['image_name']}")
-            for kind, top, index in definitions:
-                tile = (0, top, scan.width, top + crop_height)
+            for kind, tile, index in definitions:
                 suffix = f"{kind}_{index:02d}"
                 image_path = output / "images" / split / f"{stem}_{suffix}.png"
                 label_path = output / "labels" / split / f"{stem}_{suffix}.txt"
                 image_path.parent.mkdir(parents=True, exist_ok=True)
                 label_path.parent.mkdir(parents=True, exist_ok=True)
-                target_height = max(1, round(crop_height * imgsz / scan.width))
-                with read_crop(scan, tile, size=(imgsz, target_height)) as bitmap:
+                scale = imgsz / max(tile[2]-tile[0], tile[3]-tile[1])
+                size = (max(1, round((tile[2]-tile[0])*scale)), max(1, round((tile[3]-tile[1])*scale)))
+                with read_crop(scan, tile, size=size) as bitmap:
                     bitmap.save(image_path)
                 line = _label(annotation["bounding_boxes"]["lithology_legend"], tile) if kind == "positive" else ""
                 label_path.write_text(line + ("\n" if line else ""), encoding="utf-8")
@@ -138,6 +166,7 @@ def prepare_legend_dataset(
         "imgsz": imgsz,
         "train_variants": train_variants,
         "include_negatives": include_negatives,
+        "crop_mode": crop_mode,
         "materialized": True,
         "class_names": list(LEGEND_CLASS_NAMES),
         "source_groups": {name: sorted(values) for name, values in groups.items()},

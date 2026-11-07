@@ -14,10 +14,11 @@ from bbox_detector.common import find_dataset
 
 
 SOURCE_FILES = (
-    "README.md", "docs/classical.md", "docs/legend.md", "requirements.txt", "requirements-cv.txt", "requirements-dev.txt", "pytest.ini",
+    "README.md", "docs/classical.md", "docs/legend.md", "docs/legend_optimization.md", "docs/legend_review.json", "docs/legend_policy.json", "requirements.txt", "requirements-cv.txt", "requirements-dev.txt", "pytest.ini",
     "prepare_dataset.py", "train_bboxes.py", "predict_bboxes.py", "evaluate_bboxes.py",
     "tools/package_colab.py", "tools/build_templates.py", "tools/benchmark_bboxes.py", "tools/train_legend.py", "tools/evaluate_legend.py",
-    "notebooks/train_colab.ipynb", "notebooks/classical_colab.ipynb", "notebooks/legend_colab.ipynb",
+    "tools/audit_legends.py", "tools/optimize_legends.py", "tools/train_legend_bands.py",
+    "notebooks/train_colab.ipynb", "notebooks/classical_colab.ipynb", "notebooks/legend_colab.ipynb", "notebooks/legend_optimize_colab.ipynb",
 )
 
 

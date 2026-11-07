@@ -22,6 +22,7 @@ def train_legend_model(
     workers: int = 2,
     seed: int = 42,
     max_hours: float | None = None,
+    rect: bool = False,
     model_factory: Callable | None = None,
 ) -> dict:
     return train_model(
@@ -38,5 +39,6 @@ def train_legend_model(
         workers=workers,
         seed=seed,
         max_hours=max_hours,
+        rect=rect,
         model_factory=model_factory,
     )
