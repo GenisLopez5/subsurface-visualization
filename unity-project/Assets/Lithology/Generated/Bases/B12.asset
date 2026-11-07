@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0551ffe3a0c9794489a2daf01ccb30fe, type: 3}
+  m_Name: B12
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.BaseTextureSet
+  stableId: B12
+  description: Granular / oolitic limestone
+  procurementGuidance: 'A carbonate-grain texture with a separate grain-versus-matrix
+    mask. Keep an ooid-specific variant or mask; generic packstone and grainstone
+    must not automatically inherit ooids. Search: granular limestone seamless PBR;
+    oolitic limestone ooid texture.'
+  albedo: {fileID: 2800000, guid: 50e3eb21f4893014195655d7295dada8, type: 3}
+  normal: {fileID: 0}
+  surface: {fileID: 2800000, guid: bdc50a03b01337743a6dfc7eaa3034f3, type: 3}
+  height: {fileID: 2800000, guid: d03ff354a35bdd149a594f6ee7f212ac, type: 3}
+  componentMask: {fileID: 0}
+  detailAlbedo: {fileID: 2800000, guid: 44724281ddcb90e4ab831fb6775ad6c2, type: 3}
+  detailNormal: {fileID: 2800000, guid: f1af30a4bd06fd641924d990f10e947e, type: 3}
+  detailMask: {fileID: 2800000, guid: af6679be69c17f643b2c4fd3ddeb9eb7, type: 3}
+  surfaceLayout: R Metallic / G AO / B unused / A Smoothness
+  illustrativePreview: 1
+  conditional: 0
+  independentGrainScale: 1
+  hasSeparatedMacro: 1
+  supportsHeightDisplacement: 0
+  invertNormalGreen: 0
+  macroTileMetres: 1
+  detailTileMetres: 0.01
+  detailColorStrength: 0.4
+  sourceNotes: Illustrative deterministic procedural preview. No specimen observations.
+  licenseNotes: Generated locally for this project; no external scan.
+  sourceUrl: 
+  physicalScaleEvidence: Unknown; numerical defaults are artistic
+  revision: 3

@@ -1,0 +1,66 @@
+[
+  {
+    "label": "Claystone Silty Clay",
+    "intervals": 55,
+    "lookup": "Unknown",
+    "role": "Unknown",
+    "schematic": true,
+    "definition": null
+  },
+  {
+    "label": "Salt (K-Na-Mg)",
+    "intervals": 20,
+    "lookup": "Exact",
+    "role": "GenericClass",
+    "schematic": true,
+    "definition": "L138"
+  },
+  {
+    "label": "Gypsum/Anhyd",
+    "intervals": 25,
+    "lookup": "Unknown",
+    "role": "Unknown",
+    "schematic": true,
+    "definition": null
+  },
+  {
+    "label": "Chert",
+    "intervals": 13,
+    "lookup": "Exact",
+    "role": "Physical",
+    "schematic": false,
+    "definition": "L078"
+  },
+  {
+    "label": "Dolomite",
+    "intervals": 2,
+    "lookup": "Exact",
+    "role": "Physical",
+    "schematic": false,
+    "definition": "L059"
+  },
+  {
+    "label": "Claystone Sililicif",
+    "intervals": 9,
+    "lookup": "Unknown",
+    "role": "Unknown",
+    "schematic": true,
+    "definition": null
+  },
+  {
+    "label": "Marl",
+    "intervals": 2,
+    "lookup": "Exact",
+    "role": "Physical",
+    "schematic": false,
+    "definition": "L009"
+  },
+  {
+    "label": "Coal Dolomite",
+    "intervals": 5,
+    "lookup": "Unknown",
+    "role": "Unknown",
+    "schematic": true,
+    "definition": null
+  }
+]

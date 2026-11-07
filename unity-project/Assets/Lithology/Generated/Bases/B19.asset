@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0551ffe3a0c9794489a2daf01ccb30fe, type: 3}
+  m_Name: B19
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.BaseTextureSet
+  stableId: B19
+  description: Volcanic cinder / scoria
+  procurementGuidance: 'A vesicular volcanic material with a usable cavity mask and
+    normal or height map. Visible holes at close range may require geometry instead
+    of surface shading alone. Search: volcanic scoria seamless PBR; cinder vesicular
+    rock texture.'
+  albedo: {fileID: 2800000, guid: fb284446bbae294459828036e66f4def, type: 3}
+  normal: {fileID: 0}
+  surface: {fileID: 2800000, guid: 45caf830c13a1474d9eab61d25e7e974, type: 3}
+  height: {fileID: 2800000, guid: 1d6c7e4aa64247b42aa26ad370879263, type: 3}
+  componentMask: {fileID: 0}
+  detailAlbedo: {fileID: 2800000, guid: 4adb80fd9684e9947a452f26b5a37d1b, type: 3}
+  detailNormal: {fileID: 2800000, guid: c7d602e23fdd88b448e45d44ba6608b3, type: 3}
+  detailMask: {fileID: 2800000, guid: 702167926cd7ed04b94710e501a8fb13, type: 3}
+  surfaceLayout: R Metallic / G AO / B unused / A Smoothness
+  illustrativePreview: 1
+  conditional: 0
+  independentGrainScale: 1
+  hasSeparatedMacro: 1
+  supportsHeightDisplacement: 0
+  invertNormalGreen: 0
+  macroTileMetres: 1
+  detailTileMetres: 0.01
+  detailColorStrength: 0.4
+  sourceNotes: Illustrative deterministic procedural preview. No specimen observations.
+  licenseNotes: Generated locally for this project; no external scan.
+  sourceUrl: 
+  physicalScaleEvidence: Unknown; numerical defaults are artistic
+  revision: 3

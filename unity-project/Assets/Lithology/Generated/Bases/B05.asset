@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0551ffe3a0c9794489a2daf01ccb30fe, type: 3}
+  m_Name: B05
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.BaseTextureSet
+  stableId: B05
+  description: Cemented sandstone
+  procurementGuidance: 'A sandstone surface showing packed grains and an intergranular
+    matrix or cement. Prefer an unweathered surface; avoid masonry blocks and strong
+    bedding that cannot be disabled. Search: sandstone fresh surface seamless PBR;
+    sandstone grain matrix texture.'
+  albedo: {fileID: 2800000, guid: 9759b588fda99154f9125750f35e6536, type: 3}
+  normal: {fileID: 0}
+  surface: {fileID: 2800000, guid: 982e944909620a0439ab199c2ada2754, type: 3}
+  height: {fileID: 2800000, guid: 48dde982ffa7bfd41b39b10f82baf314, type: 3}
+  componentMask: {fileID: 0}
+  detailAlbedo: {fileID: 2800000, guid: 3deccff7988550e49813ec4d8503e39e, type: 3}
+  detailNormal: {fileID: 2800000, guid: 305e5f40b1aaff445b7c81ff6f00782b, type: 3}
+  detailMask: {fileID: 2800000, guid: 08d941c0b756fa44b9027f82561684b9, type: 3}
+  surfaceLayout: R Metallic / G AO / B unused / A Smoothness
+  illustrativePreview: 1
+  conditional: 0
+  independentGrainScale: 1
+  hasSeparatedMacro: 1
+  supportsHeightDisplacement: 0
+  invertNormalGreen: 0
+  macroTileMetres: 1
+  detailTileMetres: 0.01
+  detailColorStrength: 0.4
+  sourceNotes: Illustrative deterministic procedural preview. No specimen observations.
+  licenseNotes: Generated locally for this project; no external scan.
+  sourceUrl: 
+  physicalScaleEvidence: Unknown; numerical defaults are artistic
+  revision: 3

@@ -1,0 +1,14 @@
+.control-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 320px; padding: 18px; background-color: rgb(24,32,36); color: rgb(229,231,220); }
+.title { font-size: 30px; -unity-font-style: bold; margin-bottom: 8px; }
+.eyebrow { font-size: 10px; color: rgb(158,192,174); margin-bottom: 12px; letter-spacing: 1px; }
+.notice { background-color: rgb(43,56,57); padding: 10px; margin-top: 14px; margin-bottom: 14px; font-size: 11px; white-space: normal; }
+.button-row { flex-direction: row; margin-bottom: 12px; }
+.button-row Button { flex-grow: 1; margin-right: 4px; }
+.control-panel Button { background-color: rgb(61,81,78); color: rgb(239,237,218); border-width: 0; padding: 7px; }
+.control-panel Toggle, .control-panel TextField, .control-panel DropdownField, .control-panel Slider { margin-top: 7px; margin-bottom: 7px; }
+.control-panel .unity-base-field__label { color: rgb(217,224,214); min-width: 100px; white-space: normal; }
+.info { white-space: normal; margin-top: 14px; margin-bottom: 18px; padding-top: 12px; border-top-width: 1px; border-top-color: rgb(86,111,103); font-size: 12px; }
+.control-panel .unity-text-input, .control-panel .unity-base-popup-field__input { background-color: rgb(45,59,62); color: rgb(239,237,218); border-color: rgb(91,116,107); }
+.control-panel .unity-base-popup-field__text, .control-panel .unity-text-element { color: rgb(229,231,220); }
+.control-panel .unity-toggle__checkmark { background-color: rgb(62,79,77); border-color: rgb(136,166,146); }
+.control-panel .unity-base-text-field__input, .control-panel .unity-text-field__input { background-color: rgb(45,59,62); color: rgb(239,237,218); }

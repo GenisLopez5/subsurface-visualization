@@ -1,0 +1,58 @@
+# Unity caches and generated files
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/UIElementsSchema/
+
+# Build output
+/[Bb]uild/
+/[Bb]uilds/
+/ServerData/
+/*_BackUpThisFolder_ButDontShipItWithYourGame/
+/*_BurstDebugInformation_DoNotShip/
+
+# Unity Version Control / Plastic workspace
+/.plastic/
+
+# IDE caches and generated solutions
+.vs/
+.idea/
+.gradle/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.DotSettings.user
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Generated debug metadata
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Logs, temporary files and crash reports
+*.log
+*.tmp
+sysinfo.txt
+mono_crash.*
+.dirstamp
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Unity recovery files
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta

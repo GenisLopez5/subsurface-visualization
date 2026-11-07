@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "initialFrame": 25369,
+  "finalFrame": 25491,
+  "sourceIntervals": 17,
+  "topFeet": 25400,
+  "bottomFeet": 25700,
+  "wheelWorks": true,
+  "dragWorks": true,
+  "zoomWorks": true,
+  "clickWorks": true,
+  "pickerAdapterWorks": true,
+  "gapWorks": true,
+  "invalidImportRetainsPrevious": true,
+  "documentImageApiWorks": true,
+  "viewSwitchPreservesDepth": true,
+  "staleImageCleared": true
+}

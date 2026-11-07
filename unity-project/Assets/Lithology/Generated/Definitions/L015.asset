@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f97fcecb6ae05343aa99c8fa3c31fc7, type: 3}
+  m_Name: L015
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.LithologyDefinition
+  stableId: L015
+  rawLabel: Silty Clay-Shale
+  provisionalNormalizedName: 
+  role: 0
+  interpretation: 0
+  requiresSourceLegend: 0
+  sourceVerified: 0
+  prefixExpanded: 0
+  sourceInstructions: clay_content, silt_content, lamination
+  sourceLocations:
+  - source: Supplied implementation brief / pasted extraction
+    mappingRow: 15
+    briefLine: 201
+    extractionLocation: Unknown
+    pdfFile: Unknown
+    pdfPage: Unknown
+    codebook: Unknown
+  optionalComponentSources: []
+  possibleButUnselectedBases: []
+  generatedRecipe: {fileID: 11400000, guid: afb3c5ea52b13a542985d26663b7e6a9, type: 2}
+  confirmedRecipe: {fileID: 0}
+  confirmationEvidence: 
