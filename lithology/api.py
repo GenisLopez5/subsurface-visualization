@@ -85,9 +85,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from . import files_api
 
     hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store)
-    from . import legend_review
-
-    app.include_router(legend_review.make_router(s, store, images, jobs.lock))
     app.state.settings, app.state.jobs = s, jobs
 
     # ------------------------------------------------------------------ helpers
