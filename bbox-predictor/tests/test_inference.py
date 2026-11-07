@@ -82,6 +82,31 @@ def test_cross_class_overlap_is_preserved(tmp_path):
     assert result["bounding_boxes"][CLASS_NAMES[1]] == [12, 20, 24, 230]
 
 
+def test_columns_share_union_of_vertical_extents_and_keep_independent_x(tmp_path):
+    image = _image(tmp_path)
+    boxes = _regions()
+    boxes[0] = (10, 30, 20, 210)
+    boxes[1] = (40, 20, 50, 230)
+    diagnostics = {}
+    result = predict_document(
+        image,
+        detector=GeometricDetector(document_tiles(100, 250), boxes),
+        imgsz=64,
+        diagnostics=diagnostics,
+    )
+    assert result["bounding_boxes"][CLASS_NAMES[0]] == [10, 20, 20, 230]
+    assert result["bounding_boxes"][CLASS_NAMES[1]] == [40, 20, 50, 230]
+    assert diagnostics["shared_column_vertical_extent"] == {
+        "applied": True,
+        "top": 20,
+        "bottom": 230,
+        "original_boxes": {
+            CLASS_NAMES[0]: [10, 30, 20, 210],
+            CLASS_NAMES[1]: [40, 20, 50, 230],
+        },
+    }
+
+
 def test_censored_boundaries_recovered_from_overlapping_interiors(tmp_path):
     image = _image(tmp_path, size=(100, 350))
     boxes = {0: (10, 50, 20, 300), 1: (40, 50, 50, 300), 2: (25, 5, 85, 20)}
@@ -108,7 +133,8 @@ def test_recentered_retry_resolves_endpoint(tmp_path):
     detector = AmbiguousDetector(tiles + [(0, 25, 100, 125)], boxes, skipped={(0, 0)})
     diagnostics = {}
     result = predict_document(image, detector=detector, imgsz=64, diagnostics=diagnostics)
-    assert result["bounding_boxes"][CLASS_NAMES[0]] == [10, 70, 20, 230]
+    assert result["bounding_boxes"][CLASS_NAMES[0]] == [10, 20, 20, 230]
+    assert diagnostics["shared_column_vertical_extent"]["original_boxes"][CLASS_NAMES[0]] == [10, 70, 20, 230]
     assert diagnostics["retry_tiles"] == 1
 
 

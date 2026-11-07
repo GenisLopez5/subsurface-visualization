@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 import zipfile
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 from bbox_detector.common import find_dataset
 
 
-ROOT = Path(__file__).resolve().parent
 SOURCE_FILES = (
-    "README.md", "requirements.txt", "requirements-dev.txt", "pytest.ini",
+    "README.md", "docs/classical.md", "docs/legend.md", "requirements.txt", "requirements-cv.txt", "requirements-dev.txt", "pytest.ini",
     "prepare_dataset.py", "train_bboxes.py", "predict_bboxes.py", "evaluate_bboxes.py",
-    "package_colab.py", "train_colab.ipynb",
+    "tools/package_colab.py", "tools/build_templates.py", "tools/benchmark_bboxes.py", "tools/train_legend.py", "tools/evaluate_legend.py",
+    "notebooks/train_colab.ipynb", "notebooks/classical_colab.ipynb", "notebooks/legend_colab.ipynb",
 )
 
 

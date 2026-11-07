@@ -2,16 +2,32 @@
 
 Entrenament i predicció de `depth_column`, `interpreted_lithology_column` i `lithology_legend` amb YOLO11s. El predictor retorna les caixes en píxels de la imatge original, compatibles amb el notebook del repte.
 
-El codi està preparat per entrenar a Colab. **Encara cal executar l’entrenament per obtenir `best.pt` i mesurar la precisió real.** Els tests de geometria i les proves amb dades sintètiques comproven el funcionament del pipeline; no són una estimació de fidelitat sobre documents nous.
+També hi ha una alternativa **OpenCV sense xarxes neuronals** i un backend **híbrid YOLO + línies**, amb un benchmark compartit. Consulta [la documentació clàssica](docs/classical.md) i el notebook [classical_colab.ipynb](notebooks/classical_colab.ipynb) per executar-los en CPU o comparar-los amb els teus pesos.
+
+La llegenda és el principal coll d'ampolla del model general. El notebook [legend_colab.ipynb](notebooks/legend_colab.ipynb) entrena un detector d'una sola classe sobre capçaleres i el compara amb els JSON de validació existents, sense tornar a entrenar les columnes. Consulta [les instruccions del detector de llegenda](docs/legend.md).
+
+## Estructura
+
+- `bbox_detector/`: implementació reutilitzable.
+- `prepare_dataset.py`, `train_bboxes.py`, `predict_bboxes.py`, `evaluate_bboxes.py`: comandes principals.
+- `tools/`: empaquetat, plantilles OpenCV i benchmarks.
+- `notebooks/`: notebooks de Colab.
+- `docs/`: documentació addicional.
+- `tests/`: proves automatitzades.
 
 ## Començar a Colab
 
-1. Des d’aquest directori executa `python3 package_colab.py`. Genera `artifacts/colab_bundle.zip` amb codi, notebook i els 51 TIFF anotats. No cal instal·lar PyTorch per empaquetar; sí Pillow per importar les utilitats compartides.
-2. Puja el ZIP a **My Drive/subsurface-bboxes/colab_bundle.zip**. Obre [train_colab.ipynb](train_colab.ipynb) a Google Colab i activa una GPU T4 o superior.
+1. Des d’aquest directori executa `python3 tools/package_colab.py`. Genera `artifacts/colab_bundle.zip` amb codi, notebook i els 51 TIFF anotats. No cal instal·lar PyTorch per empaquetar; sí Pillow per importar les utilitats compartides.
+2. Puja el ZIP a **My Drive/subsurface-bboxes/colab_bundle.zip**. Obre [train_colab.ipynb](notebooks/train_colab.ipynb) a Google Colab i activa una GPU T4 o superior.
 3. Executa les cel·les en ordre. Els retalls es preparen al disc local de Colab; pesos, logs i validació es guarden a Drive sota `subsurface-bboxes/runs/<data-hora>/`.
 4. Descarrega `inference_export.zip`, generat al final, per executar el predictor localment amb els pesos entrenats.
 
-El ZIP pesa aproximadament 1 GB. Si ja tens les imatges a Colab, pots fer `python3 package_colab.py --source-only` i ajustar `DATASET` al notebook. Les descàrregues de dependències i pesos inicials necessiten internet. La predicció utilitza pesos locals i no crida APIs externes.
+El ZIP pesa aproximadament 1 GB. Si ja tens les imatges a Colab, pots fer `python3 tools/package_colab.py --source-only` i ajustar `DATASET` al notebook. Les descàrregues de dependències i pesos inicials necessiten internet. La predicció utilitza pesos locals i no crida APIs externes.
+
+Per millorar només la llegenda amb el model general ja entrenat, obre
+[legend_colab.ipynb](notebooks/legend_colab.ipynb). Necessita els JSON de
+`runs/20261107-151404/validation/predictions/` a Drive i guarda el nou model a
+`subsurface-bboxes/legend-runs/<data-hora>/`.
 
 ## Entorn local
 
@@ -71,9 +87,9 @@ La sortida té aquest contracte:
 
 Les coordenades són enteres `[xmin, ymin, xmax, ymax]`, amb origen superior esquerre i màxims exclusius. Els números de l’exemple només il·lustren el format. No cal proporcionar anotacions al predictor. Es comprova que els pesos continguin exactament les tres classes; els pesos COCO inicials encara no serveixen per predir-les.
 
-La inferència recorre franges quadrades de tota l’amplada amb un 50% de solapament. Agrupa deteccions compatibles en X i trams continus en Y, i estima els extrems amb deteccions interiors als retalls. Els extrems censurats es tornen a processar amb retalls desplaçats. Les classes es reconstrueixen independentment: algunes anotacions legítimes se solapen en X. Si una regió continua sense resoldre’s, el procés acaba amb codi 2 i missatge explícit, sense escriure un JSON nou de successos. Fes servir una ruta nova per intent per evitar confondre una sortida antiga amb una predicció fallida.
+La inferència recorre franges quadrades de tota l’amplada amb un 50% de solapament. Agrupa deteccions compatibles en X i trams continus en Y, i estima els extrems amb deteccions interiors als retalls. Els extrems censurats es tornen a processar amb retalls desplaçats. Les X de les dues columnes es reconstrueixen independentment, però comparteixen el menor `ymin` i el major `ymax`: aquesta convenció es compleix exactament en les 51 anotacions. Si una regió continua sense resoldre’s, el procés acaba amb codi 2 i missatge explícit, sense escriure un JSON nou de successos. Fes servir una ruta nova per intent per evitar confondre una sortida antiga amb una predicció fallida.
 
-L’ajust a línies d’OpenCV queda desactivat: cal demostrar una millora en validació abans d’activar un refinament que podria eliminar marges correctament anotats.
+L'ajust a línies d'OpenCV s'activa explícitament amb `--backend hybrid`. El backend per defecte és `yolo`; compara els resultats amb [el benchmark](docs/classical.md) abans de triar el refinament, perquè podria eliminar marges correctament anotats.
 
 ## Avaluar les caixes finals
 

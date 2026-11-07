@@ -17,6 +17,7 @@ def training_options(
     data: str | Path,
     output: str | Path,
     *,
+    run_name: str = "detector",
     epochs: int = 60,
     patience: int = 10,
     imgsz: int = 1536,
@@ -27,6 +28,8 @@ def training_options(
     max_hours: float | None = None,
 ) -> dict:
     """Keep geometry and readable text intact while varying scale/illumination."""
+    if not run_name or Path(run_name).name != run_name:
+        raise ValueError("run_name must be a simple nonempty directory name")
     if epochs < 1 or patience < 0 or batch < 1 or workers < 0:
         raise ValueError("epochs/batch must be positive; patience/workers nonnegative")
     if imgsz < 32 or imgsz % 32:
@@ -36,7 +39,7 @@ def training_options(
     options = {
         "data": str(Path(data).resolve()),
         "project": str(Path(output).resolve()),
-        "name": "detector",
+        "name": run_name,
         "exist_ok": False,
         "epochs": epochs,
         "patience": patience,
@@ -75,7 +78,7 @@ def training_options(
     return options
 
 
-def validate_training_data(data: str | Path) -> dict:
+def validate_training_data(data: str | Path, class_names: tuple[str, ...] = CLASS_NAMES) -> dict:
     import yaml
 
     data = Path(data).resolve()
@@ -89,8 +92,8 @@ def validate_training_data(data: str | Path) -> dict:
             names = [names.get(i, names.get(str(i))) for i in range(len(names))]
         except (KeyError, TypeError) as error:
             raise ValueError("Invalid class mapping in dataset YAML") from error
-    if names != list(CLASS_NAMES):
-        raise ValueError(f"Dataset classes must be {list(CLASS_NAMES)!r} in that order")
+    if names != list(class_names):
+        raise ValueError(f"Dataset classes must be {list(class_names)!r} in that order")
     root = Path(config.get("path", data.parent))
     if not root.is_absolute():
         root = data.parent / root
@@ -119,7 +122,8 @@ def validate_training_data(data: str | Path) -> dict:
         manifest = json.loads(manifest_path.read_text())
         if not manifest.get("materialized", True):
             raise ValueError("Dataset was only audited; run prepare_dataset.py without --audit-only")
-        groups = {split: {r["group"] for r in manifest["records"] if r["split"] == split} for split in ("train", "val")}
+        provenance = manifest.get("records", manifest.get("samples", []))
+        groups = {split: {r["group"] for r in provenance if r["split"] == split} for split in ("train", "val")}
         if groups["train"] & groups["val"]:
             raise ValueError("Document-family leakage in the dataset manifest")
     return config
@@ -145,6 +149,8 @@ def train_model(
     output: str | Path = "artifacts/training",
     *,
     model: str | Path = "yolo11s.pt",
+    class_names: tuple[str, ...] = CLASS_NAMES,
+    run_name: str = "detector",
     epochs: int = 60,
     patience: int = 10,
     imgsz: int = 1536,
@@ -160,10 +166,10 @@ def train_model(
     Native-document validation must subsequently be run with evaluate_bboxes.py;
     YOLO's best.pt is selected using validation on the sampled crops.
     """
-    validate_training_data(data)
+    validate_training_data(data, class_names)
     if Path(model).suffix != ".pt":
         raise ValueError("Use pretrained .pt weights, for example yolo11s.pt")
-    options = training_options(data, output, epochs=epochs, patience=patience, imgsz=imgsz,
+    options = training_options(data, output, run_name=run_name, epochs=epochs, patience=patience, imgsz=imgsz,
                                batch=batch, device=device, workers=workers, seed=seed, max_hours=max_hours)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -208,7 +214,7 @@ def train_model(
             continue
         break
     trainer = getattr(detector, "trainer", None)
-    save_dir = Path(trainer.save_dir).resolve() if trainer is not None else output / "detector"
+    save_dir = Path(trainer.save_dir).resolve() if trainer is not None else output / run_name
     best = save_dir / "weights" / "best.pt"
     if not best.is_file():
         raise RuntimeError(f"Training returned without a best checkpoint: {best}")
@@ -219,7 +225,7 @@ def train_model(
         except (TypeError, ValueError):
             continue
     summary = {
-        "status": "completed", "model_initialization": str(model), "best_weights": str(best),
+        "status": "completed", "model_initialization": str(model), "class_names": list(class_names), "best_weights": str(best),
         "best_weights_sha256": hashlib.sha256(best.read_bytes()).hexdigest(),
         "run_directory": str(save_dir), "data": str(Path(data).resolve()),
         "effective_batch_size": int(getattr(trainer, "batch_size", options["batch"])),

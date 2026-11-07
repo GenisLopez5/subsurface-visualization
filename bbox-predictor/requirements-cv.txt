@@ -1,0 +1,9 @@
+# Classical detector: no PyTorch, Ultralytics, neural OCR, or downloaded weights.
+Pillow>=10.4,<13
+numpy>=1.26,<3
+PyYAML>=6.0,<7
+opencv-python-headless==4.11.0.86
+# 2.2.3 still supports older pip/setuptools versions used by the target
+# notebooks; the separate binary wheel supplies a current libvips runtime.
+pyvips==2.2.3
+pyvips-binary==8.18.7

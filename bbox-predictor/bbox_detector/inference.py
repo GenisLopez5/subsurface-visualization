@@ -98,6 +98,24 @@ def _retry_tiles(estimates: dict[str, RegionEstimate], width: int, height: int, 
     return tiles
 
 
+def share_column_vertical_extent(boxes: dict[str, list[int]]) -> dict | None:
+    """Apply the dataset's shared top/bottom invariant to resolved columns."""
+    column_names = CLASS_NAMES[:2]
+    if any(name not in boxes for name in column_names):
+        return None
+    original = {name: boxes[name][:] for name in column_names}
+    top = min(original[name][1] for name in column_names)
+    bottom = max(original[name][3] for name in column_names)
+    for name in column_names:
+        boxes[name] = [original[name][0], top, original[name][2], bottom]
+    return {
+        "applied": any(boxes[name] != original[name] for name in column_names),
+        "top": top,
+        "bottom": bottom,
+        "original_boxes": original,
+    }
+
+
 def predict_document(
     image_path: str | Path,
     weights: str | Path | None = None,
@@ -192,7 +210,15 @@ def predict_document(
             unresolved[name] = ["invalid_box"]
         else:
             boxes[name] = bounded
-    details.update({"width": width, "height": height, "detections": len(detections), "unresolved": unresolved, "elapsed_seconds": time.perf_counter() - started})
+    shared_extent = share_column_vertical_extent(boxes)
+    details.update({
+        "width": width,
+        "height": height,
+        "detections": len(detections),
+        "unresolved": unresolved,
+        "shared_column_vertical_extent": shared_extent,
+        "elapsed_seconds": time.perf_counter() - started,
+    })
     if diagnostics is not None:
         diagnostics.update(details)
     if unresolved:
