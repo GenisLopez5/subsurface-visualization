@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "policy": {
+    "strategy": "fragments_frame",
+    "min_relative_confidence": 0.3,
+    "min_vertical_iou": 0.6,
+    "max_gap_fraction": 0.05,
+    "imgsz": 2048,
+    "confidence": 0.05,
+    "multiview_retry": true
+  },
+  "selection_metric": [
+    "legend_documents_iou_ge_0_8",
+    "legend_iou_mean"
+  ],
+  "workflow_version": "1.0.0",
+  "general": {
+    "imgsz": 1536,
+    "confidence": 0.25,
+    "overlap": 0.5
+  }
+}
