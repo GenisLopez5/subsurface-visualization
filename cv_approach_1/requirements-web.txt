@@ -1,0 +1,7 @@
+# Web app (installed into .venv by ./run.sh). The pipeline itself needs requirements.txt.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+# tests (pytest + FastAPI TestClient)
+httpx>=0.27
+pytest>=8.0

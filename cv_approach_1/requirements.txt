@@ -1,0 +1,11 @@
+# Python >= 3.9. Also needs the Tesseract OCR program (not pip-installable): ./setup_venv.sh puts a copy inside .venv,
+# or install it system-wide: sudo apt install tesseract-ocr (Ubuntu) / brew install tesseract (macOS)
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+scikit-learn>=1.3
+scikit-image>=0.21
+opencv-python-headless>=4.8
+pillow>=10.0
+pytesseract>=0.3.10
+matplotlib>=3.7

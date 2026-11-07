@@ -1,0 +1,6 @@
+.venv
+__pycache__
+runs/
+outputs*/
+outputs_run.log
+.pytest_cache/
