@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+# working folder (uploads, cache, temp files)
+lithology-data/
+# data never goes into the repo
+*.tif
+*.tiff
+*.pdf

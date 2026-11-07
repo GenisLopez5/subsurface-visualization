@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lithology"
+version = "0.1.0"
+description = "Lithology intervals from mud-log images, with an HTTP API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "scipy>=1.11",
+    "rapidocr>=3.0",
+    "onnxruntime>=1.18",
+    "pypdfium2>=4.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+lithology = "lithology.__main__:main"
+
+[tool.setuptools]
+packages = ["lithology"]
