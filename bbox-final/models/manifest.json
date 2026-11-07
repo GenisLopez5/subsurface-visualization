@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "models": {
+    "general": {
+      "file": "general.pt",
+      "sha256": "195361471104ba4a2751247f82cd66ccc391dcb132233cc01926f91792c221ce",
+      "classes": [
+        "depth_column",
+        "interpreted_lithology_column",
+        "lithology_legend"
+      ]
+    },
+    "legend": {
+      "file": "legend.pt",
+      "sha256": "cc55672255ac742b79b52c562eb01c93a46021e563679bdc97a00d0574889482",
+      "classes": [
+        "lithology_legend"
+      ]
+    }
+  }
+}

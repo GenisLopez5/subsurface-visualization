@@ -1,0 +1,34 @@
+{
+  "origin": "Validated bbox-predictor runtime; inference modules only",
+  "files": {
+    "common.py": {
+      "source_sha256": "2f78425d6d33c6f72ccae83fe948479e9eb21a79290d4091780d5c7bc0efe873",
+      "runtime_sha256": "7071945850dee86eb39d6617d3864f2b944b86014aa30721fd1702ba4e4f3158"
+    },
+    "aggregation.py": {
+      "source_sha256": "d02531c83d3f9991d7fa31c11c37a88bfa605fa71c05def1b702eb8e1da591a7",
+      "runtime_sha256": "d02531c83d3f9991d7fa31c11c37a88bfa605fa71c05def1b702eb8e1da591a7"
+    },
+    "inference.py": {
+      "source_sha256": "b34fd18c7f5aafcb5e355614555edd9b2e679c4b122c4eb6dd2793453ee5fe78",
+      "runtime_sha256": "b34fd18c7f5aafcb5e355614555edd9b2e679c4b122c4eb6dd2793453ee5fe78"
+    },
+    "legend_inference.py": {
+      "source_sha256": "2ceb51a5356a28ad0288993a7a49cf7c2ec7b4c2493a03cda846ce7066cf24f2",
+      "runtime_sha256": "c8391a76a5f1c0fcbfca4faa1ce26914c496b1fae862f9b11f26f564c2a53173"
+    },
+    "legend_geometry.py": {
+      "source_sha256": "9dce4104f50386ab39b61acf57f53e0ce246b782dc2ad5728508644648d3f35f",
+      "runtime_sha256": "9dce4104f50386ab39b61acf57f53e0ce246b782dc2ad5728508644648d3f35f"
+    },
+    "legend_pipeline.py": {
+      "source_sha256": "4b36bc04c794f140139d6ce77bbaa6446540c113c14cd6ed04f10853b1cf9be6",
+      "runtime_sha256": "4b36bc04c794f140139d6ce77bbaa6446540c113c14cd6ed04f10853b1cf9be6"
+    },
+    "legend_multiview.py": {
+      "source_sha256": "d26340f94425587444d6617385a15666370a515f2ee0fe1b70d4f06aa4cb69ff",
+      "runtime_sha256": "d26340f94425587444d6617385a15666370a515f2ee0fe1b70d4f06aa4cb69ff"
+    }
+  },
+  "removed": "Dataset discovery, annotation loading, cached-prediction fusion and training imports"
+}
