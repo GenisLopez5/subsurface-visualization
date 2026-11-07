@@ -65,10 +65,10 @@ def wait_done(client, rid, timeout=600):
 
 def test_health_and_config(client):
     h = client.get("/api/health").json()
-    assert h["tesseract"]["ok"], h
+    assert h["ocr"]["lithology"]["ok"] and h["ocr"]["cv"]["ok"], h
     cfg = client.get("/api/config").json()
     names = {f["name"] for f in cfg["fields"]}
-    assert {"auto_scale", "tie_ratio", "k_range", "swatch_scales"} <= names
+    assert {"method", "auto_scale", "tie_ratio", "k_range", "window_px"} <= names
     tie = next(f for f in cfg["fields"] if f["name"] == "tie_ratio")
     assert tie["type"] == "float" and tie["default"] == 0.1 and "tie" in tie["help"]
     assert client.get("/").status_code == 200
@@ -90,7 +90,7 @@ def test_upload_preflight_run_matches_cli(client):
     # bad config is rejected before anything runs
     assert client.post(f"/api/runs/{rid}/start", json={"config": {"nope": 1}}).status_code == 400
     assert client.post(f"/api/runs/{rid}/start", json={"config": {"tie_ratio": "abc"}}).status_code == 400
-    r = client.post(f"/api/runs/{rid}/start", json={"config": {}})
+    r = client.post(f"/api/runs/{rid}/start", json={"config": {"method": "cv"}})   # the 99.5% regression
     assert r.status_code == 200, r.text
     # one job at a time
     other = client.post("/api/runs", json={}).json()["id"]

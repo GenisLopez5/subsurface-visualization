@@ -97,12 +97,12 @@ async function refreshHealth() {
   try {
     const h = await api("/api/health");
     S.health = h;
-    const t = $("#tessPill");
-    t.className = "pill " + (h.tesseract.ok ? "ok" : "err");
-    t.textContent = h.tesseract.ok ? `OCR ✓ ${h.tesseract.version.replace(/^tesseract\s*/i, "Tesseract ")}` : "OCR missing";
-    t.title = h.tesseract.ok ? h.tesseract.path : h.tesseract.message;
+    const t = $("#tessPill"), o = h.ocr.lithology;
+    t.className = "pill " + (o.ok ? "ok" : "err");
+    t.textContent = o.ok ? `OCR ✓ ${o.version}` : "OCR missing";
+    t.title = `lithology method: ${o.ok ? o.version : o.message}\ncv method: ${h.ocr.cv.ok ? "Tesseract ✓" : h.ocr.cv.message}`;
     $("#memPill").textContent = h.mem_available_mb != null ? `RAM free ${fmtMB(h.mem_available_mb)}` : "";
-    $("#banner").innerHTML = h.tesseract.ok ? "" : `<div class="bar"><strong>Tesseract OCR not found.</strong> Legend names and depths need it. Run <code>./setup_venv.sh</code> in the project folder, then restart the app.</div>`;
+    $("#banner").innerHTML = o.ok ? "" : `<div class="bar"><strong>RapidOCR not installed.</strong> Legend names and depths need it. Run <code>.venv/bin/pip install -r requirements.txt</code> in the project folder, then restart the app.</div>`;
     const jp = $("#jobPill");
     if (h.busy) {
       const st = await api(`/api/runs/${h.busy}/status`);
@@ -126,6 +126,7 @@ function route() {
   if (a === "new") return viewNew();
   if (a === "runs") return viewRuns();
   if (a === "how") return viewHow();
+  if (a === "eval" && id) return viewEval(id);
   if (a === "run" && id) return tab === "log" ? viewLog(id, rest.join("/")) : viewRun(id, tab);
   viewNew();
 }
@@ -140,69 +141,223 @@ async function viewHome() {
 // ---------------------------------------------------------------------------------------------------------------------
 async function viewNew() {
   setNav("new");
+  let mode = store.get("newMode2", "single");
   view(`
   <div class="page-head"><div class="title"><h1>New run</h1>
-    <div class="muted">Process one log or a whole batch. Your files are never modified.</div></div></div>
-  <div class="card"><div class="field-row"><label for="runName" class="nowrap"><strong>Run name</strong> <span class="muted">(optional)</span></label>
-    <input type="text" id="runName" placeholder="e.g. full dataset, tie ratio 5%" maxlength="120"></div></div>
-  <div class="choices">
-    <div class="card choice"><h2><span class="num-circle">1</span>Upload files</h2>
-      <div class="dropzone" id="drop" tabindex="0" role="button"><strong>Drop files here</strong> or click to choose<br>
-        <span class="small">image (.tif .png .jpg) + its <code>.json</code> annotation, optional <code>.csv</code> labels, one log or many</span></div>
-      <input type="file" id="fileInput" multiple class="hidden" accept=".tif,.tiff,.png,.jpg,.jpeg,.json,.csv">
-      <p class="small muted">Files are streamed to <code>runs/&lt;id&gt;/data/</code>. Labels go to <code>data/labels/</code>; <code>example.csv</code> is matched to the example log automatically.</p>
-    </div>
-    <div class="card choice"><h2><span class="num-circle">2</span>Use a folder on this computer</h2>
-      <label class="small muted" for="folderPath">Folder with logs (flat, or <code>bbox_annotation/</code> + <code>images/</code>)</label>
-      <input type="text" id="folderPath" list="dataList" placeholder="/path/to/dataset" style="width:100%;margin:4px 0 8px">
-      <label class="small muted" for="labelsPath">Labels folder (optional, <code>&lt;stem&gt;.csv</code> ground truth)</label>
-      <input type="text" id="labelsPath" list="labelsList" placeholder="/path/to/labels" style="width:100%;margin:4px 0 10px">
-      <div class="row"><button class="primary" id="linkBtn">Add folder</button><span class="small muted">Nothing is copied: the run links to the files.</span></div>
-    </div>
-    <div class="card choice"><h2><span class="num-circle">3</span>Open existing results</h2>
-      <label class="small muted" for="resultsPath">Folder with <code>summary.json</code> (e.g. the CLI's <code>outputs/</code>)</label>
-      <input type="text" id="resultsPath" list="resultsList" placeholder="/path/to/outputs" style="width:100%;margin:4px 0 10px">
-      <div class="row"><button class="primary" id="importBtn">Open results</button><span class="small muted">View only, nothing is re-run.</span></div>
+    <div class="muted">Your files are never modified.</div></div></div>
+  <div class="modeseg" role="tablist">
+    <button data-mode="single" role="tab">Single image</button><button data-mode="batch" role="tab">Batch</button><button data-mode="eval" role="tab">Evaluation</button>
+  </div>
+  <div class="card"><div class="field-row"><label for="runName" class="nowrap"><strong>Name</strong> <span class="muted">(optional)</span></label>
+    <input type="text" id="runName" placeholder="e.g. Callaway, hybrid method" maxlength="120"></div></div>
+
+  <div data-panel="single">
+    <div class="card"><h2>One image + its annotation</h2>
+      <div class="dropzone" id="drop" tabindex="0" role="button" style="padding:40px 16px"><strong>Drop the .tif and its .json here</strong> or click to choose both<br>
+        <span class="small">.tif / .tiff / .png / .jpg / .pdf + the bounding-box .json</span></div>
+      <input type="file" id="fileInput" multiple class="hidden" accept=".tif,.tiff,.png,.jpg,.jpeg,.pdf,.json">
+      <p class="small muted">Next: a quick check of both files, the settings, then Start.</p>
+      <details style="margin-top:6px"><summary class="muted" style="cursor:pointer">…or pick an image already on this computer (no upload)</summary>
+        <div style="margin-top:10px"><input type="text" id="logFilter" placeholder="Filter…" style="width:100%;margin-bottom:8px">
+        <select id="logSel" size="10" style="width:100%"><option disabled>Loading…</option></select>
+        <div id="logInfo" class="small muted" style="margin:8px 0;min-height:20px"></div>
+        <div class="row"><button class="primary" id="runNowBtn" disabled>▶ Run now</button><button id="setupBtn" disabled>Settings first…</button>
+          <span class="small muted">Run now = default settings.</span></div></div>
+      </details>
     </div>
   </div>
-  <datalist id="dataList"></datalist><datalist id="labelsList"></datalist><datalist id="resultsList"></datalist>
+
+  <div data-panel="batch">
+    <div class="card"><h2>A whole dataset folder</h2>
+      <label class="small muted" for="folderPath">Folder with <code>bbox_annotation/</code> + <code>images/</code> (or <code>.json</code> + images side by side)</label>
+      <div class="field-row" style="margin:6px 0 10px"><input type="text" id="folderPath" list="dataList" placeholder="/path/to/dataset"><button class="primary" id="linkBtn">Next →</button></div>
+      <p class="small muted">Nothing is copied. Next: tick the images to process (all by default) and adjust settings.</p>
+    </div>
+  </div>
+
+  <div data-panel="eval">
+    <div class="grid2">
+      <div class="card"><h2>1 · Images with ground truth</h2>
+        <div id="gtList" class="muted">Loading…</div>
+        <p class="small muted">Ground truth = a <code>&lt;image name&gt;.csv</code> in <code id="defLabels">cv_approach_1/labels</code> (columns top_depth, bottom_depth, lithology, top_y, bottom_y). Add more CSVs there to evaluate more images.</p>
+      </div>
+      <div class="card"><h2>2 · Methods to compare</h2>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology" checked> <b>lithology</b>&nbsp;<span class="muted small">Pau's lithology/ package only</span></label>
+        <label class="check" style="display:flex;margin-bottom:12px"><input type="checkbox" data-method="cv" checked> <b>cv</b>&nbsp;<span class="muted small">clustering only</span></label>
+        <div class="row"><button class="primary big" id="evalBtn" disabled>▶ Start evaluation</button></div>
+        <p class="small muted">One run per method, one after another (queued). You get a side-by-side comparison: accuracy, boundaries, confusion matrices.</p>
+      </div>
+    </div>
+  </div>
+  <datalist id="dataList"></datalist>
   <div class="card"><div class="card-head"><h2>Recent runs</h2><div class="spacer"></div><a href="#/runs">All runs →</a></div><div id="recent" class="muted">Loading…</div></div>`);
 
+  const setMode = (m) => {
+    mode = m; store.set("newMode2", m);
+    $$("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+    $$("[data-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== m));
+  };
+  $$("[data-mode]").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+  setMode(mode);
   api("/api/suggestions").then((s) => {
-    const fill = (id, arr) => { $(id).innerHTML = arr.map((p) => `<option value="${esc(p)}">`).join(""); };
-    fill("#dataList", s.data); fill("#labelsList", s.labels); fill("#resultsList", s.results);
-    if (s.data[0] && !$("#folderPath").value) $("#folderPath").placeholder = s.data[0];
-    if (s.labels[0] && !$("#labelsPath").value) $("#labelsPath").placeholder = s.labels[0];
-    if (s.results[0] && !$("#resultsPath").value) $("#resultsPath").placeholder = s.results[0];
+    $("#dataList").innerHTML = s.data.map((p) => `<option value="${esc(p)}">`).join("");
+    const ds = s.data.find((p) => /dataset/i.test(p)) || s.data[0];
+    if (ds) $("#folderPath").value = ds;
   }).catch(() => {});
   api("/api/runs").then((r) => { $("#recent").innerHTML = runsTable(r.runs.slice(0, 5), true); }).catch(fail);
-
   const name = () => $("#runName").value.trim();
-  const newRun = () => api("/api/runs", { method: "POST", json: { name: name() } });
-  const startUpload = async (files) => {
+  const newRun = (fallback) => api("/api/runs", { method: "POST", json: { name: name() || fallback || "" } });
+
+  // --- single image: drop, or pick from disk
+  wireDrop($("#drop"), $("#fileInput"), async (files) => {
     if (!files.length) return;
-    try { const r = await newRun(); S.pendingUpload = [...files]; location.hash = `#/run/${r.id}/setup`; } catch (e) { fail(e); }
+    const imgs = files.filter((f) => !/\.(json|csv)$/i.test(f.name));
+    if (imgs.length > 1) toast("Single image: drop one image (+ its .json). Use Batch for a folder.", true);
+    try { const r = await newRun(imgs[0] ? imgs[0].name.replace(/\.[^.]+$/, "") : ""); S.pendingUpload = [...files]; location.hash = `#/run/${r.id}/setup`; } catch (e) { fail(e); }
+  });
+  let logs = [];
+  const uniq = (ls) => { const seen = new Set(); return ls.filter((l) => !seen.has(l.stem) && seen.add(l.stem)); };
+  const selected = () => { const v = $("#logSel").value; if (!v || !v.includes("\n")) return null; const [folder, stem] = v.split("\n"); return logs.find((l) => l.folder === folder && l.stem === stem); };
+  const pick = () => {
+    const l = selected();
+    $("#runNowBtn").disabled = $("#setupBtn").disabled = !l;
+    $("#logInfo").innerHTML = l ? `${esc(l.image)} · ${l.size_mb != null ? fmtNum(l.size_mb, 1) + " MB" : "?"}${l.width ? ` · ${fmtInt(l.width)} × ${fmtInt(l.height)} px` : ""}` : "";
   };
-  wireDrop($("#drop"), $("#fileInput"), startUpload);
-  const pathOr = (el) => el.value.trim() || "";
+  const drawLogs = () => {
+    const q = $("#logFilter").value.toLowerCase();
+    const list = uniq(logs).filter((l) => l.stem.toLowerCase().includes(q));
+    const prev = $("#logSel").value;
+    $("#logSel").innerHTML = list.length ? list.map((l) => `<option value="${esc(l.folder + "\n" + l.stem)}">${esc(l.stem)}</option>`).join("") : `<option disabled>No image found.</option>`;
+    if (prev) $("#logSel").value = prev;
+    pick();
+  };
+  $("#logFilter").oninput = drawLogs;
+  $("#logSel").onchange = pick;
+  const singleRun = async (start) => {
+    const l = selected();
+    if (!l) return;
+    $("#runNowBtn").disabled = $("#setupBtn").disabled = true;
+    try {
+      const r = await newRun(short(l.stem, 60));
+      await api(`/api/runs/${r.id}/link`, { method: "POST", json: { path: l.folder, logs: [l.stem] } });
+      if (start) { await api(`/api/runs/${r.id}/start`, { method: "POST", json: { config: {}, queue: true } }); location.hash = `#/run/${r.id}/monitor`; refreshHealth(); }
+      else location.hash = `#/run/${r.id}/setup`;
+    } catch (e) { fail(e); pick(); }
+  };
+  $("#runNowBtn").onclick = () => singleRun(true);
+  $("#setupBtn").onclick = () => singleRun(false);
+  $("#logSel").ondblclick = () => singleRun(true);
+
+  // --- batch
   $("#linkBtn").onclick = async () => {
-    const path = pathOr($("#folderPath")) || $("#folderPath").placeholder;
-    if (!path || path.startsWith("/path")) return toast("Type the folder path first", true);
-    const labels = $("#labelsPath").value.trim();
+    const path = $("#folderPath").value.trim();
+    if (!path) return toast("Type the dataset folder path first", true);
     $("#linkBtn").disabled = true;
     try {
-      const r = await newRun();
-      const res = await api(`/api/runs/${r.id}/link`, { method: "POST", json: { path, labels } });
-      toast(`Linked ${res.linked} log(s)${res.labelled ? `, ${res.labelled} with labels` : ""}`);
+      const r = await newRun(`Batch: ${path.split("/").filter(Boolean).pop()}`);
+      const res = await api(`/api/runs/${r.id}/link`, { method: "POST", json: { path } });
+      toast(`Found ${res.linked} image(s)`);
       location.hash = `#/run/${r.id}/setup`;
     } catch (e) { fail(e); $("#linkBtn").disabled = false; }
   };
-  $("#importBtn").onclick = async () => {
-    const path = pathOr($("#resultsPath")) || $("#resultsPath").placeholder;
-    if (!path || path.startsWith("/path")) return toast("Type the results folder path first", true);
-    try { const r = await api("/api/runs/import", { method: "POST", json: { path, name: name() } }); location.hash = `#/run/${r.id}/results`; } catch (e) { fail(e); }
+
+  // --- evaluation
+  let gt = [];
+  const evalReady = () => { $("#evalBtn").disabled = !$$("[data-gt]:checked").length || !$$("[data-method]:checked").length; };
+  api("/api/logs").then((r) => {
+    logs = r.logs; drawLogs();
+    if (r.labels_dir) $("#defLabels").textContent = r.labels_dir;
+    gt = uniq(r.logs.filter((l) => l.labelled));
+    $("#gtList").innerHTML = gt.length ? gt.map((l, i) => `<label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-gt="${i}" checked> <span class="mono small ellipsis" title="${esc(l.stem)}">${esc(l.stem)}</span></label>`).join("")
+      : `<div class="empty">No image has ground truth yet.</div>`;
+    $$("[data-gt], [data-method]").forEach((c) => (c.onchange = evalReady));
+    evalReady();
+  }).catch(fail);
+  $("#evalBtn").onclick = async () => {
+    $("#evalBtn").disabled = true;
+    try {
+      const ev = await api("/api/evaluations", { method: "POST", json: { name: name(), logs: $$("[data-gt]:checked").map((c) => ({ folder: gt[c.dataset.gt].folder, stem: gt[c.dataset.gt].stem })), methods: $$("[data-method]:checked").map((c) => c.dataset.method) } });
+      location.hash = `#/eval/${ev.id}`;
+      refreshHealth();
+    } catch (e) { fail(e); evalReady(); }
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Evaluation: methods side by side
+// ---------------------------------------------------------------------------------------------------------------------
+async function viewEval(id) {
+  setNav("runs");
+  view(`<div class="pad muted">Loading evaluation…</div>`);
+  let charts = [];
+  onCleanup(() => charts.forEach((c) => c.destroy()));
+  let timer = null;
+  onCleanup(() => clearTimeout(timer));
+  let lastKey = "";
+  const load = async () => {
+    let ev;
+    try { ev = await api(`/api/evaluations/${id}`); } catch (e) { view(`<div class="empty">${esc(e.message)} · <a href="#/runs">Back to runs</a></div>`); return; }
+    const res = ev.results;
+    const busy = res.some((r) => ["running", "queued"].includes(r.status));
+    const key = JSON.stringify(res.map((r) => [r.status, Math.round(100 * (r.fraction || 0)), r.logs.length]));
+    if (key !== lastKey) { lastKey = key; render(ev); }
+    if (busy) timer = setTimeout(load, 2000);
+  };
+  const best = (vals, higher) => { const v = vals.filter((x) => x != null); return v.length ? (higher ? Math.max(...v) : Math.min(...v)) : null; };
+  const render = (ev) => {
+    charts.forEach((c) => c.destroy()); charts = [];
+    const res = ev.results;
+    const stems = [...new Set(ev.logs.map((l) => l.stem))];
+    const per = (r, stem) => r.logs.find((x) => x.stem === stem);
+    const mm = (k) => res.map((r) => (r.mean_metrics ? r.mean_metrics[k] : null));
+    const bAcc = best(mm("row_acc"), true), bBnd = best(mm("boundary_mean_px"), false), bF1 = best(mm("boundary_f1"), true);
+    const mark = (v, b) => (v != null && v === b ? ` class="num yes"` : ` class="num"`);
+    view(`
+    <div class="page-head"><div class="title"><div class="small"><a href="#/runs">← Runs</a></div><h1>${esc(ev.name)}</h1>
+      <div class="small muted">Evaluation · created ${esc(ev.created)} · ${stems.length} image(s) with ground truth · ${ev.methods.length} method(s)</div></div>
+      <div class="row"><button class="danger" id="delEval">Delete</button></div></div>
+    <div class="stats" style="grid-template-columns:repeat(${res.length},minmax(220px,1fr))">
+      ${res.map((r) => `<div class="stat"><div class="row"><strong style="font-size:15px">${esc(r.method)}</strong>${badge(r.status)}<div class="spacer"></div><a class="small" href="#/run/${r.run_id}">open run →</a></div>
+        <div class="progress ${r.status === "done" ? "done" : ["failed", "cancelled", "interrupted"].includes(r.status) ? "failed" : r.status === "running" ? "striped" : ""}" style="margin:8px 0"><div style="width:${r.status === "done" ? 100 : Math.round(100 * (r.fraction || 0))}%"></div></div>
+        <div class="value">${r.mean_metrics ? fmtNum(r.mean_metrics.row_acc, 2) + "%" : "–"}</div><div class="sub">row accuracy${r.mean_metrics ? ` · boundary ${fmtNum(r.mean_metrics.boundary_mean_px, 2)} px · F1 ${fmtNum(r.mean_metrics.boundary_f1, 1)}%` : ""}</div>
+        <div class="sub">${r.total_s != null ? "runtime " + fmtSec(r.total_s) : r.status === "queued" ? "waiting for the previous method" : r.status === "running" ? `running ${fmtSec(r.elapsed_s)}` : ""}${r.errors && r.errors.length ? ` · <span class="no">${r.errors.length} error(s)</span>` : ""}</div></div>`).join("")}
+    </div>
+    <div class="card tight"><div class="table-wrap"><table class="data"><thead><tr><th>Metric (mean)</th>${res.map((r) => `<th class="num">${esc(r.method)}</th>`).join("")}</tr></thead><tbody>
+      <tr><td>Row accuracy %</td>${res.map((r, i) => `<td${mark(mm("row_acc")[i], bAcc)}>${fmtNum(mm("row_acc")[i], 2)}</td>`).join("")}</tr>
+      <tr><td>Boundary error px</td>${res.map((r, i) => `<td${mark(mm("boundary_mean_px")[i], bBnd)}>${fmtNum(mm("boundary_mean_px")[i], 2)}</td>`).join("")}</tr>
+      <tr><td>Boundary F1 %</td>${res.map((r, i) => `<td${mark(mm("boundary_f1")[i], bF1)}>${fmtNum(mm("boundary_f1")[i], 1)}</td>`).join("")}</tr>
+      <tr><td>Runtime</td>${res.map((r) => `<td class="num">${fmtSec(r.total_s)}</td>`).join("")}</tr>
+    </tbody></table></div></div>
+    <div class="card"><h2>Per image</h2><div class="table-wrap"><table class="data"><thead><tr><th>Image</th>${res.map((r) => `<th class="num">${esc(r.method)}: row acc.</th><th class="num">bnd px</th><th class="num">intervals</th>`).join("")}</tr></thead><tbody>
+      ${stems.map((st) => `<tr><td class="ellipsis" style="max-width:320px" title="${esc(st)}">${esc(st)}</td>${res.map((r) => { const x = per(r, st); const m = x && x.metrics;
+        return `<td class="num">${m ? `<a href="#/run/${r.run_id}/log/${enc(st)}">${fmtNum(m.row_acc, 2)}%</a>` : "–"}</td><td class="num">${m ? fmtNum(m.boundary_mean_px, 1) : "–"}</td><td class="num">${x ? fmtInt(x.n_intervals) : "–"}</td>`; }).join("")}</tr>`).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h2>Accuracy by method</h2><div class="chart-box" style="height:260px"><canvas id="evChart"></canvas></div></div>
+    <div class="card"><h2>Confusion matrices</h2><p class="small muted">Rows = true lithology, columns = predicted (share of the true rock's pixel rows). Look for big red cells: those are the names each method mixes up.</p>
+      ${stems.map((st) => `<h3 class="mono small" style="margin-top:14px">${esc(st)}</h3><div class="grid2">${res.map((r) => { const x = per(r, st);
+        return `<div><div class="small"><b>${esc(r.method)}</b></div>${x && x.metrics ? confusionTable(x.metrics.confusion) : `<div class="muted small">${r.status === "done" ? "no metrics" : "not finished yet"}</div>`}</div>`; }).join("")}</div>`).join("")}
+    </div>`);
+    $("#delEval").onclick = async () => {
+      if (!confirm("Delete this evaluation and its runs?")) return;
+      try { await api(`/api/evaluations/${id}`, { method: "DELETE" }); toast("Evaluation deleted"); location.hash = "#/runs"; } catch (e) { fail(e); }
+    };
+    if (chartsReady() && res.some((r) => r.mean_metrics)) {
+      chartDefaults();
+      charts.push(new Chart($("#evChart"), {
+        type: "bar",
+        data: { labels: res.map((r) => r.method), datasets: [
+          { label: "Row accuracy (%)", data: mm("row_acc"), backgroundColor: "#2a78d6", fmt: (v) => `${v.toFixed(1)}%` },
+          { label: "Boundary F1 (%)", data: mm("boundary_f1"), backgroundColor: "#1baf7a", fmt: (v) => `${v.toFixed(1)}%` }] },
+        options: { maintainAspectRatio: false, animation: false, layout: { padding: { top: 18 } }, scales: { y: { beginAtZero: true, max: 100 } },
+          plugins: { legend: { position: "top", labels: { boxWidth: 12 } }, valueLabels: { enabled: true, format: (v) => v.toFixed(1) } } },
+        plugins: [valueLabels],
+      }));
+    } else $("#evChart").parentElement.innerHTML = `<div class="empty">Appears when a method has finished.</div>`;
+  };
+  load();
+}
+
 function wireDrop(zone, input, onFiles) {
   zone.onclick = () => input.click();
   zone.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
@@ -228,7 +383,7 @@ function runsTable(runs, compact = false) {
       <td class="num">${fmtSec(r.total_s)}</td>
       <td class="num">${r.mean_metrics ? fmtNum(r.mean_metrics.row_acc, 2) + "%" : "–"}</td>
       ${compact ? "" : `<td class="nowrap"><button data-clone="${r.id}" ${r.mode === "import" ? "disabled" : ""} title="New draft with the same files and settings">Clone</button>
-        <button class="danger" data-del="${r.id}" ${r.status === "running" ? "disabled" : ""}>Delete</button></td>`}
+        <button class="danger" data-del="${r.id}" ${["running", "queued"].includes(r.status) ? "disabled" : ""}>Delete</button></td>`}
     </tr>`).join("")}</tbody></table></div>`;
 }
 document.addEventListener("click", (e) => {
@@ -237,7 +392,27 @@ document.addEventListener("click", (e) => {
 });
 async function viewRuns() {
   view(`<div class="page-head"><div class="title"><h1>Runs</h1><div class="muted">Every run is a folder in <code>runs/</code>. Click one to reopen it.</div></div>
-    <a class="btn primary" href="#/new">New run</a></div><div class="card tight" id="runsBox"><div class="pad muted">Loading…</div></div>`);
+    <button id="importToggle">Import results folder…</button><a class="btn primary" href="#/new">New run</a></div>
+    <div class="card hidden" id="importBox"><h2>Import existing results</h2>
+      <label class="small muted" for="resultsPath">Folder with <code>summary.json</code> (e.g. the command line's <code>outputs/</code>). View only, nothing is re-run.</label>
+      <div class="field-row" style="margin-top:6px"><input type="text" id="resultsPath" list="resultsList" placeholder="/path/to/outputs"><button class="primary" id="importBtn">Import</button></div>
+      <datalist id="resultsList"></datalist></div>
+    <div id="evalBox"></div>
+    <div class="card tight" id="runsBox"><div class="pad muted">Loading…</div></div>`);
+  $("#importToggle").onclick = () => { $("#importBox").classList.toggle("hidden"); api("/api/suggestions").then((s) => { $("#resultsList").innerHTML = s.results.map((p) => `<option value="${esc(p)}">`).join(""); if (s.results[0] && !$("#resultsPath").value) $("#resultsPath").placeholder = s.results[0]; }).catch(() => {}); };
+  $("#importBtn").onclick = async () => {
+    const path = $("#resultsPath").value.trim() || $("#resultsPath").placeholder;
+    if (!path || path.startsWith("/path")) return toast("Type the results folder path first", true);
+    try { const r = await api("/api/runs/import", { method: "POST", json: { path } }); location.hash = `#/run/${r.id}/results`; } catch (e) { fail(e); }
+  };
+  api("/api/evaluations").then((r) => {
+    if (!r.evaluations.length) return;
+    $("#evalBox").innerHTML = `<div class="card tight"><div class="row" style="padding:10px 12px;border-bottom:1px solid var(--line)"><h2 style="margin:0">Evaluations</h2><span class="small muted">same ground-truth images, methods side by side</span></div>
+      <div class="table-wrap"><table class="data"><thead><tr><th>Evaluation</th><th>Created</th><th class="num">Images</th><th>Methods: row accuracy</th></tr></thead><tbody>
+      ${r.evaluations.map((e) => `<tr class="click" data-href="#/eval/${e.id}"><td><strong>${esc(e.name)}</strong></td><td class="nowrap">${esc(e.created)}</td><td class="num">${e.n_images}</td>
+        <td>${e.methods.map((m) => `<span class="nowrap" style="margin-right:12px">${esc(m)}: ${e.acc[m] != null ? `<b>${fmtNum(e.acc[m], 1)}%</b>` : badge(e.statuses[m] || "?")}</span>`).join("")}</td></tr>`).join("")}
+      </tbody></table></div></div>`;
+  }).catch(() => {});
   const load = async () => {
     const r = await api("/api/runs");
     $("#runsBox").innerHTML = runsTable(r.runs);
@@ -333,10 +508,10 @@ async function tabSetup(id, st) {
   <div class="card"><div class="card-head"><h2>Add logs</h2><span class="muted small">single log or batch: add as many as you like before starting</span></div>
     <div class="grid2">
       <div><div class="dropzone" id="drop" tabindex="0" role="button"><strong>Drop files</strong> or click to choose<br><span class="small">images, .json annotations, .csv labels</span></div>
-        <input type="file" id="fileInput" multiple class="hidden" accept=".tif,.tiff,.png,.jpg,.jpeg,.json,.csv"></div>
+        <input type="file" id="fileInput" multiple class="hidden" accept=".tif,.tiff,.png,.jpg,.jpeg,.pdf,.json,.csv"></div>
       <div><label class="small muted" for="folderPath">…or link a folder on this computer</label>
         <div class="field-row" style="margin:4px 0 6px"><input type="text" id="folderPath" list="dataList" placeholder="/path/to/dataset"></div>
-        <div class="field-row"><input type="text" id="labelsPath" list="labelsList" placeholder="labels folder (optional)"><button id="linkBtn">Add folder</button></div>
+        <div class="field-row"><input type="text" id="labelsPath" list="labelsList" placeholder="ground-truth folder (optional; default cv_approach_1/labels)"><button id="linkBtn">Add folder</button></div>
         <datalist id="dataList"></datalist><datalist id="labelsList"></datalist></div>
     </div>
     <div id="uploads" class="hidden"><div class="row" style="margin-top:12px"><strong class="small">Uploading</strong><span class="small muted" id="upTotal"></span></div>
@@ -450,17 +625,19 @@ function renderConfigForm(cfg) {
     const v = val(f);
     if (f.type === "bool") return `<label class="check"><input type="checkbox" data-cfg="${f.name}" ${v ? "checked" : ""}> ${v ? "on" : "off"}</label>`;
     if (f.type === "list") return `<input type="text" data-cfg="${f.name}" value="${esc(v.join(", "))}" title="comma-separated ${f.elem}s">`;
+    if (f.type === "str") return f.choices ? `<select data-cfg="${f.name}">${f.choices.map((c) => `<option ${c === v ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>` : `<input type="text" data-cfg="${f.name}" value="${esc(v)}">`;
     return `<input type="number" data-cfg="${f.name}" value="${esc(v)}" step="${f.type === "int" ? 1 : "any"}">`;
   };
   const presetOpts = () => `<option value="">Load a preset…</option><optgroup label="Built-in">${Object.keys(cfg.presets.builtin).map((n) => `<option value="b:${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>
     ${Object.keys(cfg.presets.user).length ? `<optgroup label="Saved">${Object.keys(cfg.presets.user).map((n) => `<option value="u:${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>` : ""}`;
   $("#presetSel").innerHTML = presetOpts();
-  $("#cfgForm").innerHTML = Object.entries(groups).map(([g, fs]) => `<details class="group" ${g === "Scale" || g === "Legend & naming" ? "open" : ""}><summary>${esc(g)} <span class="badge" data-gcount="${esc(g)}"></span></summary>
+  $("#cfgForm").innerHTML = Object.entries(groups).map(([g, fs]) => `<details class="group" ${g === "Method" || g === "Lithology method" ? "open" : ""}><summary>${esc(g)} <span class="badge" data-gcount="${esc(g)}"></span></summary>
     <div class="cfg-grid">${fs.map((f) => `<div class="cfg" data-field="${f.name}"><div><div class="name">${f.name}</div><div class="help">${esc(f.help)} <span class="muted">· default ${esc(Array.isArray(f.default) ? f.default.join(", ") : f.default)}</span></div></div>
       ${input(f)}<button class="reset" data-reset="${f.name}" title="Reset to default">↺</button></div>`).join("")}</div></details>`).join("");
   const parse = (f, el) => {
     if (f.type === "bool") return el.checked;
     if (f.type === "list") return el.value.split(/[\s,]+/).filter(Boolean).map(Number);
+    if (f.type === "str") return el.value;
     return f.type === "int" ? parseInt(el.value, 10) : parseFloat(el.value);
   };
   $$("[data-cfg]").forEach((el) => {
@@ -509,14 +686,14 @@ function updateStartInfo() {
   const n = S.sel ? S.sel.size : 0, c = Object.keys(overrides(S.cfg)).length;
   const lab = S.pf.rows.filter((r) => S.sel && S.sel.has(r.stem) && r.labels && r.labels.ok).length;
   const busy = S.health && S.health.busy;
-  $("#startInfo").innerHTML = n ? `<strong>${n}</strong> log(s) selected${lab ? ` (${lab} with labels → accuracy)` : ""} · ${c ? `<strong>${c}</strong> changed setting(s)` : "default settings"}${busy ? ` · <span style="color:var(--warn)">another run is in progress</span>` : ""}`
+  $("#startInfo").innerHTML = n ? `<strong>${n}</strong> log(s) selected${lab ? ` (${lab} with labels → accuracy)` : ""} · ${c ? `<strong>${c}</strong> changed setting(s)` : "default settings"}${busy ? ` · <span style="color:var(--warn)">another run is in progress: this one will be queued</span>` : ""}`
     : `<span class="muted">Select at least one valid log.</span>`;
   $("#startBtn").disabled = !n;
 }
 async function startRun(id, cfg) {
   $("#startBtn").disabled = true;
   try {
-    await api(`/api/runs/${id}/start`, { method: "POST", json: { config: overrides(cfg), logs: [...S.sel] } });
+    await api(`/api/runs/${id}/start`, { method: "POST", json: { config: overrides(cfg), logs: [...S.sel], queue: true } });
     location.hash = `#/run/${id}/monitor`;
     refreshHealth();
   } catch (e) { fail(e); $("#startBtn").disabled = false; }
@@ -604,7 +781,8 @@ function tabMonitor(id, st) {
     bar.classList.toggle("failed", ["failed", "cancelled", "interrupted"].includes(s.status));
     $("#mStatus").innerHTML = badge(s.status);
     if ($("#runBadge")) $("#runBadge").innerHTML = badge(s.status);
-    $("#cancelBtn").classList.toggle("hidden", s.status !== "running");
+    $("#cancelBtn").classList.toggle("hidden", !["running", "queued"].includes(s.status));
+    if (s.status === "queued") $("#mCurrent").innerHTML = `<div class="notice">Queued: waits for the run in progress to finish, then starts automatically.</div>`;
     if (s.worker && s.worker.cancelling) $("#cancelBtn").disabled = true;
     $("#mDone").textContent = `${s.finished} / ${s.total || "?"}`;
     $("#mErr").innerHTML = s.n_errors ? `<span class="no">${s.n_errors} error(s)</span>` : "no errors";
@@ -614,10 +792,10 @@ function tabMonitor(id, st) {
     $("#mPeak").textContent = s.worker && s.worker.peak_rss_mb ? `peak ${fmtMB(s.worker.peak_rss_mb)}` : "";
     $("#mFree").textContent = fmtMB(s.mem_available_mb);
     const c = s.current;
-    $("#mCurrent").innerHTML = c && s.status === "running" ? `<div class="row"><strong>Now:</strong> <span class="mono ellipsis" title="${esc(c.stem)}">[${c.index}/${s.total}] ${esc(c.stem)}</span>
+    if (s.status !== "queued") $("#mCurrent").innerHTML = c && s.status === "running" ? `<div class="row"><strong>Now:</strong> <span class="mono ellipsis" title="${esc(c.stem)}">[${c.index}/${s.total}] ${esc(c.stem)}</span>
       <span class="muted small">${c.running_s != null ? fmtSec(c.running_s) + " on this log" : ""}</span></div>
-      <div class="stepper">${STAGES.map((g) => `<span class="step ${g in c.stages ? "done" : g === c.stage ? "now" : ""}">${g in c.stages ? "✓ " : ""}${g}${g in c.stages ? ` ${c.stages[g].toFixed(1)}s` : ""}</span>`).join("")}</div>
-      <div class="progress"><div style="width:${(100 * Object.keys(c.stages).length) / STAGES.length}%"></div></div>` : "";
+      <div class="stepper">${(c.stage_names || STAGES).map((g) => `<span class="step ${g in c.stages ? "done" : g === c.stage ? "now" : ""}">${g in c.stages ? "✓ " : ""}${g}${g in c.stages ? ` ${c.stages[g].toFixed(1)}s` : ""}</span>`).join("")}</div>
+      <div class="progress"><div style="width:${(100 * Object.keys(c.stages).length) / (c.stage_names || STAGES).length}%"></div></div>` : "";
   };
   const finished = (status) => {
     $("#mFinished").innerHTML = `<div class="notice ${status === "done" ? "ok" : "warn"}">Run ${esc(status)}. <a href="#/run/${id}/results"><strong>Open the results dashboard →</strong></a></div>`;
@@ -642,6 +820,7 @@ function tabMonitor(id, st) {
 const COLUMNS = [
   { key: "stem", label: "Log", get: (r) => r.stem, always: true },
   { key: "flags", label: "Flags", get: (r) => r._flags.length, html: (r) => r._flags.map((f) => `<span class="flag ${f === "error" ? "err" : ""}">${esc(f)}</span>`).join("") },
+  { key: "method", label: "Method", get: (r) => r.method || "cv" },
   { key: "n_intervals", label: "Intervals", num: true, get: (r) => r.n_intervals },
   { key: "k", label: "k", num: true, get: (r) => r.k },
   { key: "colour", label: "Colour", get: (r) => (r.colour_scan == null ? null : r.colour_scan ? 1 : 0), html: (r) => (r.colour_scan == null ? "–" : r.colour_scan ? "yes" : "no") },
@@ -949,6 +1128,7 @@ async function viewLog(id, stem) {
       <div>${flags.map((f) => `<span class="flag ${f === "error" ? "err" : ""}">${esc(f)}</span>`).join("")}${r && !flags.length ? `<span class="badge ok">no flags</span>` : ""}</div></div>
     <div class="row">
       <button id="prevBtn" ${prev ? "" : "disabled"} title="Previous log (←)">← Prev</button><button id="nextBtn" ${next ? "" : "disabled"} title="Next log (→)">Next →</button>
+      ${d.files.annotated_tif ? `<a class="btn" href="/api/runs/${id}/files/outputs/${enc(d.files.annotated_tif)}?download=true" title="High-resolution result in the challenge notebook's style">⬇ Annotated TIF</a>` : ""}
       ${d.files.csv ? `<a class="btn primary" href="/api/runs/${id}/files/outputs/${enc(d.files.csv)}?download=true">⬇ CSV</a>` : ""}
     </div></div>
   ${d.error ? `<div class="notice err"><strong>This log failed:</strong> ${esc(d.error)}</div>` : ""}
@@ -1036,34 +1216,37 @@ async function viewLog(id, stem) {
         <td class="nowrap"><span class="swatch" style="background:${colour(iv.lithology)}"></span>${esc(iv.lithology)}${iv.ambiguous ? `<span class="q" title="Ambiguous. Alternatives: ${esc(alts || "look-alike swatch")}">?</span>` : ""}</td>
         <td class="num">${iv.cluster_id}</td></tr>`; }).join("")}</tbody></table></div>`,
     clusters: () => !r ? `<div class="muted">Available when the run has finished.</div>` : !Object.keys(r.clusters).length ? `<div class="empty">No clusters (blank column).</div>` : `
-      <div class="small muted" style="margin-bottom:8px">Each cluster of similar texture is named after the nearest legend swatch. Margin = how much better the best swatch is than the 2nd (higher = surer).</div>
-      <table class="data"><thead><tr><th class="num">Cl.</th><th>Name</th><th class="num">Intervals</th><th class="num">Share</th><th class="num">Margin</th><th>Nearest swatches (distance)</th></tr></thead><tbody>
+      <div class="small muted" style="margin-bottom:8px">${r.method === "lithology" ? "Each interval is classified directly against the legend fingerprints; one row per lithology found. Confidence = (2nd best - best) / 2nd best distance, averaged over its intervals (higher = surer)." : "Each cluster of similar texture is named after the nearest legend swatch. Margin = how much better the best swatch is than the 2nd (higher = surer)."}</div>
+      <table class="data"><thead><tr><th class="num">Cl.</th><th>Name</th><th class="num">Intervals</th><th class="num">Share</th><th class="num">${r.method === "lithology" ? "Confidence" : "Margin"}</th><th>Nearest swatches (distance)</th></tr></thead><tbody>
       ${Object.entries(r.clusters).map(([cid, c]) => {
         const ivs = rows.filter((iv) => String(iv.cluster_id) === cid), px = ivs.reduce((a, iv) => a + iv.bottom_y - iv.top_y, 0), tot = rows.reduce((a, iv) => a + iv.bottom_y - iv.top_y, 0) || 1;
         return `<tr class="${c.ambiguous ? "amb" : ""}"><td class="num">${cid}</td><td class="nowrap"><span class="swatch" style="background:${colour(c.name)}"></span>${esc(c.name)}${c.ambiguous ? `<span class="q" title="Alternatives: ${esc(c.alternatives.join(", "))}">?</span>` : ""}</td>
           <td class="num">${ivs.length}</td><td class="num">${fmtNum((100 * px) / tot, 0)}%</td><td class="num">${fmtNum(c.margin, 2)}</td>
           <td class="small">${Object.entries(c.distances).map(([n, v]) => `${esc(n)} <span class="muted">${fmtNum(v, 2)}</span>`).join("<br>") || "–"}</td></tr>`; }).join("")}</tbody></table>
-      <dl class="kv" style="margin-top:12px"><dt>k (clusters)</dt><dd>${r.k}</dd><dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd><dt>Transition clusters removed</dt><dd>${r.transition_clusters_removed.length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
+      <dl class="kv" style="margin-top:12px"><dt>${r.method === "lithology" ? "Lithologies found" : "k (clusters)"}</dt><dd>${r.k}</dd>${r.silhouette != null ? `<dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd>` : ""}<dt>Transition clusters removed</dt><dd>${(r.transition_clusters_removed || []).length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
     legend: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       ${r.swatches.length ? "" : `<div class="notice warn"><strong>No legend swatches found.</strong> Every cluster is named "Unknown". The swatch finder expects same-size framed squares with a readable name below or to the right.</div>`}
       ${d.files.legend_png ? `<img class="legend-img" src="${file(d.files.legend_png)}" alt="Detected legend swatches">` : ""}
       ${r.swatches.length ? `<table class="data" style="margin-top:10px"><thead><tr><th>Swatch name (OCR)</th><th>Looks like</th></tr></thead><tbody>
-        ${r.swatches.map((w) => `<tr><td>${esc(w.name)}</td><td class="${w.look_alikes.length ? "no" : "muted"}">${esc(w.look_alikes.join(", ") || "–")}</td></tr>`).join("")}</tbody></table>` : ""}`,
+        ${r.swatches.map((w) => `<tr><td>${esc(w.name)}${w.ignored ? ` <span class="muted small">(ignored: ${esc(w.ignored)})</span>` : ""}</td><td class="${w.look_alikes.length ? "no" : "muted"}">${esc(w.look_alikes.join(", ") || "–")}</td></tr>`).join("")}</tbody></table>` : ""}`,
     depth: () => !r ? `<div class="muted">Available when the run has finished.</div>` : !r.depth ? `<div class="notice warn"><strong>No depth found.</strong> OCR could not read at least two consistent depth labels, so depths are empty.</div>` : `
       ${d.files.depth_png ? `<img class="depth-img" src="${file(d.files.depth_png)}" alt="Depth calibration">` : ""}
       <dl class="kv" style="margin-top:10px"><dt>Equation</dt><dd class="mono">depth = ${r.depth.a.toFixed(6)} · y + ${fmtNum(r.depth.b, 2)}</dd>
-        <dt>Labels used / read</dt><dd>${r.depth.n_used} / ${r.depth.n_read}</dd>
+        <dt>Labels used / read</dt><dd>${r.depth.n_used} / ${r.depth.n_read}</dd>${r.depth.model ? `<dt>Model</dt><dd>${esc(r.depth.model)} · rms ${fmtNum(r.depth.rms_px, 2)} px</dd>` : ""}
         <dt>Depth range</dt><dd>${rows.length && rows[0].top_depth != null ? `${fmtNum(rows[0].top_depth, 1)} → ${fmtNum(rows[rows.length - 1].bottom_depth, 1)}` : "–"}</dd>
         <dt>Scale</dt><dd>${fmtNum(1 / r.depth.a, 1)} px per depth unit</dd></dl>`,
     info: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       <dl class="kv"><dt>Colour scan</dt><dd>${r.colour_scan ? "yes (fill colour used)" : "no"}</dd>
-        <dt>Pattern period P</dt><dd>${fmtNum(r.scale.period, 1)} px ${r.scale.measured ? "(measured)" : '<span class="no">(not measured: default used)</span>'}</dd>
+        <dt>Method</dt><dd>${esc(r.method || "cv")}${r.legend_method ? ` · legend: ${esc(r.legend_method)}` : ""}</dd>
+        ${r.scale ? `<dt>Pattern period P</dt><dd>${fmtNum(r.scale.period, 1)} px ${r.scale.measured ? "(measured)" : '<span class="no">(not measured: default used)</span>'}</dd>
         <dt>Window / stride</dt><dd>${r.scale.window} / ${r.scale.stride} px</dd><dt>Min bed</dt><dd>${r.scale.min_bed} px</dd>
-        <dt>Refine radius / window</dt><dd>${r.scale.refine_radius} / ${r.scale.refine_window} px</dd><dt>Stroke / diagonal kernel</dt><dd>${r.scale.stroke} / ${r.scale.diag} px</dd>
+        <dt>Refine radius / window</dt><dd>${r.scale.refine_radius} / ${r.scale.refine_window} px</dd><dt>Stroke / diagonal kernel</dt><dd>${r.scale.stroke} / ${r.scale.diag} px</dd>`
+        : `<dt>Window</dt><dd>${r.window_px ? r.window_px + " px" : "auto (median swatch height)"}</dd>`}
+        ${r.depth_error ? `<dt>Depth</dt><dd class="no">${esc(r.depth_error)}</dd>` : ""}${r.annotated_tif_error ? `<dt>Annotated TIF</dt><dd class="no">${esc(r.annotated_tif_error)}</dd>` : ""}
         <dt>Runtime (no render)</dt><dd>${fmtSec(r.runtime_s)}</dd><dt>Peak memory (Python)</dt><dd>${fmtMB(r.peak_mb)}</dd>
         <dt>Image</dt><dd class="mono small">${esc(r.image)}</dd></dl>
       <h3 style="margin-top:14px">Stage timings</h3>
-      ${(() => { const t = r.timings_s, tot = Object.values(t).reduce((a, b) => a + b, 0) || 1;
+      ${(() => { const t = r.timings_s, tot = Object.values(t).reduce((a, b) => a + b, 0) || 1, STAGES = Object.keys(t);
         return `<div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-bottom:6px">${STAGES.map((g, i) => `<div title="${g}: ${(t[g] || 0).toFixed(2)} s" style="width:${(100 * (t[g] || 0)) / tot}%;background:${STAGE_COLOURS[i]}"></div>`).join("")}</div>
         <table class="data"><tbody>${STAGES.map((g, i) => `<tr><td><span class="swatch" style="background:${STAGE_COLOURS[i]}"></span>${g}</td><td class="num">${(t[g] || 0).toFixed(2)} s</td><td class="num muted">${fmtNum((100 * (t[g] || 0)) / tot, 0)}%</td></tr>`).join("")}</tbody></table>`; })()}`,
     acc: () => !hasMetrics ? "" : `

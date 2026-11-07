@@ -52,6 +52,7 @@ RUN_ID = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
 IMAGE_EXT = set(lp.IMAGE_SUFFIXES)
 STAGES = ["column", "segmentation", "legend+naming", "depth", "render"]
 TERMINAL = {"done", "failed", "cancelled", "interrupted", "imported"}
+EVAL_ID = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
 TILE_H = 2048
 
 app = FastAPI(title="Lithology Console", docs_url="/api/docs", redoc_url=None)
@@ -62,6 +63,7 @@ META_LOCK = threading.Lock()
 JOB_LOCK = threading.Lock()
 TILE_LOCK = threading.Lock()
 JOB: dict = {}                       # the running job: run_id, pid, proc, cancel, rss_mb, peak_rss_mb
+QUEUE: list = []                     # run ids waiting for the worker (FIFO), e.g. the runs of an evaluation
 
 
 # ======================================================================================================================
@@ -175,23 +177,9 @@ def pid_alive(pid: Optional[int]) -> bool:
         return True
 
 
-_TESS_VERSION: Optional[str] = None
-
-
-def tesseract_info() -> dict:
-    global _TESS_VERSION
-    try:
-        lp.check_tesseract()
-    except RuntimeError as e:
-        return dict(ok=False, message=str(e))
-    if _TESS_VERSION is None:
-        try:
-            out = subprocess.run([lp.pytesseract.pytesseract.tesseract_cmd, "--version"], capture_output=True,
-                                 text=True, timeout=10)
-            _TESS_VERSION = (out.stdout or out.stderr).splitlines()[0]
-        except Exception:
-            _TESS_VERSION = "unknown version"
-    return dict(ok=True, version=_TESS_VERSION, path=str(lp.pytesseract.pytesseract.tesseract_cmd))
+def ocr_status() -> dict:
+    """OCR engine of each method: RapidOCR (method 'lithology', the default) and Tesseract (method 'cv')."""
+    return dict(lithology=lp.ocr_info("lithology"), cv=lp.ocr_info("cv"))
 
 
 # ======================================================================================================================
@@ -211,10 +199,11 @@ def config_schema() -> list:
             continue
         name = m.group(1)
         d = getattr(defaults, name)
-        kind = "bool" if isinstance(d, bool) else "int" if isinstance(d, int) else "float" if isinstance(d, float) else "list"
+        kind = ("bool" if isinstance(d, bool) else "int" if isinstance(d, int) else "float" if isinstance(d, float)
+                else "str" if isinstance(d, str) else "list")
         elem = None if kind != "list" else ("int" if all(isinstance(x, int) for x in d) else "float")
         out.append(dict(name=name, group=group, type=kind, elem=elem, default=list(d) if kind == "list" else d,
-                        help=(m.group(3) or "").strip()))
+                        help=(m.group(3) or "").strip(), choices=getattr(lp, "CHOICES", {}).get(name)))
     return out
 
 
@@ -228,6 +217,11 @@ def validate_config(overrides: Optional[dict]) -> dict:
         try:
             if isinstance(d, bool):
                 if not isinstance(v, bool):
+                    raise ValueError
+                full[k] = v
+            elif isinstance(d, str):
+                choices = getattr(lp, "CHOICES", {}).get(k)
+                if not isinstance(v, str) or (choices and v not in choices):
                     raise ValueError
                 full[k] = v
             elif isinstance(d, int):
@@ -341,8 +335,11 @@ def preflight(d: Path) -> dict:
             info = dict(name=img.name, size_mb=None, width=None, height=None, mode=None)
             try:
                 info["size_mb"] = round(img.stat().st_size / 1e6, 1)
-                with Image.open(img) as im:
-                    info.update(width=im.width, height=im.height, mode=im.mode)
+                if img.suffix.lower() == ".pdf":                    # rendered at the annotation's size
+                    info.update(width=(ann or {}).get("width"), height=(ann or {}).get("height"), mode="PDF")
+                else:
+                    with Image.open(img) as im:
+                        info.update(width=im.width, height=im.height, mode=im.mode)
             except Exception as e:
                 row["errors"].append(f"image unreadable: {type(e).__name__}: {e}")
             row["image"] = info
@@ -397,11 +394,13 @@ def read_events(d: Path) -> list:
 def progress(d: Path, events: Optional[list] = None) -> dict:
     events = read_events(d) if events is None else events
     total, logs, current, t0, t_end, fatal = 0, {}, None, None, None, None
+    stages = STAGES
     for e in events:
         ev = e.get("event")
         t0 = t0 or e.get("t")
         if ev == "start":
             total = e["n_logs"]
+            stages = e.get("stages") or STAGES
         elif ev == "log_start":
             current = e["log"]
             logs[e["log"]] = dict(stem=e["log"], index=e["index"], status="running", stages={}, t_start=e.get("t"))
@@ -418,17 +417,17 @@ def progress(d: Path, events: Optional[list] = None) -> dict:
             fatal, t_end = e["error"], e.get("t")
     finished = sum(1 for r in logs.values() if r["status"] != "running")
     cur = logs.get(current) if current and logs.get(current, {}).get("status") == "running" else None
-    frac_cur = len(cur["stages"]) / len(STAGES) if cur else 0.0
+    frac_cur = len(cur["stages"]) / len(stages) if cur else 0.0
     fraction = min(1.0, (finished + frac_cur) / total) if total else 0.0
     meta = read_meta(d)
     if t_end is None and meta.get("status") in TERMINAL and events:
         t_end = events[-1].get("t")
     elapsed = ((t_end or time.time()) - t0) if t0 else 0.0
     eta = elapsed * (1 - fraction) / fraction if 0.02 < fraction < 1 and t_end is None else None
-    next_stage = STAGES[len(cur["stages"])] if cur and len(cur["stages"]) < len(STAGES) else None
+    next_stage = stages[len(cur["stages"])] if cur and len(cur["stages"]) < len(stages) else None
     return dict(total=total, finished=finished, n_errors=sum(1 for r in logs.values() if r["status"] == "error"),
                 fraction=round(fraction, 4), elapsed_s=round(elapsed, 1), eta_s=None if eta is None else round(eta, 0),
-                current=dict(stem=cur["stem"], index=cur["index"], stages=cur["stages"], stage=next_stage,
+                current=dict(stem=cur["stem"], index=cur["index"], stages=cur["stages"], stage=next_stage, stage_names=stages,
                              running_s=round(time.time() - cur["t_start"], 1) if cur.get("t_start") else None)
                 if cur else None,
                 logs=sorted(logs.values(), key=lambda r: r["index"]), fatal=fatal, n_events=len(events))
@@ -473,6 +472,25 @@ def _supervise(rid: str, proc: Optional[subprocess.Popen], pid: int) -> None:
     write_meta(d, status=status, finished=now(), error=error, peak_rss_mb=JOB.get("peak_rss_mb"), **digest)
     with JOB_LOCK:
         JOB.clear()
+    start_next()
+
+
+def start_next() -> None:
+    """Start the next queued run, if the worker is free."""
+    with JOB_LOCK:
+        while QUEUE and not JOB:
+            d = RUNS / QUEUE.pop(0)
+            if (d / "meta.json").is_file() and read_meta(d).get("status") == "queued":
+                start_worker(d)
+
+
+def enqueue_or_start(d: Path) -> None:
+    """Call with JOB_LOCK held."""
+    if JOB:
+        QUEUE.append(d.name)
+        write_meta(d, status="queued", queued=now())
+    else:
+        start_worker(d)
 
 
 def start_worker(d: Path) -> None:
@@ -493,6 +511,9 @@ def recover_runs() -> None:
         try:
             meta = read_meta(d)
         except (OSError, json.JSONDecodeError):
+            continue
+        if meta.get("status") == "queued":
+            QUEUE.append(meta["id"])
             continue
         if meta.get("status") != "running":
             continue
@@ -518,6 +539,8 @@ def digest_from_summary(d: Path) -> dict:
 
 
 recover_runs()
+QUEUE.sort()
+threading.Thread(target=start_next, daemon=True).start()
 
 
 # ======================================================================================================================
@@ -535,7 +558,7 @@ def favicon():
 
 @app.get("/api/health")
 def health():
-    return dict(tesseract=tesseract_info(), python=sys.version.split()[0], pipeline=str(ROOT / "lithology_pipeline.py"),
+    return dict(ocr=ocr_status(), python=sys.version.split()[0], pipeline=str(ROOT / "lithology_pipeline.py"),
                 runs_dir=str(RUNS), busy=JOB.get("run_id"), mem_available_mb=mem_available_mb(), cpus=os.cpu_count())
 
 
@@ -591,6 +614,46 @@ def _looks_like_data(p: Path) -> bool:
         return False
 
 
+def default_labels_dir() -> Optional[Path]:
+    """Ground truth used automatically: cv_approach_1/labels (holds the organisers' example.csv as <stem>.csv)."""
+    d = ROOT / "labels"
+    return d if d.is_dir() else None
+
+
+_LOGS_CACHE: dict = {}
+
+
+@app.get("/api/logs")
+def list_logs(path: Optional[str] = None):
+    """Every log (image + JSON) in a folder, or in all the data folders found on this computer (single-log picker)."""
+    folders = [path] if path else suggestions()["data"]
+    out = []
+    for f in folders:
+        fp = Path(os.path.expanduser(f))
+        if not fp.is_absolute() or not fp.is_dir():
+            continue
+        try:
+            mtime = max([fp.stat().st_mtime] + [d.stat().st_mtime for d in fp.iterdir() if d.is_dir()])
+        except (OSError, ValueError):
+            mtime = 0
+        key = (str(fp), mtime)
+        if key not in _LOGS_CACHE:
+            rows = []
+            for l in lp.find_logs(fp, default_labels_dir()):
+                try:
+                    ann = json.loads(Path(l.annotation_path).read_text())
+                    size = round(Path(l.image_path).stat().st_size / 1e6, 1)
+                except (OSError, json.JSONDecodeError):
+                    ann, size = {}, None
+                labelled = l.labels_path is not None or (l.stem == lp.EXAMPLE_STEM and any(
+                    (fp / p).is_file() for p in ("example.csv", "example/example.csv")))
+                rows.append(dict(folder=str(fp), stem=l.stem, image=Path(l.image_path).name, size_mb=size,
+                                 width=ann.get("width"), height=ann.get("height"), labelled=labelled))
+            _LOGS_CACHE[key] = rows
+        out += _LOGS_CACHE[key]
+    return dict(logs=out, folders=[str(Path(f)) for f in folders], labels_dir=str(default_labels_dir() or ""))
+
+
 @app.get("/api/suggestions")
 def suggestions():
     """Folders on this computer that look like log data or pipeline results (to pre-fill the forms)."""
@@ -629,7 +692,7 @@ def list_runs():
                 continue
             out.append({k: m.get(k) for k in ("id", "name", "created", "mode", "status", "n_logs", "n_errors",
                                               "total_s", "mean_metrics", "source", "started", "finished", "error")})
-    return dict(runs=out, busy=JOB.get("run_id"))
+    return dict(runs=out, busy=JOB.get("run_id"), queue=list(QUEUE))
 
 
 @app.post("/api/runs")
@@ -651,8 +714,8 @@ def rename_run(rid: str, body: dict = Body(...)):
 @app.delete("/api/runs/{rid}")
 def delete_run(rid: str):
     d = run_path(rid)
-    if JOB.get("run_id") == rid:
-        raise HTTPException(409, "this run is in progress: cancel it first")
+    if JOB.get("run_id") == rid or rid in QUEUE:
+        raise HTTPException(409, "this run is in progress or queued: cancel it first")
     for root, dirs, files in os.walk(d, followlinks=False):           # unlink symlinks first: never touch targets
         for n in dirs + files:
             p = Path(root) / n
@@ -742,10 +805,13 @@ def link_folder(rid: str, body: dict = Body(...)):
     if not src.is_absolute() or not src.is_dir():
         raise HTTPException(400, f"not a folder: {src}")
     lab_raw = str(body.get("labels") or "").strip()
-    lab = Path(os.path.expanduser(lab_raw)) if lab_raw else None
+    lab = Path(os.path.expanduser(lab_raw)) if lab_raw else default_labels_dir()
     if lab is not None and not lab.is_dir():
         raise HTTPException(400, f"labels folder not found: {lab}")
     logs = lp.find_logs(src, lab)
+    want = body.get("logs")
+    if want:                                                        # single log / a selection of the folder
+        logs = [l for l in logs if l.stem in set(want)]
     if not logs:
         raise HTTPException(400, "no logs found: need <stem>.json with bounding_boxes + its image "
                                  "(flat, or bbox_annotation/ + images/)")
@@ -806,38 +872,48 @@ def start_run(rid: str, body: Optional[dict] = Body(None)):
     d = run_path(rid)
     body = body or {}
     with JOB_LOCK:
-        if JOB:
+        if JOB and not body.get("queue"):
             raise HTTPException(409, f"another run is in progress ({JOB.get('run_id')}); one job at a time")
-        meta = require_draft(d)
-        overrides = body.get("config") or {}
-        cfg = validate_config(overrides)
-        pf = preflight(d)
-        ok = [r for r in pf["rows"] if r["ok"]]
-        want = body.get("logs")
-        sel = [r for r in ok if want is None or r["stem"] in set(want)]
-        if not sel:
-            raise HTTPException(400, "no valid log selected (see the pre-flight table)")
-        work = d / "work"
-        (work / "labels").mkdir(parents=True, exist_ok=True)
-        for r in sel:                                                   # only the selected logs, as symlinks
-            place_symlink(work / r["json"], d / "data" / r["json"])
-            place_symlink(work / r["image"]["name"], d / "data" / r["image"]["name"])
-            if r["labels"] and r["labels"]["ok"]:
-                place_symlink(work / "labels" / f"{r['stem']}.csv", d / "data" / r["labels"]["rel"])
-        (d / "job.json").write_text(json.dumps(dict(data_dir=str(work), out_dir=str(d / "outputs"),
-                                                    labels_dir=str(work / "labels"), config=cfg), indent=2))
-        defaults = validate_config({})
-        write_meta(d, config=cfg, config_overrides={k: v for k, v in cfg.items() if v != defaults[k]},
-                   selected=[r["stem"] for r in sel], n_logs=len(sel), n_labelled=sum(1 for r in sel if r["labels"]))
-        for f in ("events.jsonl", "result.json"):
-            (d / f).unlink(missing_ok=True)
-        start_worker(d)
+        require_draft(d)
+        prepare_run(d, body)
+        enqueue_or_start(d)
     return status_payload(d)
+
+
+def prepare_run(d: Path, body: dict) -> None:
+    """Validate settings + selection, link the selected logs into work/, write job.json (no start)."""
+    overrides = body.get("config") or {}
+    cfg = validate_config(overrides)
+    pf = preflight(d)
+    ok = [r for r in pf["rows"] if r["ok"]]
+    want = body.get("logs")
+    sel = [r for r in ok if want is None or r["stem"] in set(want)]
+    if not sel:
+        raise HTTPException(400, "no valid log selected (see the pre-flight table)")
+    work = d / "work"
+    (work / "labels").mkdir(parents=True, exist_ok=True)
+    for r in sel:                                                   # only the selected logs, as symlinks
+        place_symlink(work / r["json"], d / "data" / r["json"])
+        place_symlink(work / r["image"]["name"], d / "data" / r["image"]["name"])
+        if r["labels"] and r["labels"]["ok"]:
+            place_symlink(work / "labels" / f"{r['stem']}.csv", d / "data" / r["labels"]["rel"])
+    (d / "job.json").write_text(json.dumps(dict(data_dir=str(work), out_dir=str(d / "outputs"),
+                                                labels_dir=str(work / "labels"), config=cfg), indent=2))
+    defaults = validate_config({})
+    write_meta(d, config=cfg, config_overrides={k: v for k, v in cfg.items() if v != defaults[k]},
+               selected=[r["stem"] for r in sel], n_logs=len(sel), n_labelled=sum(1 for r in sel if r["labels"]))
+    for f in ("events.jsonl", "result.json"):
+        (d / f).unlink(missing_ok=True)
 
 
 @app.post("/api/runs/{rid}/cancel")
 def cancel_run(rid: str):
     d = run_path(rid)
+    with JOB_LOCK:
+        if rid in QUEUE:
+            QUEUE.remove(rid)
+            write_meta(d, status="cancelled", finished=now(), error="cancelled before it started")
+            return status_payload(d)
     if JOB.get("run_id") != rid:
         raise HTTPException(409, "this run is not in progress")
     JOB["cancel"] = True
@@ -962,7 +1038,7 @@ def log_detail(rid: str, stem: str):
     error = next((e["error"] for e in (summary or {}).get("errors", []) if e["log"] == stem), None)
     files = {}
     for key, suffix in (("csv", ".csv"), ("page_png", "_page.png"), ("column_png", "_column.png"),
-                        ("legend_png", "_legend.png"), ("depth_png", "_depth.png")):
+                        ("legend_png", "_legend.png"), ("depth_png", "_depth.png"), ("annotated_tif", "_annotated.tif")):
         if (out_dir / f"{stem}{suffix}").is_file():
             files[key] = f"{stem}{suffix}"
     if not files and record is None and error is None:
@@ -1067,3 +1143,104 @@ def download(rid: str, what: str = "csv"):
     meta = read_meta(d)
     label = re.sub(r"[^A-Za-z0-9._-]+", "_", meta.get("name") or rid).strip("_") or rid
     return FileResponse(z, filename=f"lithology_{label}_{what}.zip", media_type="application/zip")
+
+
+# ======================================================================================================================
+# API: evaluations (same ground-truth images, several methods, compared side by side)
+# ======================================================================================================================
+EVALS = RUNS / ".evaluations"
+
+
+def _eval_path(eid: str) -> Path:
+    if not EVAL_ID.fullmatch(eid or "") or not (EVALS / f"{eid}.json").is_file():
+        raise HTTPException(404, "unknown evaluation")
+    return EVALS / f"{eid}.json"
+
+
+@app.post("/api/evaluations")
+def create_evaluation(body: dict = Body(...)):
+    """body: {name, logs: [{folder, stem}], methods: ["hybrid", "lithology", "cv"]}. One queued run per method."""
+    methods = [m for m in (body.get("methods") or []) if m in lp.CHOICES["method"]]
+    logs = [l for l in (body.get("logs") or []) if l.get("folder") and l.get("stem")]
+    if not methods or not logs:
+        raise HTTPException(400, "choose at least one image and one method")
+    EVALS.mkdir(parents=True, exist_ok=True)
+    eid, i = time.strftime("%Y%m%d-%H%M%S"), 2
+    while (EVALS / f"{eid}.json").exists():
+        eid, i = f"{time.strftime('%Y%m%d-%H%M%S')}-{i}", i + 1
+    name = (body.get("name") or "").strip()[:100] or f"Evaluation {eid}"
+    by_folder: dict = {}
+    for l in logs:
+        by_folder.setdefault(l["folder"], []).append(l["stem"])
+    runs = {}
+    for m in methods:
+        d = new_run(f"{name} · {m}", mode="evaluation", evaluation=eid)
+        for folder, stems in by_folder.items():
+            link_folder(d.name, {"path": folder, "logs": stems})
+        with JOB_LOCK:
+            prepare_run(d, {"config": {"method": m}})
+            enqueue_or_start(d)
+        runs[m] = d.name
+    ev = dict(id=eid, name=name, created=now(), methods=methods, logs=logs, runs=runs)
+    (EVALS / f"{eid}.json").write_text(json.dumps(ev, indent=2))
+    return ev
+
+
+def _eval_state(ev: dict) -> dict:
+    out = []
+    for m, rid in ev["runs"].items():
+        d = RUNS / rid
+        if not (d / "meta.json").is_file():
+            out.append(dict(method=m, run_id=rid, status="deleted"))
+            continue
+        meta = read_meta(d)
+        p = progress(d)
+        row = dict(method=m, run_id=rid, status=meta.get("status"), fraction=p["fraction"], elapsed_s=p["elapsed_s"],
+                   mean_metrics=None, total_s=None, logs=[], errors=[])
+        s = d / "outputs" / "summary.json"
+        if s.is_file():
+            j = json.loads(s.read_text())
+            row.update(mean_metrics=j.get("mean_metrics"), total_s=j.get("total_s"), errors=j.get("errors", []),
+                       logs=[dict(stem=r["stem"], n_intervals=r["n_intervals"], runtime_s=r["runtime_s"],
+                                  metrics=r.get("metrics"), ambiguous=r.get("ambiguous", [])) for r in j["logs"]])
+        else:
+            row["logs"] = [dict(stem=r["stem"], n_intervals=r.get("n_intervals"), runtime_s=r.get("runtime_s"),
+                                metrics=r.get("metrics"), ambiguous=r.get("ambiguous", []))
+                           for r in p["logs"] if r["status"] == "done"]
+        out.append(row)
+    return dict(ev, results=out)
+
+
+@app.get("/api/evaluations")
+def list_evaluations():
+    if not EVALS.is_dir():
+        return dict(evaluations=[])
+    evs = []
+    for f in sorted(EVALS.glob("*.json"), reverse=True):
+        try:
+            st = _eval_state(json.loads(f.read_text()))
+        except (OSError, json.JSONDecodeError):
+            continue
+        evs.append({k: st[k] for k in ("id", "name", "created", "methods")} |
+                   dict(n_images=len(st["logs"]), statuses={r["method"]: r["status"] for r in st["results"]},
+                        acc={r["method"]: (r["mean_metrics"] or {}).get("row_acc") for r in st["results"]}))
+    return dict(evaluations=evs)
+
+
+@app.get("/api/evaluations/{eid}")
+def get_evaluation(eid: str):
+    return _eval_state(json.loads(_eval_path(eid).read_text()))
+
+
+@app.delete("/api/evaluations/{eid}")
+def delete_evaluation(eid: str):
+    """Deletes the evaluation and its runs (unless one is still queued or running)."""
+    ev = json.loads(_eval_path(eid).read_text())
+    for rid in ev["runs"].values():
+        if JOB.get("run_id") == rid or rid in QUEUE:
+            raise HTTPException(409, "a run of this evaluation is still queued or running: cancel it first")
+    for rid in ev["runs"].values():
+        if (RUNS / rid / "meta.json").is_file():
+            delete_run(rid)
+    _eval_path(eid).unlink()
+    return dict(deleted=eid)

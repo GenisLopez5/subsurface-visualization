@@ -94,7 +94,7 @@ label.check { display: inline-flex; gap: 6px; align-items: center; cursor: point
 .badge.ok, .badge.done, .badge.imported { background: var(--ok-soft); color: var(--ok); }
 .badge.err, .badge.failed, .badge.error { background: var(--err-soft); color: var(--err); }
 .badge.warn, .badge.cancelled, .badge.interrupted { background: var(--warn-soft); color: var(--warn); }
-.badge.running { background: var(--accent-soft); color: var(--accent); }
+.badge.running, .badge.queued { background: var(--accent-soft); color: var(--accent); }
 .flag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--warn-soft); color: var(--warn); margin: 1px 2px 1px 0; white-space: nowrap; }
 .flag.err { background: var(--err-soft); color: var(--err); }
 .yes { color: var(--ok); font-weight: 600; }
@@ -239,3 +239,12 @@ ol.how .t { font-weight: 650; }
 #logsTable td { white-space: nowrap; }
 .side-panel .tabs button { padding: 8px 8px; font-size: 13px; }
 #ivTable td, #ivTable th { padding: 5px 7px; white-space: nowrap; }
+
+/* New run: single / batch / open */
+.modeseg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 14px; background: var(--panel); }
+.modeseg button { border: none; border-radius: 0; padding: 9px 18px; font-weight: 600; color: var(--muted); }
+.modeseg button + button { border-left: 1px solid var(--line); }
+.modeseg button.on { background: var(--accent); color: #fff; }
+select[size] { padding: 4px; font-family: var(--mono); font-size: 12.5px; }
+select[size] option { padding: 3px 6px; border-radius: 4px; }
+select[size] optgroup { font-family: system-ui, sans-serif; color: var(--muted); font-style: normal; }
