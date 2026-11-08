@@ -4,3 +4,8 @@
 bbox-final/models/** -text
 bbox-final/models-pt/*.json -text
 *.pt binary
+
+# Keep Unity source snapshots consistent across Windows and GitHub.
+unity-project/**/*.cs text eol=lf
+unity-project/**/*.uxml text eol=lf
+unity-project/**/*.uss text eol=lf

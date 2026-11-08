@@ -18,6 +18,15 @@ HTTP; Player Settings permits HTTP with the user's approval.
 - Download all remains in the toolbar; Open and Download selected are context
   interactions rather than toolbar buttons (opening uses double-click).
 - Only `done` documents appear in the library. Search uses the server name filter.
+- The library includes an offline world overview. Hovering or keyboard-focusing a
+  document highlights its TIFF location; documents without coordinates show an
+  explicit unavailable state. A small green/purple marker identifies mapped rows.
+  The list response should preferably expose
+  `location: {"latitude": ..., "longitude": ..., "label": ...}`. The client also
+  accepts this object under `stats.location`, `geo_location`, the aliases `lat`,
+  `lon`/`lng`, and GeoJSON-order `coordinates: [longitude, latitude]`. Invalid or
+  out-of-range coordinates are never plotted. The map is drawn locally and does
+  not call a map or geocoding service.
 - Upload TIFFs accepts multiple files (512 MB per transfer). The activity panel
   tracks returned IDs and polls status every three seconds, including in the viewer.
   Upload activity is session-only. Closing the idle panel clears finished entries;
