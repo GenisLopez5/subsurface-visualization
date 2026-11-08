@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f97fcecb6ae05343aa99c8fa3c31fc7, type: 3}
+  m_Name: L155
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.LithologyDefinition
+  stableId: L155
+  rawLabel: Others
+  provisionalNormalizedName: 
+  role: 6
+  interpretation: 0
+  requiresSourceLegend: 0
+  sourceVerified: 0
+  prefixExpanded: 0
+  sourceInstructions: distinct unspecified-category display state
+  sourceLocations:
+  - source: Supplied implementation brief / pasted extraction
+    mappingRow: 155
+    briefLine: 391
+    extractionLocation: Unknown
+    pdfFile: Unknown
+    pdfPage: Unknown
+    codebook: Unknown
+  optionalComponentSources: []
+  possibleButUnselectedBases: []
+  generatedRecipe: {fileID: 11400000, guid: c3a435a00e8103d479d5cd4bf64f26b9, type: 2}
+  confirmedRecipe: {fileID: 0}
+  confirmationEvidence: 

@@ -12,7 +12,7 @@ For the web UI (asynchronous, with progress)
     POST /api/jobs/{id}/rerun         same inputs, ignore the cache
     GET  /api/jobs/{id}/overview.png  whole log drawn by the notebook code
     GET  /api/jobs/{id}/zoom.png      ?top=&bottom= (depths) &scale=
-    GET  /api/jobs/{id}/annotated.tif ?scale=
+    GET  /api/jobs/{id}/annotated.tif full resolution
     GET  /api/jobs/{id}/result.csv | result.json
     GET  /api/dataset                 annotations in the store (+ whether the image is available)
     POST /api/batch/scan              look inside a server folder
@@ -30,6 +30,11 @@ Desktop helpers (only with --desktop, when the server runs on the user's machine
 
 Errors are JSON: {"error": "..."} (+ "need": "json"|"image" and "keep" when a partner file is missing).
 Interactive docs: /docs
+Drawn images (overview, zoom, annotated TIF, v1 result TIF + preview) have the colour key added
+ON TOP, so they are taller than the original. Their layout comes with them, as a "layout" object in
+the JSON and as X-Legend-Height / X-Scale / X-Y-Start headers on the image responses:
+
+    y_in_drawn_image = legend_height_px + (y_in_original - y_start) * scale
 """
 from __future__ import annotations
 
@@ -49,6 +54,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from .annotations import IMAGE_EXT, AnnotationNotFound, AnnotationStore, ImageStore, load_annotation, resolve_annotation
 from .config import Settings
+from . import drawing
 from .jobs import Job, JobManager
 
 
@@ -75,7 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                               "**/api/v1**: file management for frontends (uploads, status, results in Postgres).")
     if s.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"],
-                           allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag"])
+                           allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag", *drawing.LAYOUT_HEADERS])
     from . import files_api
 
     hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store)
@@ -159,6 +165,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "depth_range": [r["intervals"][0]["top_depth"], r["intervals"][-1]["bottom_depth"]] if r["intervals"] else None,
             }
             out["intervals"] = r["intervals"]
+            out["layout"] = job.overview_layout  # of overview.png
             out["files"] = {
                 "Overview image": str(job.overview.with_suffix(".tif").resolve()),
                 "Source image": str(job.image_path.resolve()),
@@ -181,8 +188,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 output: str = Query("zip", pattern="^(zip|json)$",
                                     description="zip: <name>_annotated.tif + <name>_lithology.csv; "
                                                 "json: intervals + CSV text + links to the files"),
-                scale: float | None = Query(None, gt=0, le=1, description="size of the annotated image "
-                                            "(default: whole log at most ~12k px tall)"),
                 force: bool = Query(False, description="ignore cached results")):
         paths = save_uploads([file] + ([annotation] if annotation else []))
         picked = pick_inputs(paths)
@@ -194,15 +199,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if job.status != "done":
             return err(job.error or "processing failed", 500, id=job.id)
         try:
-            tif = jobs.annotated_image(job, scale=scale, tif=True)
+            tif = jobs.annotated_image(job, tif=True)
         except ValueError as e:
             return err(str(e))
         stem = Path(img.name).stem
         if output == "json":
             return {"id": job.id, "image": img.name, "annotation": ann_path.name, "notes": notes,
                     "intervals": job.result["intervals"],
+                    "layout": drawing.read_layout(tif),  # of the annotated TIF
                     "csv": (job.tmp / "results.csv").read_text(),
-                    "annotated_tif_url": f"/api/jobs/{job.id}/annotated.tif" + (f"?scale={scale}" if scale else ""),
+                    "annotated_tif_url": f"/api/jobs/{job.id}/annotated.tif",
                     "csv_url": f"/api/jobs/{job.id}/result.csv"}
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -211,7 +217,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         buf.seek(0)
         return StreamingResponse(buf, media_type="application/zip",
                                  headers={"Content-Disposition": f'attachment; filename="{stem}_lithology.zip"',
-                                          "X-Job-Id": job.id})
+                                          "X-Job-Id": job.id, **drawing.layout_headers(drawing.read_layout(tif))})
 
     # ------------------------------------------------------------------ jobs (web UI)
 
@@ -257,7 +263,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/jobs/{jid}/overview.png")
     def overview(jid: str):
         job = _done(jid)
-        return job if isinstance(job, JSONResponse) else FileResponse(job.overview, media_type="image/png")
+        if isinstance(job, JSONResponse):
+            return job
+        return FileResponse(job.overview, media_type="image/png", headers=drawing.layout_headers(job.overview_layout))
 
     @app.get("/api/jobs/{jid}/zoom.png")
     def zoom(jid: str, top: float, bottom: float, scale: float = Query(0.5, gt=0, le=1)):
@@ -265,18 +273,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if isinstance(job, JSONResponse):
             return job
         png = jobs.zoom(job, top, bottom, scale)
-        return FileResponse(png, media_type="image/png", headers={"X-File-Path": str(png.with_suffix(".tif").resolve())})
+        return FileResponse(png, media_type="image/png", headers={"X-File-Path": str(png.with_suffix(".tif").resolve()),
+                                                                  **drawing.layout_headers(drawing.read_layout(png))})
 
     @app.get("/api/jobs/{jid}/annotated.tif")
-    def annotated_tif(jid: str, scale: float | None = Query(None, gt=0, le=1)):
+    def annotated_tif(jid: str):
         job = _done(jid)
         if isinstance(job, JSONResponse):
             return job
         try:
-            tif = jobs.annotated_image(job, scale=scale, tif=True)
+            tif = jobs.annotated_image(job, tif=True)
         except ValueError as e:
             return err(str(e))
-        return FileResponse(tif, media_type="image/tiff", filename=f"{job.image_path.stem}_annotated.tif")
+        return FileResponse(tif, media_type="image/tiff", filename=f"{job.image_path.stem}_annotated.tif",
+                            headers=drawing.layout_headers(drawing.read_layout(tif)))
 
     @app.get("/api/jobs/{jid}/result.{fmt}")
     def result_file(jid: str, fmt: str):

@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6533487051815254881430edbe6b06ab, type: 3}
+  m_Name: L173
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.LithologyMaterialRecipe
+  stableId: L173-default
+  baseTexture: {fileID: 0}
+  componentLayers: []
+  modifiers: []
+  coordinates:
+    triplanar: 1
+    space: 0
+    metresPerUnityUnit: 1
+    geologicalOrigin: {x: 0, y: 0, z: 0}
+    beddingNormal: {x: 0, y: 1, z: 0}
+    cleavageNormal: {x: 0.7, y: 0.7, z: 0}
+  structure:
+    beddingSpacingMetres: 0.12
+    cleavageSpacingMetres: 0.08
+    fractureSpacingMetres: 0.45
+    clastSpacingMetres: 0.12
+    veinWidthMetres: 0.004
+    mottleSpacingMetres: 0.5
+    bedding: 0
+    cleavage: 0
+    fractures: 0
+    banding: 0
+    welding: 0
+    poorSorting: 0
+    irregularity: 0.15
+    carbonateMudPresent: 1
+    grainSupport: 0.3
+  palette: {r: 1, g: 1, b: 1, a: 1}
+  mineralLight: {r: 0.83, g: 0.8, b: 0.73, a: 1}
+  mineralDark: {r: 0.14, g: 0.16, b: 0.17, a: 1}
+  mineralDarkCoverage: 0.3
+  grainMetres: 0.0008
+  schematicExaggeration: 8
+  normalStrength: 0.55
+  smoothness: 0.25
+  seed: 189482
+  revision: 1
+  numericalDefaultsAreIllustrative: 1
+  notes: Artistic display parameters; not measured mineral fractions, strength, or
+    specimen dimensions.

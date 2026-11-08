@@ -1,0 +1,35 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:Style src="BoreholeViewer.uss" />
+  <ui:VisualElement class="app">
+    <ui:VisualElement class="header">
+      <ui:VisualElement class="source"><ui:Label name="filename" class="filename" /><ui:Label name="range" class="source-range" /></ui:VisualElement>
+      <ui:Button name="loadCsv" text="Load CSV · debug" class="header-button" />
+      <ui:Button name="loadImage" text="Load document" class="header-button" />
+    </ui:VisualElement>
+    <ui:Label name="error" class="error hidden" />
+    <ui:VisualElement class="workspace">
+      <ui:VisualElement name="documentView" class="document-pane">
+        <ui:VisualElement name="documentViewport" class="document-viewport">
+          <ui:Image name="documentImage" class="document-image" picking-mode="Ignore" />
+          <ui:VisualElement name="documentWindow" class="document-window" picking-mode="Ignore" />
+          <ui:VisualElement name="documentSelection" class="document-selection" picking-mode="Ignore" />
+          <ui:VisualElement name="documentPlaceholder" class="placeholder" picking-mode="Ignore"><ui:Label text="THE SOURCE, IN CONTEXT" class="placeholder-title" /><ui:Label text="Load the segmented document to link image pixels with depth. The cylinder remains available while you choose a page." class="placeholder-copy" /></ui:VisualElement>
+          <ui:Label name="documentNotice" class="document-notice" picking-mode="Ignore" />
+          <ui:VisualElement name="csvOverlay" class="csv-overlay hidden"><ui:VisualElement class="csv-toolbar"><ui:Label text="CSV" /><ui:Button name="hideCsv" text="Close" /></ui:VisualElement><ui:ScrollView name="csvHorizontal" mode="Horizontal"><ui:VisualElement name="csvHeader" class="csv-row" /><ui:ListView name="csvRows" /></ui:ScrollView></ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="pane-footer"><ui:Button name="toggleCsv" text="CSV" /><ui:Label name="pixelReadout" /><ui:Label name="syncState" /></ui:VisualElement>
+      </ui:VisualElement>
+      <ui:VisualElement class="column-pane">
+        <ui:VisualElement name="viewport" class="viewport">
+          <ui:Image name="renderImage" class="render-image" picking-mode="Ignore" />
+          <ui:Label name="labelHint" class="label-hint hidden" text="Zoom in to see section labels" picking-mode="Ignore" /><ui:Label name="surfaceGap" class="surface-gap hidden" picking-mode="Ignore" />
+          <ui:VisualElement name="ruler" class="ruler" picking-mode="Ignore" />
+          <ui:VisualElement name="intervalLabels" class="annotation-layer" picking-mode="Ignore" />
+          <ui:VisualElement name="selectionCard" class="selection-card hidden" picking-mode="Ignore"><ui:Label text="SELECTED INTERVAL" class="selection-caption" /><ui:Label name="selectedName" class="selected-name" /><ui:Label name="selectedDepths" class="selected-depths" /><ui:Label name="selectedInfo" class="selected-info" /></ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="navigation" class="navigation"><ui:Button name="zoomOut" text="−" class="zoom-button" /><ui:Button name="zoomIn" text="+" class="zoom-button" /><ui:Button name="fit" text="Fit" /><ui:DropdownField name="appearance" class="appearance" /></ui:VisualElement>
+      </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement class="footer"><ui:Label name="depthReadout" class="depth-readout" /><ui:Label name="status" class="status" /></ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,1 @@
+{"name":"Borehole.Editor","rootNamespace":"Subsurface.Borehole.Editor","references":["Borehole.Runtime","Lithology.Runtime","Lithology.Editor","Unity.RenderPipelines.Universal.Runtime"],"includePlatforms":["Editor"],"autoReferenced":true}

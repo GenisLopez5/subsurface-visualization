@@ -16,6 +16,12 @@
     DELETE /api/v1/files?ids=a,b,c               several at once
     GET    /api/v1/health
 
+The result TIF has the colour key added on top, so it is taller than the original. Its layout is in
+stats.layout of the file (and "layout" in result_json); download/result_tif and preview/result_tif also
+send it as X-Legend-Height / X-Scale / X-Y-Start headers (for the preview: at the preview's size):
+
+    y_in_result_tif = legend_height_px + y_in_original * scale
+
 File status: uploading -> queued (or needs_annotation) -> processing -> done | error
 (uploading: the request has returned, the image is being stored in Postgres in the background)
 """
@@ -39,6 +45,7 @@ from pydantic import BaseModel
 from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_matches, resolve_upload_annotation,
                           validate_annotation)
 from .config import Settings
+from . import drawing
 from .db import BLOB_KINDS, DB, STATUSES, dumps
 from .worker import CONTENT_TYPES, Uploader, Worker, safe_name, spool_dir
 
@@ -196,6 +203,8 @@ class PreviewCache:
 
 
 def render_preview(blob: dict, width: int) -> bytes:
+    """PNG of the blob at most `width` px wide. Images are decoded and shrunk in strips of rows,
+    so a log that is hundreds of millions of pixels never has to exist at full size in RGB."""
     from PIL import Image
 
     Image.MAX_IMAGE_PIXELS = None
@@ -206,17 +215,96 @@ def render_preview(blob: dict, width: int) -> bytes:
         page = pdfium.PdfDocument(bytes(data))[0]
         w = page.get_width()
         im = page.render(scale=max(width / w, 0.05)).to_pil()
+        if im.width > width:
+            im = im.resize((width, max(1, round(im.height * width / im.width))), Image.Resampling.LANCZOS)
     else:
         im = Image.open(io.BytesIO(data))
         im.draft("RGB", (width, int(im.height * width / im.width)))  # fast path for JPEGs
-    if im.mode not in ("RGB", "L"):
-        im = im.convert("RGB") if im.mode != "1" else im.convert("L")
-    if im.width > width:
-        im = im.resize((width, max(1, round(im.height * width / im.width))), Image.Resampling.LANCZOS
-                       if im.width * im.height < 80_000_000 else Image.Resampling.BOX)
+        if im.width > width:
+            strips = _deflate_rgb_strips(im, data) or _pil_strips(im)
+            im = _shrink_strips(strips, im.width, im.height, width)
+        elif im.mode not in ("RGB", "L"):
+            im = im.convert("RGB") if im.mode != "1" else im.convert("L")
     buf = io.BytesIO()
     im.save(buf, "PNG", optimize=False)
     return buf.getvalue()
+
+
+PREVIEW_STRIP_ROWS = 4096
+
+
+def _pil_strips(im):
+    """(y, image) pieces of any image, converted to RGB/L a strip at a time."""
+    mode = "L" if im.mode in ("1", "L", "I;16", "I") else "RGB"
+    for y in range(0, im.height, PREVIEW_STRIP_ROWS):
+        yield y, im.crop((0, y, im.width, min(y + PREVIEW_STRIP_ROWS, im.height))).convert(mode)
+
+
+def _deflate_rgb_strips(im, data):
+    """(y, image) pieces of a strip-based, Deflate-compressed 8-bit RGB TIF (the result TIFs) read straight
+    from the file, one TIF strip at a time (Pillow would decode the whole image first). None if the
+    file is anything else."""
+    import zlib
+
+    from PIL import Image
+
+    try:
+        t = im.tag_v2
+        if (im.format != "TIFF" or im.mode != "RGB" or t.get(259) not in (8, 32946) or t.get(284, 1) != 1
+                or t.get(317, 1) != 1 or 322 in t or 273 not in t):
+            return None
+        offsets, counts, rps = t[273], t[279], int(t.get(278, im.height))
+    except Exception:
+        return None
+    if isinstance(offsets, int):
+        offsets, counts = (offsets,), (counts,)
+    mv = memoryview(data)
+
+    def gen():
+        for i, (off, n) in enumerate(zip(offsets, counts)):
+            y = i * rps
+            rows = min(rps, im.height - y)
+            raw = zlib.decompress(mv[off:off + n])
+            yield y, Image.frombuffer("RGB", (im.width, rows), raw[:im.width * 3 * rows], "raw", "RGB", 0, 1)
+    return gen()
+
+
+def _shrink_strips(strips, w, h, width):
+    """Shrink (y, image) row strips of a w x h image to `width` px wide, gathering them into blocks of
+    ~PREVIEW_STRIP_ROWS rows so each resize sees enough context."""
+    from PIL import Image
+
+    k = width / w
+    out = None
+    block, block_y, block_rows = [], 0, 0
+
+    def flush():
+        nonlocal out, block, block_rows
+        if not block:
+            return
+        mode = block[0].mode
+        piece = block[0] if len(block) == 1 else Image.new(mode, (w, block_rows))
+        if len(block) > 1:
+            yy = 0
+            for b in block:
+                piece.paste(b, (0, yy))
+                yy += b.height
+        top, bottom = round(block_y * k), round((block_y + block_rows) * k)
+        if out is None:
+            out = Image.new(mode, (width, max(1, round(h * k))), "white")
+        if bottom > top:
+            out.paste(piece.resize((width, bottom - top), Image.Resampling.LANCZOS), (0, top))
+        block, block_rows = [], 0
+
+    for y, part in strips:
+        if not block:
+            block_y = y
+        block.append(part)
+        block_rows += part.height
+        if block_rows >= PREVIEW_STRIP_ROWS:
+            flush()
+    flush()
+    return out
 
 
 # ------------------------------------------------------------------ router
@@ -391,6 +479,11 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
     def get_file(fid: UUID, db: DB = Depends(get_db)):
         return file_out(file_or_404(db, fid))
 
+    def result_layout(db: DB, fid) -> dict | None:
+        """Layout of the stored result TIF (legend height on top, scale); None for results made before it existed."""
+        row = db.get_file(fid)
+        return ((row or {}).get("stats") or {}).get("layout")
+
     def drop_local(ids):
         for fid in ids:
             shutil.rmtree(spool_dir(settings, fid), ignore_errors=True)
@@ -423,8 +516,10 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
             file_or_404(db, fid)
             raise HTTPException(404, f"{kind} not available yet")
         disp = "inline" if inline else "attachment"
-        return Response(bytes(b["data"]), media_type=b["content_type"],
-                        headers={"Content-Disposition": f'{disp}; filename="{b["filename"]}"', "ETag": b["sha256"]})
+        headers = {"Content-Disposition": f'{disp}; filename="{b["filename"]}"', "ETag": b["sha256"]}
+        if kind == "result_tif":
+            headers.update(drawing.layout_headers(result_layout(db, fid)))
+        return Response(bytes(b["data"]), media_type=b["content_type"], headers=headers)
 
     @r.get("/files/{fid}/preview/{kind}", responses={200: {"content": {"image/png": {}}}})
     def preview(fid: UUID, kind: Literal["original", "result_tif"], request: Request,
@@ -434,14 +529,17 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
             file_or_404(db, fid)
             raise HTTPException(404, f"{kind} not available yet")
         etag = f'"{meta["sha256"][:16]}-{width}"'
+        headers = {"ETag": etag, "Cache-Control": "private, max-age=3600"}
+        if kind == "result_tif":
+            headers.update(drawing.layout_headers(drawing.scaled_layout(result_layout(db, fid), width)))
         if request.headers.get("if-none-match") == etag:
-            return Response(status_code=304)
+            return Response(status_code=304, headers=headers)
         key = (str(fid), kind, width, meta["sha256"])
         png = previews.get(key)
         if png is None:
             png = render_preview(db.get_blob(fid, kind), width)
             previews.put(key, png)
-        return Response(png, media_type="image/png", headers={"ETag": etag, "Cache-Control": "private, max-age=3600"})
+        return Response(png, media_type="image/png", headers=headers)
 
     @r.put("/files/{fid}/annotation", response_model=FileOut,
            summary="Set or replace the bounding boxes (JSON body, or a JSON file as multipart 'file'); re-queues")

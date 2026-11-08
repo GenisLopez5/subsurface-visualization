@@ -1,0 +1,122 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Lithology / L070-default
+  m_Shader: {fileID: 4800000, guid: b5a48fe5423bd6c4a8250f40bec93324, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 50e3eb21f4893014195655d7295dada8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentMap1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentMap2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentNormal1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentNormal2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentSurface1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ComponentSurface2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _CoverageMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMap:
+        m_Texture: {fileID: 2800000, guid: 44724281ddcb90e4ab831fb6775ad6c2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormal:
+        m_Texture: {fileID: 2800000, guid: f1af30a4bd06fd641924d990f10e947e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MineralMask:
+        m_Texture: {fileID: 2800000, guid: af6679be69c17f643b2c4fd3ddeb9eb7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SurfaceMap:
+        m_Texture: {fileID: 2800000, guid: bdc50a03b01337743a6dfc7eaa3034f3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _DetailEnabled: 1
+    - _DetailStrength: 0.4
+    - _GrainScale: 0.0064
+    - _HasCoverageMask: 0
+    - _HasDetailNormal: 1
+    - _HasMineralRegions: 0
+    - _HasNormal: 0
+    - _HasSurface: 1
+    - _InvertGreen: 0
+    - _Irregularity: 0.15
+    - _LayerCount: 1
+    - _Legend: 0
+    - _MacroScale: 1
+    - _MineralBalance: 0.3
+    - _NormalStrength: 0.55
+    - _ProceduralDark: 0
+    - _Schematic: 0
+    - _Seed: 4881
+    - _Smoothness: 0.25
+    - _StatusPattern: 6
+    - _Triplanar: 1
+    - _UnitMetres: 1
+    - _VeinWidth: 0.004
+    - _WorldSpace: 1
+    m_Colors:
+    - _BeddingNormal: {r: 0, g: 1, b: 0, a: 0}
+    - _CleavageNormal: {r: 0.70710677, g: 0.70710677, b: 0, a: 0}
+    - _Fabric: {r: 0, g: 0, b: 0.85, a: 0}
+    - _GeoOrigin: {r: 0, g: 0, b: 0, a: 0}
+    - _Layer1: {r: 2, g: 0.75, b: 0.0064, a: 0.3}
+    - _Layer2: {r: 0, g: 0, b: 0.032, a: 0.3}
+    - _LayerColor1: {r: 0.73, g: 0.71, b: 0.63, a: 1}
+    - _LayerColor2: {r: 0.65, g: 0.62, b: 0.5, a: 1}
+    - _LayerSurface1: {r: 0.22, g: 0, b: 0, a: 0}
+    - _LayerSurface2: {r: 0.25, g: 0, b: 0, a: 0}
+    - _LegendColor: {r: 0.76, g: 0.6252267, b: 0.54719996, a: 1}
+    - _MineralDark: {r: 0.14, g: 0.16, b: 0.17, a: 1}
+    - _MineralLight: {r: 0.83, g: 0.8, b: 0.73, a: 1}
+    - _Spacing: {r: 0.12, g: 0.08, b: 0.45, a: 0.5}
+    - _Structure: {r: 0, g: 0, b: 0, a: 0}
+    - _Tint: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

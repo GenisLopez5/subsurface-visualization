@@ -83,11 +83,12 @@ def stats(result) -> dict:
 
 
 def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_root: Path,
-            force=False, log=print, debug_dir: Path | None = None, scale=None) -> dict:
+            force=False, log=print, debug_dir: Path | None = None) -> dict:
     """Extract + draw one log.
 
-    Writes out_dir/<name>.csv and out_dir/<name>.tif (LZW-compressed) and, if
-    debug_dir is given, debug_dir/<name>.json. Returns a summary dict including the file paths.
+    Writes out_dir/<name>.csv and out_dir/<name>.tif (full resolution, Deflate-compressed) and, if
+    debug_dir is given, debug_dir/<name>.json. Returns a summary dict including the file paths and
+    the TIF's layout (legend bar height on top, scale: see drawing.make_layout).
     """
     t0 = time.time()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -103,8 +104,8 @@ def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_r
     try:
         page, image = page_for_notebook(img_path, result, tmp, log)
         log("drawing")
-        drawing.render_tif(image, ann_path, result, files["tif"], scale=scale)
+        layout = drawing.render_tif(image, ann_path, result, files["tif"])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return {"status": "done", "seconds": round(time.time() - t0), **stats(result),
-            "files": {k: str(v) for k, v in files.items()}, "result": result}
+            "layout": layout, "files": {k: str(v) for k, v in files.items()}, "result": result}

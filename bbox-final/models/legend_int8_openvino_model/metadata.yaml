@@ -1,0 +1,22 @@
+description: Ultralytics YOLO11s model trained on /content/drive/MyDrive/subsurface-bboxes/legend-runs/20261107-182318/dataset/dataset.yaml
+author: Ultralytics
+date: '2026-11-08T00:04:33.722335'
+version: 8.3.228
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 2048
+- 2048
+names:
+  0: lithology_legend
+args:
+  batch: 1
+  fraction: 1.0
+  half: false
+  int8: true
+  dynamic: true
+  nms: false
+channels: 3

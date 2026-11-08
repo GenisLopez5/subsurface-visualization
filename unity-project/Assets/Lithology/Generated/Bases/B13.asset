@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0551ffe3a0c9794489a2daf01ccb30fe, type: 3}
+  m_Name: B13
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.BaseTextureSet
+  stableId: B13
+  description: Coal / lignite
+  procurementGuidance: 'A carbon-rich rock texture with distinguishable dull and
+    shiny patches, subtle cleat or fracture detail, and a configurable dark palette.
+    A lignite reference can add brown or woody details when warranted. Search: coal
+    seamless PBR; lignite fresh surface texture.'
+  albedo: {fileID: 2800000, guid: e5c402dd0cabc9044a22190029eda80c, type: 3}
+  normal: {fileID: 0}
+  surface: {fileID: 2800000, guid: c6ff47ef0c29b784ca37827749a3cd4c, type: 3}
+  height: {fileID: 2800000, guid: 69c5d53be18caef48b637dd7bd724024, type: 3}
+  componentMask: {fileID: 0}
+  detailAlbedo: {fileID: 2800000, guid: aae3dd5a1c6500444af5d3c575a40aab, type: 3}
+  detailNormal: {fileID: 2800000, guid: 7399b7861bf74b2459772217a81b7250, type: 3}
+  detailMask: {fileID: 2800000, guid: b75ff73646f065f42a42737b2b00f281, type: 3}
+  surfaceLayout: R Metallic / G AO / B unused / A Smoothness
+  illustrativePreview: 1
+  conditional: 0
+  independentGrainScale: 1
+  hasSeparatedMacro: 1
+  supportsHeightDisplacement: 0
+  invertNormalGreen: 0
+  macroTileMetres: 1
+  detailTileMetres: 0.01
+  detailColorStrength: 0.4
+  sourceNotes: Illustrative deterministic procedural preview. No specimen observations.
+  licenseNotes: Generated locally for this project; no external scan.
+  sourceUrl: 
+  physicalScaleEvidence: Unknown; numerical defaults are artistic
+  revision: 3

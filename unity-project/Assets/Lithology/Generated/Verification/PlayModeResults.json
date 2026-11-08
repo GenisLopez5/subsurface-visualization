@@ -1,0 +1,13 @@
+{
+  "playMode": true,
+  "domainReloadDisabled": true,
+  "before": 671,
+  "after": 789,
+  "seconds": 8.493302,
+  "selectorChoices": 180,
+  "selectionWorks": true,
+  "legendWorks": true,
+  "grainWorks": true,
+  "shaderErrors": 0,
+  "shaderWarnings": 3
+}

@@ -1,0 +1,3468 @@
+{
+  "schemaVersion": 1,
+  "bases": [
+    {
+      "guidance": "A fine, non-granular earth or mudstone surface without conspicuous sand grains or mandatory lamination. Prefer a neutral, fresh or cut surface; use separate consolidation and fracture settings for clay versus claystone. Search: clay mudstone seamless PBR; fresh claystone texture.",
+      "id": "B01",
+      "family": "Fine clay / mud matrix"
+    },
+    {
+      "guidance": "A fine-grained shale surface with a readable bedding or fissility direction. Obtain restrained relief and a directional mask so lamination can follow the geological bedding orientation. Search: laminated shale seamless PBR; shale fresh cut surface.",
+      "id": "B02",
+      "family": "Laminated shale"
+    },
+    {
+      "guidance": "A subtly granular fine siltstone surface, finer than the sandstone set. Avoid assigning resolvable coarse sand grains simply to make the material visible at a distance. Search: siltstone seamless PBR; fine siltstone texture.",
+      "id": "B03",
+      "family": "Silt / siltstone"
+    },
+    {
+      "guidance": "A neutral sand surface with individually separable grains and no dunes, footprints, shells, or cemented bedding baked into the image. Keep grain-scale detail separable from broad color variation. Search: neutral sand grains seamless PBR; sand closeup texture.",
+      "id": "B04",
+      "family": "Loose sand"
+    },
+    {
+      "guidance": "A sandstone surface showing packed grains and an intergranular matrix or cement. Prefer an unweathered surface; avoid masonry blocks and strong bedding that cannot be disabled. Search: sandstone fresh surface seamless PBR; sandstone grain matrix texture.",
+      "id": "B05",
+      "family": "Cemented sandstone"
+    },
+    {
+      "guidance": "A rounded to subrounded pebble-in-matrix texture with a separate clast mask. Clast scale, abundance, sorting, and matrix texture must be adjustable independently. Search: conglomerate rock seamless PBR; rounded pebble matrix texture.",
+      "id": "B06",
+      "family": "Rounded clasts / conglomerate"
+    },
+    {
+      "guidance": "An angular rock-fragment-in-matrix texture with an independent clast mask and restrained weathering. It must retain angular outlines instead of recoloring the rounded-clast set. Search: breccia rock seamless PBR; angular rock fragments matrix texture.",
+      "id": "B07",
+      "family": "Angular clasts / breccia"
+    },
+    {
+      "guidance": "A fine, relatively uniform carbonate matrix without compulsory fossils, ooids, or large crystals. This supplies the matrix for limestone, argillaceous limestone, and marl recipes. Search: micritic limestone seamless PBR; fine limestone fresh surface.",
+      "id": "B08",
+      "family": "Fine micritic limestone"
+    },
+    {
+      "guidance": "A restrained interlocking carbonate-crystal surface suitable as a visual starting point for crystalline dolostone. Fine crystal detail should be independent of any large fractures or veins. Search: crystalline dolostone seamless PBR; dolomite rock fresh surface texture.",
+      "id": "B09",
+      "family": "Crystalline carbonate / dolostone"
+    },
+    {
+      "guidance": "A pale, very fine and matte chalk surface, with subtle porous relief and no mandatory flint nodules or weathered cliff staining. Search: chalk rock seamless PBR; fresh chalk surface texture.",
+      "id": "B10",
+      "family": "Chalk"
+    },
+    {
+      "guidance": "Recognizable shell fragments in carbonate material, with shell and void masks. Prefer assets that allow shell size and abundance to vary without changing the whole matrix. Search: coquina seamless PBR; shell limestone texture mask.",
+      "id": "B11",
+      "family": "Shell-rich limestone / coquina"
+    },
+    {
+      "guidance": "A carbonate-grain texture with a separate grain-versus-matrix mask. Keep an ooid-specific variant or mask; generic packstone and grainstone must not automatically inherit ooids. Search: granular limestone seamless PBR; oolitic limestone ooid texture.",
+      "id": "B12",
+      "family": "Granular / oolitic limestone"
+    },
+    {
+      "guidance": "A carbon-rich rock texture with distinguishable dull and shiny patches, subtle cleat or fracture detail, and a configurable dark palette. A lignite reference can add brown or woody details when warranted. Search: coal seamless PBR; lignite fresh surface texture.",
+      "id": "B13",
+      "family": "Coal / lignite"
+    },
+    {
+      "guidance": "A massive gypsum reference with fine crystalline detail. Fibrous satin spar and transparent crystal specimens are optional variants, not mandatory properties of every gypsum interval. Search: massive gypsum seamless PBR; gypsum rock fresh texture.",
+      "id": "B14",
+      "family": "Gypsum"
+    },
+    {
+      "guidance": "A compact massive anhydrite reference with restrained crystalline relief, separate from the gypsum surface. Do not rely on color alone to establish mineral identity. Search: massive anhydrite rock texture; anhydrite fresh core surface.",
+      "id": "B15",
+      "family": "Anhydrite"
+    },
+    {
+      "guidance": "A rock-salt crystalline surface with adjustable crystal scale. Cube-like crystal cues may be a detail mask, but the bulk interval need not be transparent. This set can be reused visually for sylvite without merging their identities. Search: rock salt halite seamless PBR; halite crystalline texture.",
+      "id": "B16",
+      "family": "Halite / salt"
+    },
+    {
+      "guidance": "A very fine, dense silica-rich surface with restrained conchoidal-fracture cues. Color, banding, porcelain-like appearance, and sheen should be independent modifiers. Search: chert fresh surface seamless texture; flint conchoidal surface PBR.",
+      "id": "B17",
+      "family": "Chert"
+    },
+    {
+      "guidance": "An ash-rich pyroclastic matrix with independently maskable lithic, crystal, and glass fragments. Avoid baking a specific welding direction or large lapilli into the only base asset. Search: tuff rock seamless PBR; volcanic ash tuff texture.",
+      "id": "B18",
+      "family": "Tuff"
+    },
+    {
+      "guidance": "A vesicular volcanic material with a usable cavity mask and normal or height map. Visible holes at close range may require geometry instead of surface shading alone. Search: volcanic scoria seamless PBR; cinder vesicular rock texture.",
+      "id": "B19",
+      "family": "Volcanic cinder / scoria"
+    },
+    {
+      "guidance": "A fine volcanic groundmass suitable for basalt and andesite presets. Use a non-vesicular, non-porphyritic reference as the neutral starting point; add holes or phenocrysts only when justified. Search: basalt fine groundmass seamless PBR; andesite fresh surface texture.",
+      "id": "B20",
+      "family": "Fine mafic / intermediate volcanic rock"
+    },
+    {
+      "guidance": "A fine volcanic groundmass for the rhyolite, dacite, and quartz-latite visual presets. Flow banding and conspicuous phenocrysts should be independently selectable rather than compulsory. This shared rendering family is not a claim that all three rocks have identical composition. Search: rhyolite fine groundmass seamless PBR; dacite fresh surface texture.",
+      "id": "B21",
+      "family": "Fine felsic / intermediate volcanic rock"
+    },
+    {
+      "guidance": "An interlocking crystal texture with separately adjustable pale feldspar, quartz-like, and dark mineral regions. Use for granite, granodiorite, and quartz monzonite visual presets while retaining separate geological labels. Search: granite interlocking crystals seamless PBR; granodiorite fresh surface texture.",
+      "id": "B22",
+      "family": "Coarse felsic to intermediate intrusive rock"
+    },
+    {
+      "guidance": "An interlocking crystal texture with adjustable light-versus-dark mineral regions, suitable for diorite and gabbro visual presets. Do not substitute a rounded sand-grain texture. Search: diorite seamless PBR; gabbro interlocking crystals texture.",
+      "id": "B23",
+      "family": "Coarse intermediate / mafic intrusive rock"
+    },
+    {
+      "guidance": "A dense volcanic glass surface with conchoidal-fracture detail and configurable smoothness. Keep it dielectric; visible glassy reflection does not make it a metal. Search: obsidian volcanic glass seamless PBR; obsidian fracture texture.",
+      "id": "B24",
+      "family": "Obsidian"
+    },
+    {
+      "guidance": "A verified serpentine-rich rock reference with optional mottling and vein masks. Acquire or assign this only if the source label Serpentine denotes a rock; a mineral occurrence does not specify a whole-rock texture. Search: serpentinite fresh surface PBR; serpentine rich rock texture.",
+      "id": "B25",
+      "family": "Serpentine-rich rock (conditional)"
+    }
+  ],
+  "modifiers": [
+    {
+      "instruction": "Remap palette or mineral-region colors; exact RGB remains an artistic setting.",
+      "id": "tint"
+    },
+    {
+      "instruction": "Scale grains/crystals independently of beds, fractures, veins, and display exaggeration.",
+      "id": "grain_size"
+    },
+    {
+      "instruction": "Select loose/consolidated appearance through matrix/contact/fracture cues; no strength simulation.",
+      "id": "consolidation"
+    },
+    {
+      "instruction": "Add fine clay matrix or pore-filling component using an appropriate mask.",
+      "id": "clay_content"
+    },
+    {
+      "instruction": "Add subtle fine grains; avoid giant visible silt at physical scale.",
+      "id": "silt_content"
+    },
+    {
+      "instruction": "Add sand grains to the host; size, composition, and coverage remain independent.",
+      "id": "sand_content"
+    },
+    {
+      "instruction": "Calcium-carbonate component; mineral, occurrence, brightness, and amount are unspecified.",
+      "id": "calcareous_component"
+    },
+    {
+      "instruction": "Explicit calcite component; choose grain/cement/vein occurrence separately.",
+      "id": "calcite_component"
+    },
+    {
+      "instruction": "Dolomitic matrix/crystal component; it may have little visible effect.",
+      "id": "dolomite_component"
+    },
+    {
+      "instruction": "Silica grains, cement, or veins according to occurrence; no automatic transparency.",
+      "id": "silica_component"
+    },
+    {
+      "instruction": "Dark organic particles/patches/laminae; no automatic wet sheen.",
+      "id": "organic_content"
+    },
+    {
+      "instruction": "Directional bedding mask; shaly alone does not require stripes.",
+      "id": "lamination"
+    },
+    {
+      "instruction": "Independent planar splitting direction; may intersect bedding.",
+      "id": "cleavage"
+    },
+    {
+      "instruction": "Rounded clast mask over host matrix; independent size, sorting, and coverage.",
+      "id": "rounded_clasts"
+    },
+    {
+      "instruction": "Angular fragment mask; retain recognizable angular boundaries.",
+      "id": "angular_clasts"
+    },
+    {
+      "instruction": "Shell-shaped masks; large fragments/cavities may require geometry.",
+      "id": "shell_fragments"
+    },
+    {
+      "instruction": "Coated rounded grains; use only when an oolitic interpretation is warranted.",
+      "id": "ooids"
+    },
+    {
+      "instruction": "Generic carbonate grains; do not assume shells or ooids.",
+      "id": "carbonate_grains"
+    },
+    {
+      "instruction": "Disperse grains in a continuous supporting carbonate-mud matrix.",
+      "id": "mud_supported"
+    },
+    {
+      "instruction": "Touching grains; distinguish retained carbonate mud from cement/voids.",
+      "id": "grain_supported"
+    },
+    {
+      "instruction": "Verified binding/baffling/framework fabric; do not assume rigid coral.",
+      "id": "bound_framework"
+    },
+    {
+      "instruction": "Separate palette/finish preset; woody detail only when supported.",
+      "id": "coal_lignite_variant"
+    },
+    {
+      "instruction": "Local roughness/smoothness; does not imply metal or transparency.",
+      "id": "surface_sheen"
+    },
+    {
+      "instruction": "Directional/warped bands; independent scale and direction.",
+      "id": "banding"
+    },
+    {
+      "instruction": "Rock fragments in matrix; shape/composition/size require separate choices.",
+      "id": "lithic_fragments"
+    },
+    {
+      "instruction": "Discrete crystal fragments; retain tuff matrix rather than intrusive fabric.",
+      "id": "crystal_fragments"
+    },
+    {
+      "instruction": "Glass-shard detail in tuff matrix; preserve fragmental appearance.",
+      "id": "glass_shards"
+    },
+    {
+      "instruction": "Flatten/orient suitable pyroclastic patterns; a structural change.",
+      "id": "welding"
+    },
+    {
+      "instruction": "Cavity pattern; use geometry for actual holes/silhouettes.",
+      "id": "vesicles"
+    },
+    {
+      "instruction": "Change mineral-region palettes/patterns; retain fine/coarse fabric and distinct identity.",
+      "id": "igneous_mineral_balance"
+    },
+    {
+      "instruction": "Fragmented granitic-derived particles in sediment; preserve clastic fabric.",
+      "id": "granitic_clasts"
+    },
+    {
+      "instruction": "Broad particle sizes in independently controlled matrix.",
+      "id": "poor_sorting"
+    },
+    {
+      "instruction": "Verified soil features on a separately identified parent material.",
+      "id": "paleosol_features"
+    },
+    {
+      "instruction": "Metadata only; infer neither wetness nor gloss.",
+      "id": "plasticity"
+    },
+    {
+      "instruction": "Localized brassy metallic-looking grains/veins; host remains nonmetallic.",
+      "id": "pyrite_component"
+    },
+    {
+      "instruction": "Reference-based greenish grains/pellets on a known host.",
+      "id": "glauconite_component"
+    },
+    {
+      "instruction": "Fine clay-mineral component; a pale illustrative appearance is optional.",
+      "id": "kaolinite_component"
+    },
+    {
+      "instruction": "Resolve siderite versus limonite before assigning mineral appearance.",
+      "id": "iron_mineral_component"
+    },
+    {
+      "instruction": "Reference needed for mineral, grain, nodule, coating, or matrix appearance.",
+      "id": "phosphate_component"
+    },
+    {
+      "instruction": "Adjust crystal boundaries/detail using reference scale.",
+      "id": "recrystallization"
+    },
+    {
+      "instruction": "Platy dielectric detail; do not imply whole-rock foliation.",
+      "id": "mica_flakes"
+    },
+    {
+      "instruction": "Pale platy mica detail with dielectric sheen.",
+      "id": "muscovite_component"
+    },
+    {
+      "instruction": "Reference-based dark mica replacement/flecks on host.",
+      "id": "biotitization"
+    },
+    {
+      "instruction": "Reference-based chlorite replacement; no mandatory global green tint.",
+      "id": "chloritization"
+    },
+    {
+      "instruction": "Fine pale mica replacement; separate from clay/chalk mixture.",
+      "id": "sericitization"
+    },
+    {
+      "instruction": "Silica replacement/cement; no mandatory visible veins or gloss increase.",
+      "id": "silicification"
+    },
+    {
+      "instruction": "Unspecified carbonate component; mineral and occurrence remain unresolved.",
+      "id": "carbonate_component"
+    },
+    {
+      "instruction": "Resolve natural cement versus drilling cement and its composition.",
+      "id": "cement_unspecified"
+    },
+    {
+      "instruction": "Metadata/status overlay; do not create a new host lithology.",
+      "id": "contamination_status"
+    },
+    {
+      "instruction": "Metadata only until alteration process/mineral appearance is known.",
+      "id": "alteration_unspecified"
+    },
+    {
+      "instruction": "Volcanic ash/fragments within the independently identified sedimentary host.",
+      "id": "volcanic_component"
+    },
+    {
+      "instruction": "Resolve mineral occurrence versus rock before selecting a host treatment.",
+      "id": "serpentine_component"
+    },
+    {
+      "instruction": "Geometry metadata for a body; does not determine crystal size.",
+      "id": "dike_geometry"
+    }
+  ],
+  "rows": [
+    {
+      "id": "L001",
+      "rawLabel": "Clay",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 1,
+      "briefLine": 187,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L002",
+      "rawLabel": "Claystone",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 2,
+      "briefLine": 188,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L003",
+      "rawLabel": "Plastic Clay",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=unconsolidated, plasticity; plasticity is metadata only",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 3,
+      "briefLine": 189,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L004",
+      "rawLabel": "Silty Clay",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=unconsolidated, silt_content",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 4,
+      "briefLine": 190,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L005",
+      "rawLabel": "Mudstone",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 5,
+      "briefLine": 191,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L006",
+      "rawLabel": "Clay-Mudstone",
+      "selectedBaseId": "B01",
+      "instructions": "clay_content, consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 6,
+      "briefLine": 192,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L007",
+      "rawLabel": "Till",
+      "selectedBaseId": "B01",
+      "instructions": "poor_sorting, rounded_clasts, angular_clasts; component source B06,B07",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 7,
+      "briefLine": 193,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B06",
+        "B07"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L008",
+      "rawLabel": "Bentonite",
+      "selectedBaseId": "B01",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 8,
+      "briefLine": 194,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L009",
+      "rawLabel": "Marl",
+      "selectedBaseId": "B01",
+      "instructions": "clay_content, calcareous_component; component source B08",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 9,
+      "briefLine": 195,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B08"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L010",
+      "rawLabel": "Marlstone",
+      "selectedBaseId": "B01",
+      "instructions": "clay_content, calcareous_component, consolidation=consolidated; component source B08",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 10,
+      "briefLine": 196,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B08"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L011",
+      "rawLabel": "Marl - Dolo",
+      "selectedBaseId": "B01",
+      "instructions": "clay_content, dolomite_component; component source B09; V: name candidate Dolomitic Marl",
+      "role": "Physical",
+      "normalizedCandidate": "Dolomitic Marl",
+      "mappingRow": 11,
+      "briefLine": 197,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B09"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L012",
+      "rawLabel": "Marl - Calc",
+      "selectedBaseId": "B01",
+      "instructions": "clay_content, calcareous_component; component source B08; V: name candidate Calcitic or Calcareous Marl",
+      "role": "Physical",
+      "normalizedCandidate": "Calcitic or Calcareous Marl",
+      "mappingRow": 12,
+      "briefLine": 198,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B08"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L013",
+      "rawLabel": "Clyst-Tuffaceous",
+      "selectedBaseId": "B01",
+      "instructions": "consolidation=consolidated, volcanic_component; component source B18; V: name candidate Tuffaceous Claystone",
+      "role": "Physical",
+      "normalizedCandidate": "Tuffaceous Claystone",
+      "mappingRow": 13,
+      "briefLine": 199,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B18"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L014",
+      "rawLabel": "Clay-Shale",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, lamination",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 14,
+      "briefLine": 200,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L015",
+      "rawLabel": "Silty Clay-Shale",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, silt_content, lamination",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 15,
+      "briefLine": 201,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L016",
+      "rawLabel": "Sandy Clay-Shale",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, sand_content, lamination",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 16,
+      "briefLine": 202,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L017",
+      "rawLabel": "Calcareous Clay-Shale",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, calcareous_component, lamination",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 17,
+      "briefLine": 203,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L018",
+      "rawLabel": "Calc Clay-Shale",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, calcareous_component, lamination; V: name candidate Calcareous Clay-Shale",
+      "role": "Physical",
+      "normalizedCandidate": "Calcareous Clay-Shale",
+      "mappingRow": 18,
+      "briefLine": 204,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L019",
+      "rawLabel": "Shale",
+      "selectedBaseId": "B02",
+      "instructions": "lamination",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 19,
+      "briefLine": 205,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L020",
+      "rawLabel": "Slaty Shale",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, cleavage; cleavage direction independent of bedding",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 20,
+      "briefLine": 206,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L021",
+      "rawLabel": "Shale Gray",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, tint=gray",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 21,
+      "briefLine": 207,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L022",
+      "rawLabel": "Shale Colored",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, tint=unspecified; V: palette unspecified",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 22,
+      "briefLine": 208,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L023",
+      "rawLabel": "Shale Brown",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, tint=brown",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 23,
+      "briefLine": 209,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L024",
+      "rawLabel": "Shale Green",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, tint=green",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 24,
+      "briefLine": 210,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L025",
+      "rawLabel": "Silty Shale",
+      "selectedBaseId": "B02",
+      "instructions": "lamination, silt_content",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 25,
+      "briefLine": 211,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L026",
+      "rawLabel": "Calcareous Clay-Shal",
+      "selectedBaseId": "B02",
+      "instructions": "clay_content, lamination, calcareous_component; V: name candidate Calcareous Clay-Shale",
+      "role": "Physical",
+      "normalizedCandidate": "Calcareous Clay-Shale",
+      "mappingRow": 26,
+      "briefLine": 212,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L027",
+      "rawLabel": "Carbonaceous Sh",
+      "selectedBaseId": "B02",
+      "instructions": "organic_content, lamination; V: name candidate Carbonaceous Shale",
+      "role": "Physical",
+      "normalizedCandidate": "Carbonaceous Shale",
+      "mappingRow": 27,
+      "briefLine": 213,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L028",
+      "rawLabel": "Silt",
+      "selectedBaseId": "B03",
+      "instructions": "consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 28,
+      "briefLine": 214,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L029",
+      "rawLabel": "Siltstone",
+      "selectedBaseId": "B03",
+      "instructions": "consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 29,
+      "briefLine": 215,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L030",
+      "rawLabel": "Silty Siltstone",
+      "selectedBaseId": "B03",
+      "instructions": "consolidation=consolidated; preserve redundant wording",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 30,
+      "briefLine": 216,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L031",
+      "rawLabel": "Shaly Siltstone",
+      "selectedBaseId": "B03",
+      "instructions": "clay_content, lamination?; component source B02; lamination optional, never inferred solely from shaly",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 31,
+      "briefLine": 217,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B02"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L032",
+      "rawLabel": "Siltst-Tuffaceous",
+      "selectedBaseId": "B03",
+      "instructions": "volcanic_component; component source B18; V: name candidate Tuffaceous Siltstone",
+      "role": "Physical",
+      "normalizedCandidate": "Tuffaceous Siltstone",
+      "mappingRow": 32,
+      "briefLine": 218,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B18"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L033",
+      "rawLabel": "Sand",
+      "selectedBaseId": "B04",
+      "instructions": "consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 33,
+      "briefLine": 224,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L034",
+      "rawLabel": "Fine Sand",
+      "selectedBaseId": "B04",
+      "instructions": "grain_size=fine, consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 34,
+      "briefLine": 225,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L035",
+      "rawLabel": "Coarse Sand",
+      "selectedBaseId": "B04",
+      "instructions": "grain_size=coarse, consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 35,
+      "briefLine": 226,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L036",
+      "rawLabel": "Medium Sand",
+      "selectedBaseId": "B04",
+      "instructions": "grain_size=medium, consolidation=unconsolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 36,
+      "briefLine": 227,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L037",
+      "rawLabel": "Salt-Pepper Sand",
+      "selectedBaseId": "B04",
+      "instructions": "tint=light/dark grains",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 37,
+      "briefLine": 228,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L038",
+      "rawLabel": "Clay Choke Sand",
+      "selectedBaseId": "B04",
+      "instructions": "clay_content; component source B01; V: provisional clay-choked interpretation; pore-fill/coating pattern; V: name candidate Sand with clay-rich pore/matrix material",
+      "role": "Physical",
+      "normalizedCandidate": "Sand with clay-rich pore/matrix material",
+      "mappingRow": 38,
+      "briefLine": 229,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B01"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L039",
+      "rawLabel": "Congl. Sand",
+      "selectedBaseId": "B04",
+      "instructions": "rounded_clasts; component source B06; V: name candidate Conglomeratic Sand",
+      "role": "Physical",
+      "normalizedCandidate": "Conglomeratic Sand",
+      "mappingRow": 39,
+      "briefLine": 230,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B06"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L040",
+      "rawLabel": "Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 40,
+      "briefLine": 231,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L041",
+      "rawLabel": "Fine Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "grain_size=fine, consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 41,
+      "briefLine": 232,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L042",
+      "rawLabel": "Medium Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "grain_size=medium, consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 42,
+      "briefLine": 233,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L043",
+      "rawLabel": "Coarse Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "grain_size=coarse, consolidation=consolidated",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 43,
+      "briefLine": 234,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L044",
+      "rawLabel": "Calcareous Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "calcareous_component",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 44,
+      "briefLine": 235,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L045",
+      "rawLabel": "Dolomitic Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "dolomite_component",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 45,
+      "briefLine": 236,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L046",
+      "rawLabel": "Shaly Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "clay_content, lamination?; component source B02; lamination optional, never inferred solely from shaly",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 46,
+      "briefLine": 237,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B02"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L047",
+      "rawLabel": "Sandstone-Tuffaceous",
+      "selectedBaseId": "B05",
+      "instructions": "volcanic_component; component source B18",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 47,
+      "briefLine": 238,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B18"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L048",
+      "rawLabel": "Congl. Sandstone",
+      "selectedBaseId": "B05",
+      "instructions": "rounded_clasts; component source B06; V: name candidate Conglomeratic Sandstone",
+      "role": "Physical",
+      "normalizedCandidate": "Conglomeratic Sandstone",
+      "mappingRow": 48,
+      "briefLine": 239,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B06"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L049",
+      "rawLabel": "Granite Wash",
+      "selectedBaseId": "B05",
+      "instructions": "granitic_clasts; V: sedimentary fabric; consolidation/size unknown; candidates B04/B06/B07",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 49,
+      "briefLine": 240,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B04",
+        "B06",
+        "B07"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L050",
+      "rawLabel": "Conglomerate",
+      "selectedBaseId": "B06",
+      "instructions": "rounded_clasts",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 50,
+      "briefLine": 241,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L051",
+      "rawLabel": "Pebbles",
+      "selectedBaseId": "B06",
+      "instructions": "grain_size=pebble-sized; V: size only; B06 is illustrative; shape/matrix/consolidation unknown; candidate B07",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 51,
+      "briefLine": 242,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B07"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L052",
+      "rawLabel": "Breccia",
+      "selectedBaseId": "B07",
+      "instructions": "angular_clasts",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 52,
+      "briefLine": 243,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L053",
+      "rawLabel": "Argillaceous Limesto",
+      "selectedBaseId": "B08",
+      "instructions": "clay_content; component source B01; V: name candidate Argillaceous Limestone",
+      "role": "Physical",
+      "normalizedCandidate": "Argillaceous Limestone",
+      "mappingRow": 53,
+      "briefLine": 249,
+      "occurrences": 2,
+      "extractionLocations": [
+        "section 1/Shale",
+        "section 2/Limestone"
+      ],
+      "componentSourceIds": [
+        "B01"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L054",
+      "rawLabel": "Limestone",
+      "selectedBaseId": "B08",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 54,
+      "briefLine": 250,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L055",
+      "rawLabel": "Argillaceous Limestone",
+      "selectedBaseId": "B08",
+      "instructions": "clay_content; component source B01",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 55,
+      "briefLine": 251,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B01"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L056",
+      "rawLabel": "Dolomitic Limestone",
+      "selectedBaseId": "B08",
+      "instructions": "dolomite_component; component source B09",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 56,
+      "briefLine": 252,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B09"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L057",
+      "rawLabel": "Bituminous Limestone",
+      "selectedBaseId": "B08",
+      "instructions": "organic_content",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 57,
+      "briefLine": 253,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L058",
+      "rawLabel": "Wackstone",
+      "selectedBaseId": "B08",
+      "instructions": "carbonate_grains, mud_supported; component source B12; V: name candidate Wackestone",
+      "role": "Physical",
+      "normalizedCandidate": "Wackestone",
+      "mappingRow": 58,
+      "briefLine": 254,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B12"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L059",
+      "rawLabel": "Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "V: provisional rock interpretation; mineral meaning also possible",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 59,
+      "briefLine": 255,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L060",
+      "rawLabel": "Fine Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "grain_size=fine; V: confirm source interpretation",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 60,
+      "briefLine": 256,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L061",
+      "rawLabel": "Sandy Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "sand_content",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 61,
+      "briefLine": 257,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L062",
+      "rawLabel": "Sandy and Calcareous Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "sand_content, calcareous_component",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 62,
+      "briefLine": 258,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L063",
+      "rawLabel": "Argil and Sandy Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "clay_content, sand_content; V: name candidate Argillaceous and Sandy Dolomite",
+      "role": "Physical",
+      "normalizedCandidate": "Argillaceous and Sandy Dolomite",
+      "mappingRow": 63,
+      "briefLine": 259,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L064",
+      "rawLabel": "Calc. Dolomite",
+      "selectedBaseId": "B09",
+      "instructions": "calcareous_component; V: name candidate Calcitic or Calcareous Dolomite",
+      "role": "Physical",
+      "normalizedCandidate": "Calcitic or Calcareous Dolomite",
+      "mappingRow": 64,
+      "briefLine": 260,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L065",
+      "rawLabel": "Dolostone",
+      "selectedBaseId": "B09",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 65,
+      "briefLine": 261,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L066",
+      "rawLabel": "Chalk",
+      "selectedBaseId": "B10",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 66,
+      "briefLine": 262,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L067",
+      "rawLabel": "Coquina",
+      "selectedBaseId": "B11",
+      "instructions": "shell_fragments",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 67,
+      "briefLine": 263,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L068",
+      "rawLabel": "Oolitic/Oolic Limestone",
+      "selectedBaseId": "B12",
+      "instructions": "ooids; V: name candidate Oolitic Limestone",
+      "role": "Physical",
+      "normalizedCandidate": "Oolitic Limestone",
+      "mappingRow": 68,
+      "briefLine": 264,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L069",
+      "rawLabel": "Packstone",
+      "selectedBaseId": "B12",
+      "instructions": "carbonate_grains, grain_supported=mud present; component source B08; carbonate mud remains between touching grains",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 69,
+      "briefLine": 265,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B08"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L070",
+      "rawLabel": "Grainstone",
+      "selectedBaseId": "B12",
+      "instructions": "carbonate_grains, grain_supported=no carbonate mud; no depositional carbonate mud; later cement possible; no assumed open porosity",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 70,
+      "briefLine": 266,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L071",
+      "rawLabel": "Coal",
+      "selectedBaseId": "B13",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 71,
+      "briefLine": 272,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L072",
+      "rawLabel": "Coal-Lignite",
+      "selectedBaseId": "B13",
+      "instructions": "coal_lignite_variant",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 72,
+      "briefLine": 273,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L073",
+      "rawLabel": "Gypsum",
+      "selectedBaseId": "B14",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 73,
+      "briefLine": 274,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L074",
+      "rawLabel": "Anhydrite",
+      "selectedBaseId": "B15",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 74,
+      "briefLine": 275,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L075",
+      "rawLabel": "Halite",
+      "selectedBaseId": "B16",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 75,
+      "briefLine": 276,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L076",
+      "rawLabel": "Salt",
+      "selectedBaseId": "B16",
+      "instructions": "V: unspecified salt chemistry; generic appearance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 76,
+      "briefLine": 277,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L077",
+      "rawLabel": "Sylvite",
+      "selectedBaseId": "B16",
+      "instructions": "share crystal template only; no mandatory red color/transparency",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 77,
+      "briefLine": 278,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L078",
+      "rawLabel": "Chert",
+      "selectedBaseId": "B17",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 78,
+      "briefLine": 279,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L079",
+      "rawLabel": "Chert - Argill",
+      "selectedBaseId": "B17",
+      "instructions": "clay_content; component source B01; V: name candidate Argillaceous Chert",
+      "role": "Physical",
+      "normalizedCandidate": "Argillaceous Chert",
+      "mappingRow": 79,
+      "briefLine": 280,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [
+        "B01"
+      ],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L080",
+      "rawLabel": "Chert - Glassy",
+      "selectedBaseId": "B17",
+      "instructions": "surface_sheen=glassy",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 80,
+      "briefLine": 281,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": true
+    },
+    {
+      "id": "L081",
+      "rawLabel": "Chert - Porcel",
+      "selectedBaseId": "B17",
+      "instructions": "surface_sheen=porcelain-like; V: name candidate Porcellanous or Porcelain-like Chert",
+      "role": "Physical",
+      "normalizedCandidate": "Porcellanous or Porcelain-like Chert",
+      "mappingRow": 81,
+      "briefLine": 282,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": true
+    },
+    {
+      "id": "L082",
+      "rawLabel": "Chert - Tiger Stripe",
+      "selectedBaseId": "B17",
+      "instructions": "banding",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 82,
+      "briefLine": 283,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": true
+    },
+    {
+      "id": "L083",
+      "rawLabel": "Chert - Undiff",
+      "selectedBaseId": "B17",
+      "instructions": "V: name candidate Undifferentiated Chert",
+      "role": "Physical",
+      "normalizedCandidate": "Undifferentiated Chert",
+      "mappingRow": 83,
+      "briefLine": 284,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": true
+    },
+    {
+      "id": "L084",
+      "rawLabel": "Tuff",
+      "selectedBaseId": "B18",
+      "instructions": "base preset",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 84,
+      "briefLine": 290,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L085",
+      "rawLabel": "Lithic Tuff",
+      "selectedBaseId": "B18",
+      "instructions": "lithic_fragments",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 85,
+      "briefLine": 291,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L086",
+      "rawLabel": "Welded Tuff",
+      "selectedBaseId": "B18",
+      "instructions": "welding; distinct flattened/directional pyroclastic pattern",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 86,
+      "briefLine": 292,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L087",
+      "rawLabel": "Crystalline Tuff",
+      "selectedBaseId": "B18",
+      "instructions": "crystal_fragments; V: crystal-rich interpretation provisional; V: name candidate Crystal-rich Tuff",
+      "role": "Physical",
+      "normalizedCandidate": "Crystal-rich Tuff",
+      "mappingRow": 87,
+      "briefLine": 293,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L088",
+      "rawLabel": "Glassy Tuff",
+      "selectedBaseId": "B18",
+      "instructions": "glass_shards; retain fragmental tuff, not massive glass",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 88,
+      "briefLine": 294,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L089",
+      "rawLabel": "Volcanic Cinder",
+      "selectedBaseId": "B19",
+      "instructions": "vesicles",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 89,
+      "briefLine": 295,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L090",
+      "rawLabel": "Andesite",
+      "selectedBaseId": "B20",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 90,
+      "briefLine": 296,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L091",
+      "rawLabel": "Basalt",
+      "selectedBaseId": "B20",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 91,
+      "briefLine": 297,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L092",
+      "rawLabel": "Dacite",
+      "selectedBaseId": "B21",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 92,
+      "briefLine": 298,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L093",
+      "rawLabel": "Rhyolite",
+      "selectedBaseId": "B21",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 93,
+      "briefLine": 299,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L094",
+      "rawLabel": "Quartz Latite",
+      "selectedBaseId": "B21",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 94,
+      "briefLine": 300,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L095",
+      "rawLabel": "Granite",
+      "selectedBaseId": "B22",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 95,
+      "briefLine": 301,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L096",
+      "rawLabel": "Granodiorite",
+      "selectedBaseId": "B22",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 96,
+      "briefLine": 302,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L097",
+      "rawLabel": "Quartz Monzonite",
+      "selectedBaseId": "B22",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 97,
+      "briefLine": 303,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L098",
+      "rawLabel": "Diorite",
+      "selectedBaseId": "B23",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 98,
+      "briefLine": 304,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L099",
+      "rawLabel": "Gabbro",
+      "selectedBaseId": "B23",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 99,
+      "briefLine": 305,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L100",
+      "rawLabel": "Quartz Diorite",
+      "selectedBaseId": "B23",
+      "instructions": "igneous_mineral_balance",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 100,
+      "briefLine": 306,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L101",
+      "rawLabel": "Hornbl-Qtz-Dio",
+      "selectedBaseId": "B23",
+      "instructions": "igneous_mineral_balance; V: name candidate Hornblende Quartz Diorite",
+      "role": "Physical",
+      "normalizedCandidate": "Hornblende Quartz Diorite",
+      "mappingRow": 101,
+      "briefLine": 307,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L102",
+      "rawLabel": "Obsidian",
+      "selectedBaseId": "B24",
+      "instructions": "surface_sheen",
+      "role": "Physical",
+      "normalizedCandidate": "",
+      "mappingRow": 102,
+      "briefLine": 308,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L103",
+      "rawLabel": "Tar",
+      "selectedBaseId": "",
+      "instructions": "organic_content, surface_sheen; procedural dark dielectric, adjustable smoothness/noise",
+      "role": "Procedural",
+      "normalizedCandidate": "",
+      "mappingRow": 103,
+      "briefLine": 314,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L104",
+      "rawLabel": "Bitumen",
+      "selectedBaseId": "",
+      "instructions": "organic_content, surface_sheen; procedural dark dielectric, adjustable smoothness/noise",
+      "role": "Procedural",
+      "normalizedCandidate": "",
+      "mappingRow": 104,
+      "briefLine": 315,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L105",
+      "rawLabel": "Pyrite",
+      "selectedBaseId": "",
+      "instructions": "pyrite_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 105,
+      "briefLine": 321,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L106",
+      "rawLabel": "Glauconite",
+      "selectedBaseId": "",
+      "instructions": "glauconite_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 106,
+      "briefLine": 322,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L107",
+      "rawLabel": "Kaolinite",
+      "selectedBaseId": "",
+      "instructions": "kaolinite_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 107,
+      "briefLine": 323,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L108",
+      "rawLabel": "Siderite or Limonite",
+      "selectedBaseId": "",
+      "instructions": "iron_mineral_component; V: keep both alternatives; generic mineral marker",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 108,
+      "briefLine": 324,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L109",
+      "rawLabel": "Phosphate",
+      "selectedBaseId": "",
+      "instructions": "phosphate_component; V: mineral/fabric unspecified; generic component marker",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 109,
+      "briefLine": 325,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L110",
+      "rawLabel": "Quartz",
+      "selectedBaseId": "",
+      "instructions": "silica_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 110,
+      "briefLine": 326,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L111",
+      "rawLabel": "Calcite",
+      "selectedBaseId": "",
+      "instructions": "calcite_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 111,
+      "briefLine": 327,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L112",
+      "rawLabel": "Recrystallized Calcite",
+      "selectedBaseId": "",
+      "instructions": "calcite_component, recrystallization",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 112,
+      "briefLine": 328,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L113",
+      "rawLabel": "Mica",
+      "selectedBaseId": "",
+      "instructions": "mica_flakes",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 113,
+      "briefLine": 329,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L114",
+      "rawLabel": "Muscovite",
+      "selectedBaseId": "",
+      "instructions": "muscovite_component",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 114,
+      "briefLine": 330,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L115",
+      "rawLabel": "Shell Fragments",
+      "selectedBaseId": "",
+      "instructions": "shell_fragments",
+      "role": "Component",
+      "normalizedCandidate": "",
+      "mappingRow": 115,
+      "briefLine": 331,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L116",
+      "rawLabel": "Conglomeratic",
+      "selectedBaseId": "",
+      "instructions": "rounded_clasts",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 116,
+      "briefLine": 337,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L117",
+      "rawLabel": "Dolomitic",
+      "selectedBaseId": "",
+      "instructions": "dolomite_component",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 117,
+      "briefLine": 338,
+      "occurrences": 2,
+      "extractionLocations": [
+        "section 2/Dolomite",
+        "section 5/Textural/Compositional"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L118",
+      "rawLabel": "Marly",
+      "selectedBaseId": "",
+      "instructions": "clay_content, carbonate_component",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 118,
+      "briefLine": 339,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L119",
+      "rawLabel": "Kaolinitic",
+      "selectedBaseId": "",
+      "instructions": "kaolinite_component",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 119,
+      "briefLine": 340,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L120",
+      "rawLabel": "Siliceous",
+      "selectedBaseId": "",
+      "instructions": "silica_component",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 120,
+      "briefLine": 341,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L121",
+      "rawLabel": "Calcareous",
+      "selectedBaseId": "",
+      "instructions": "calcareous_component",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 121,
+      "briefLine": 342,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L122",
+      "rawLabel": "Argillaceous",
+      "selectedBaseId": "",
+      "instructions": "clay_content",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 122,
+      "briefLine": 343,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L123",
+      "rawLabel": "Carbonaceous",
+      "selectedBaseId": "",
+      "instructions": "organic_content",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 123,
+      "briefLine": 344,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L124",
+      "rawLabel": "Sandy",
+      "selectedBaseId": "",
+      "instructions": "sand_content",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 124,
+      "briefLine": 345,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L125",
+      "rawLabel": "Silty",
+      "selectedBaseId": "",
+      "instructions": "silt_content",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 125,
+      "briefLine": 346,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L126",
+      "rawLabel": "Altered Zone",
+      "selectedBaseId": "",
+      "instructions": "alteration_unspecified; V: confirm source interpretation",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 126,
+      "briefLine": 347,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L127",
+      "rawLabel": "Botitization (Biotitization)",
+      "selectedBaseId": "",
+      "instructions": "biotitization; V: name candidate Biotitization",
+      "role": "Descriptor",
+      "normalizedCandidate": "Biotitization",
+      "mappingRow": 127,
+      "briefLine": 348,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L128",
+      "rawLabel": "Chloritization",
+      "selectedBaseId": "",
+      "instructions": "chloritization",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 128,
+      "briefLine": 349,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L129",
+      "rawLabel": "Sericitization",
+      "selectedBaseId": "",
+      "instructions": "sericitization",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 129,
+      "briefLine": 350,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L130",
+      "rawLabel": "Silicification",
+      "selectedBaseId": "",
+      "instructions": "silicification",
+      "role": "Descriptor",
+      "normalizedCandidate": "",
+      "mappingRow": 130,
+      "briefLine": 351,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L131",
+      "rawLabel": "Carbonaceous Mat",
+      "selectedBaseId": "",
+      "instructions": "organic_content; V: name candidate Carbonaceous Material",
+      "role": "Descriptor",
+      "normalizedCandidate": "Carbonaceous Material",
+      "mappingRow": 131,
+      "briefLine": 352,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L132",
+      "rawLabel": "Paleosol",
+      "selectedBaseId": "",
+      "instructions": "paleosol_features; V: identify parent first; candidates B01/B03/B05",
+      "role": "ContextDependent",
+      "normalizedCandidate": "",
+      "mappingRow": 132,
+      "briefLine": 358,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B01",
+        "B03",
+        "B05"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L133",
+      "rawLabel": "Boundstone",
+      "selectedBaseId": "",
+      "instructions": "bound_framework; V: reference-specific bound fabric; no automatic coral/framework; keep generic fallback",
+      "role": "ContextDependent",
+      "normalizedCandidate": "",
+      "mappingRow": 133,
+      "briefLine": 359,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L134",
+      "rawLabel": "Serpentine",
+      "selectedBaseId": "",
+      "instructions": "serpentine_component; V: mineral versus rock unresolved; B25 only after rock interpretation is confirmed",
+      "role": "ContextDependent",
+      "normalizedCandidate": "",
+      "mappingRow": 134,
+      "briefLine": 360,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B25"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L135",
+      "rawLabel": "Carbonates",
+      "selectedBaseId": "",
+      "instructions": "carbonate_component; V: rock group versus component unresolved; select no mineral or whole-rock texture yet",
+      "role": "ContextDependent",
+      "normalizedCandidate": "",
+      "mappingRow": 135,
+      "briefLine": 361,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L136",
+      "rawLabel": "Cement",
+      "selectedBaseId": "",
+      "instructions": "cement_unspecified; V: natural versus drilling material unresolved",
+      "role": "ContextDependent",
+      "normalizedCandidate": "",
+      "mappingRow": 136,
+      "briefLine": 362,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L137",
+      "rawLabel": "Evaporites",
+      "selectedBaseId": "",
+      "instructions": "V: generic class; candidates B14/B15/B16",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 137,
+      "briefLine": 368,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B14",
+        "B15",
+        "B16"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L138",
+      "rawLabel": "Salt (K-Na-Mg)",
+      "selectedBaseId": "",
+      "instructions": "V: generic salt class; composition/ratios unresolved; candidate B16",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 138,
+      "briefLine": 369,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B16"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L139",
+      "rawLabel": "Gypsum/Anhyd.",
+      "selectedBaseId": "",
+      "instructions": "V: slash meaning/ratio unresolved; candidates B14/B15; V: name candidate Gypsum / Anhydrite",
+      "role": "GenericClass",
+      "normalizedCandidate": "Gypsum / Anhydrite",
+      "mappingRow": 139,
+      "briefLine": 370,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [
+        "B14",
+        "B15"
+      ],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L140",
+      "rawLabel": "Volcanics",
+      "selectedBaseId": "",
+      "instructions": "V: generic volcanic class; no assumed fabric/composition",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 140,
+      "briefLine": 371,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L141",
+      "rawLabel": "Volcanic Rock",
+      "selectedBaseId": "",
+      "instructions": "V: generic volcanic class; no assumed fabric/composition",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 141,
+      "briefLine": 372,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L142",
+      "rawLabel": "Pyroclastics",
+      "selectedBaseId": "",
+      "instructions": "V: generic class; grain size/clasts/welding unknown",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 142,
+      "briefLine": 373,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L143",
+      "rawLabel": "Volcaniclastics Seds",
+      "selectedBaseId": "",
+      "instructions": "volcanic_component; V: sedimentary host/fabric unknown; volcanic component retained; V: name candidate Volcaniclastic Sediments",
+      "role": "GenericClass",
+      "normalizedCandidate": "Volcaniclastic Sediments",
+      "mappingRow": 143,
+      "briefLine": 374,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L144",
+      "rawLabel": "Felsic Silicic Dike",
+      "selectedBaseId": "",
+      "instructions": "dike_geometry; V: preserve felsic composition/body shape; grain fabric unspecified",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 144,
+      "briefLine": 375,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L145",
+      "rawLabel": "Igneous (Acidic)",
+      "selectedBaseId": "",
+      "instructions": "V: broad felsic class; fine/coarse/glassy fabric unspecified",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 145,
+      "briefLine": 376,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L146",
+      "rawLabel": "Igneous (Basic)",
+      "selectedBaseId": "",
+      "instructions": "V: broad mafic class; fine/coarse fabric unspecified",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 146,
+      "briefLine": 377,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L147",
+      "rawLabel": "Intrusives",
+      "selectedBaseId": "",
+      "instructions": "V: generic intrusive class; mineralogy/crystal scale unknown",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 147,
+      "briefLine": 378,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L148",
+      "rawLabel": "Extrusive Rocks",
+      "selectedBaseId": "",
+      "instructions": "V: generic extrusive class; composition/fabric unknown",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 148,
+      "briefLine": 379,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L149",
+      "rawLabel": "Metamorphic",
+      "selectedBaseId": "",
+      "instructions": "V: generic class; do not assume foliation",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 149,
+      "briefLine": 380,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L150",
+      "rawLabel": "Metamorphics",
+      "selectedBaseId": "",
+      "instructions": "V: generic class; do not assume foliation",
+      "role": "GenericClass",
+      "normalizedCandidate": "",
+      "mappingRow": 150,
+      "briefLine": 381,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L151",
+      "rawLabel": "Cement Contam.",
+      "selectedBaseId": "",
+      "instructions": "contamination_status; sample-quality overlay; retain known host separately; V: name candidate Cement Contamination",
+      "role": "DataStatus",
+      "normalizedCandidate": "Cement Contamination",
+      "mappingRow": 151,
+      "briefLine": 387,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L152",
+      "rawLabel": "Unknown",
+      "selectedBaseId": "",
+      "instructions": "distinct unknown-lithology display state",
+      "role": "DataStatus",
+      "normalizedCandidate": "",
+      "mappingRow": 152,
+      "briefLine": 388,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L153",
+      "rawLabel": "Not Available",
+      "selectedBaseId": "",
+      "instructions": "distinct unavailable-data display state",
+      "role": "DataStatus",
+      "normalizedCandidate": "",
+      "mappingRow": 153,
+      "briefLine": 389,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L154",
+      "rawLabel": "No Sample",
+      "selectedBaseId": "",
+      "instructions": "distinct unsampled display state; preserve interval geometry",
+      "role": "DataStatus",
+      "normalizedCandidate": "",
+      "mappingRow": 154,
+      "briefLine": 390,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L155",
+      "rawLabel": "Others",
+      "selectedBaseId": "",
+      "instructions": "distinct unspecified-category display state",
+      "role": "DataStatus",
+      "normalizedCandidate": "",
+      "mappingRow": 155,
+      "briefLine": 391,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L156",
+      "rawLabel": "Clay-S",
+      "selectedBaseId": "",
+      "instructions": "CODE: clay-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 156,
+      "briefLine": 397,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L157",
+      "rawLabel": "Clay-SCS",
+      "selectedBaseId": "",
+      "instructions": "CODE: clay-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 157,
+      "briefLine": 398,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L158",
+      "rawLabel": "Clay-M",
+      "selectedBaseId": "",
+      "instructions": "CODE: clay-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 158,
+      "briefLine": 399,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L159",
+      "rawLabel": "Clay-CCS",
+      "selectedBaseId": "",
+      "instructions": "CODE: clay-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 159,
+      "briefLine": 400,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L160",
+      "rawLabel": "Clay-SACS",
+      "selectedBaseId": "",
+      "instructions": "CODE: clay-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 160,
+      "briefLine": 401,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L161",
+      "rawLabel": "Sand-SIS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 161,
+      "briefLine": 402,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L162",
+      "rawLabel": "Sand-SS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 162,
+      "briefLine": 403,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L163",
+      "rawLabel": "Sand-FS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 163,
+      "briefLine": 404,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L164",
+      "rawLabel": "Sand-MS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 164,
+      "briefLine": 405,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L165",
+      "rawLabel": "Sand-CS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 165,
+      "briefLine": 406,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L166",
+      "rawLabel": "Sand-FSS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 166,
+      "briefLine": 407,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L167",
+      "rawLabel": "Sand-MSS",
+      "selectedBaseId": "",
+      "instructions": "CODE: sand-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 167,
+      "briefLine": 408,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L168",
+      "rawLabel": "Limestone-AL",
+      "selectedBaseId": "",
+      "instructions": "CODE: limestone-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 168,
+      "briefLine": 409,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L169",
+      "rawLabel": "Limestone-SL",
+      "selectedBaseId": "",
+      "instructions": "CODE: limestone-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 169,
+      "briefLine": 410,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L170",
+      "rawLabel": "Limestone-L",
+      "selectedBaseId": "",
+      "instructions": "CODE: limestone-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 170,
+      "briefLine": 411,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L171",
+      "rawLabel": "Dolomites-AD",
+      "selectedBaseId": "",
+      "instructions": "CODE: dolomite-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 171,
+      "briefLine": 412,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L172",
+      "rawLabel": "Dolomites-CD",
+      "selectedBaseId": "",
+      "instructions": "CODE: dolomite-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 172,
+      "briefLine": 413,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L173",
+      "rawLabel": "Dolomites-D",
+      "selectedBaseId": "",
+      "instructions": "CODE: dolomite-family hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 173,
+      "briefLine": 414,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L174",
+      "rawLabel": "Others-H",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 174,
+      "briefLine": 415,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L175",
+      "rawLabel": "Others-A",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 175,
+      "briefLine": 416,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L176",
+      "rawLabel": "Others-GY",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 176,
+      "briefLine": 417,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L177",
+      "rawLabel": "Others-E",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 177,
+      "briefLine": 418,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L178",
+      "rawLabel": "Others-CL",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 178,
+      "briefLine": 419,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L179",
+      "rawLabel": "Others-S",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 179,
+      "briefLine": 420,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    },
+    {
+      "id": "L180",
+      "rawLabel": "Others-V",
+      "selectedBaseId": "",
+      "instructions": "CODE: other/unspecified hint only; suffix undecoded",
+      "role": "SourceCode",
+      "normalizedCandidate": "",
+      "mappingRow": 180,
+      "briefLine": 421,
+      "occurrences": 1,
+      "extractionLocations": [
+        "Unknown"
+      ],
+      "componentSourceIds": [],
+      "candidateBaseIds": [],
+      "prefixExpanded": false
+    }
+  ]
+}

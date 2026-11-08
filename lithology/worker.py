@@ -160,10 +160,12 @@ class Worker:
             results = {
                 "result_tif": (f"{base}_annotated.tif", "image/tiff", Path(files["tif"]).read_bytes()),
                 "result_csv": (f"{base}_lithology.csv", "text/csv", Path(files["csv"]).read_bytes()),
-                "result_json": (f"{base}_result.json", "application/json", dumps(r["result"])),
+                "result_json": (f"{base}_result.json", "application/json",
+                                dumps({**r["result"], "layout": r["layout"]})),
             }
             stats = {k: r[k] for k in ("seconds", "intervals", "top_depth", "bottom_depth", "px_per_depth_unit",
                                        "depth_labels_used", "depth_fit_rms_px", "legend_entries")}
+            stats["layout"] = r["layout"]  # result TIF = legend bar on top + the page: y shift for the UI
             self.db.finish(fid, stats, results)
         except Exception as e:
             tail = "\n".join(log[-5:])

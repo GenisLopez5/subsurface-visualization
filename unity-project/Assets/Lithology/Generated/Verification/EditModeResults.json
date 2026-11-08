@@ -1,0 +1,167 @@
+{
+  "status": "completed",
+  "duration": 12.31,
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "inconclusive": 0
+  },
+  "results": [
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyRenderTests.ObjectRestPatternsFollowTranslationAndHandleNegativeNonuniformScale",
+      "Status": "Passed",
+      "Duration": 0.0740559,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyRenderTests.ZeroComponentIsPixelIdenticalAndPositiveComponentChangesPixels",
+      "Status": "Passed",
+      "Duration": 0.0479735,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.AliasesRequireEvidenceAndCollisionsAreAmbiguous",
+      "Status": "Passed",
+      "Duration": 0.017975,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ApplyingOneSlotPreservesOtherSlotsAndRestoresOwnership",
+      "Status": "Passed",
+      "Duration": 0.0068775,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.CacheSharesIdentityButSeparatesOverridesAndBoundsDormantMaterials",
+      "Status": "Passed",
+      "Duration": 0.0201891,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.CombinedComponentsSurvive(\"Sandy and Calcareous Dolomite\",\"sand_content\",\"calcareous_component\")",
+      "Status": "Passed",
+      "Duration": 0.0063693,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.CombinedComponentsSurvive(\"Argil and Sandy Dolomite\",\"clay_content\",\"sand_content\")",
+      "Status": "Passed",
+      "Duration": 0.002552,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.CompleteCataloguePreservesSourceOccurrences",
+      "Status": "Passed",
+      "Duration": 0.0156428,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ExtraLayersAndUnknownModifiersCannotDisappear",
+      "Status": "Passed",
+      "Duration": 0.0040498,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.GrainChangesDoNotResizeStructureAndZeroLayerRestoresHost",
+      "Status": "Passed",
+      "Duration": 0.0093178,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.InitializationPreservesGuidsTexturesAndAuthoredOverride",
+      "Status": "Passed",
+      "Duration": 11.4079068,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.InvalidCoordinateScaleProducesFiniteSchematicFallback",
+      "Status": "Passed",
+      "Duration": 0.0020777,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.OpaqueCodesAndConditionalSourcesStayUnresolved",
+      "Status": "Passed",
+      "Duration": 0.0042844,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.OptionalShalyLaminationIsNotInferred",
+      "Status": "Passed",
+      "Duration": 0.0022989,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.PreviewEdgesTileAndMapsHaveCorrectImports",
+      "Status": "Passed",
+      "Duration": 0.2128458,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ProvisionalCandidatesAreNotAliases",
+      "Status": "Passed",
+      "Duration": 0.0026633,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ResolverPreservesOriginal(\"Fine Sandstone\",Exact)",
+      "Status": "Passed",
+      "Duration": 0.0022841,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ResolverPreservesOriginal(\"  fine   sandstone  \",Normalized)",
+      "Status": "Passed",
+      "Duration": 0.0019617,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ResolverPreservesOriginal(\"not_a_known_rock\",Unknown)",
+      "Status": "Passed",
+      "Duration": 0.0025558,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ResolverPreservesOriginal(null,Invalid)",
+      "Status": "Passed",
+      "Duration": 0.0012019,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.ResolverPreservesOriginal(\"  \",Invalid)",
+      "Status": "Passed",
+      "Duration": 0.0010994,
+      "Message": null,
+      "StackTrace": null
+    },
+    {
+      "FullName": "Subsurface.Lithology.Tests.LithologyTests.UnknownHostNeverBecomesARock",
+      "Status": "Passed",
+      "Duration": 0.0019976,
+      "Message": null,
+      "StackTrace": null
+    }
+  ]
+}

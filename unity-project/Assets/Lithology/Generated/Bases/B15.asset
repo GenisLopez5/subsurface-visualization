@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0551ffe3a0c9794489a2daf01ccb30fe, type: 3}
+  m_Name: B15
+  m_EditorClassIdentifier: Lithology.Runtime::Subsurface.Lithology.BaseTextureSet
+  stableId: B15
+  description: Anhydrite
+  procurementGuidance: 'A compact massive anhydrite reference with restrained crystalline
+    relief, separate from the gypsum surface. Do not rely on color alone to establish
+    mineral identity. Search: massive anhydrite rock texture; anhydrite fresh core
+    surface.'
+  albedo: {fileID: 2800000, guid: 0a094099072ce624088ad3ec626e7a22, type: 3}
+  normal: {fileID: 0}
+  surface: {fileID: 2800000, guid: 97134c53049419142bb1a8da07bbed74, type: 3}
+  height: {fileID: 2800000, guid: c730e00c8d006e54b88356a618124ce6, type: 3}
+  componentMask: {fileID: 0}
+  detailAlbedo: {fileID: 2800000, guid: 3baa9c993e7d7f54a9d3823690ee8a52, type: 3}
+  detailNormal: {fileID: 2800000, guid: 719972d29d5f2bb4796dc6583c1838d6, type: 3}
+  detailMask: {fileID: 2800000, guid: cd4a870a36acf3f449ba2cff19cf4f0a, type: 3}
+  surfaceLayout: R Metallic / G AO / B unused / A Smoothness
+  illustrativePreview: 1
+  conditional: 0
+  independentGrainScale: 1
+  hasSeparatedMacro: 1
+  supportsHeightDisplacement: 0
+  invertNormalGreen: 0
+  macroTileMetres: 1
+  detailTileMetres: 0.01
+  detailColorStrength: 0.4
+  sourceNotes: Illustrative deterministic procedural preview. No specimen observations.
+  licenseNotes: Generated locally for this project; no external scan.
+  sourceUrl: 
+  physicalScaleEvidence: Unknown; numerical defaults are artistic
+  revision: 3

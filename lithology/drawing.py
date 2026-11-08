@@ -21,7 +21,8 @@ from PIL import Image
 from . import notebook_viz as NB
 
 Image.MAX_IMAGE_PIXELS = None
-MAX_OUTPUT_PIXELS = 80_000_000  # guard: the notebook code builds RGB + RGBA copies at full output size
+MAX_OUTPUT_PIXELS = 80_000_000  # guard for the notebook-drawn PNG (it builds RGB + RGBA copies at full
+                                # output size); the result TIF has no limit, it is drawn in chunks
 
 
 def write_results_csv(intervals, path, y_shift=0, y_clip=None):
@@ -41,16 +42,69 @@ def write_results_csv(intervals, path, y_shift=0, y_clip=None):
             w.writerow([f"{r['top_depth']:g}", f"{r['bottom_depth']:g}", r["lithology"], ty, by, cid])
 
 
+# ---------------------------------------------------------------------------------------------
+# Layout: the drawn image is the page (or a strip of it) shrunk by `scale`, with the colour key
+# bar added ON TOP. So the drawn image is taller than the page and every y is shifted down:
+#
+#     y_in_drawn_image = legend_height_px + (y_in_original - y_start) * scale
+#
+# The layout is saved next to every drawn image as <image>.layout.json (read_layout) and returned
+# by the API so a UI can place results (top_y / bottom_y, in original-image px) on the drawing.
+
+def make_layout(page_w, page_h, y0, y1, scale, out_w, out_h) -> dict:
+    content_h = round((y1 - y0) * scale)
+    return {
+        "legend_height_px": out_h - content_h,   # bar on top of the drawn image, in drawn-image px
+        "scale": scale,                          # drawn px per original px
+        "y_start": y0,                           # first original row drawn (0 unless it is a strip)
+        "original_width": page_w, "original_height": page_h,
+        "image_width": out_w, "image_height": out_h,
+    }
+
+
+def layout_path(image_path) -> Path:
+    image_path = Path(image_path)
+    return image_path.with_name(image_path.name + ".layout.json")
+
+
+def save_layout(image_path, layout: dict) -> dict:
+    layout_path(image_path).write_text(json.dumps(layout))
+    return layout
+
+
+def read_layout(image_path) -> dict | None:
+    p = layout_path(image_path)
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def scaled_layout(layout: dict, width: int) -> dict:
+    """The layout of the drawn image after resizing it to `width` px wide (as the previews do)."""
+    if not layout or layout["image_width"] <= width:
+        return layout
+    k = width / layout["image_width"]
+    return {**layout, "legend_height_px": round(layout["legend_height_px"] * k), "scale": layout["scale"] * k,
+            "image_width": width, "image_height": max(1, round(layout["image_height"] * k))}
+
+
+LAYOUT_HEADERS = ("X-Legend-Height", "X-Scale", "X-Y-Start")
+
+
+def layout_headers(layout: dict | None) -> dict:
+    """Response headers for an image endpoint, so the layout comes with the picture itself."""
+    if not layout:
+        return {}
+    return {"X-Legend-Height": str(layout["legend_height_px"]), "X-Scale": f"{layout['scale']:.8g}",
+            "X-Y-Start": str(layout["y_start"])}
+
+
 def default_scale(height: int) -> float:
     """Whole log in one picture of at most ~12k px tall (the notebook's default is 0.25)."""
     return min(0.25, 12000 / height)
 
 
-def draw(page_path, annotation_path, result, scale, out_dir, page_image=None, y_range=None, tif=False,
-         tif_scale=None):
+def draw(page_path, annotation_path, result, scale, out_dir, page_image=None, y_range=None, tif=False):
     """Write the temp files, run the notebook's visualize_results on them, return the PNG path
-    (and also a high-resolution LZW-compressed .tif next to it when tif=True, see render_tif;
-    tif_scale=None means full resolution, or the largest scale under TIF_MAX_PIXELS).
+    (its layout, with the legend height, is saved next to it: read_layout(path)) (and also the full-resolution .tif next to it when tif=True, see render_tif).
 
     page_path   an image file the notebook can Image.open (a PDF must be rendered first)
     y_range     (y0, y1): draw only that strip of the page; page, annotation and CSV are
@@ -77,6 +131,8 @@ def draw(page_path, annotation_path, result, scale, out_dir, page_image=None, y_
         ann_file = tmp / "annotation.json"
         ann_file.write_text(json.dumps(ann, indent=2))
         write_results_csv(result["intervals"], tmp / "results.csv", y_shift=y0, y_clip=h)
+    if y_range is None:
+        y0, y1 = 0, page.height
     if out_w * out_h > MAX_OUTPUT_PIXELS:
         raise ValueError(f"output image would be {int(out_w)}x{int(out_h)} px; use a smaller scale")
 
@@ -84,18 +140,26 @@ def draw(page_path, annotation_path, result, scale, out_dir, page_image=None, y_
     with contextlib.redirect_stdout(io.StringIO()):  # the notebook prints a line per call
         view = NB.visualize_results(str(img_file), str(ann_file), str(tmp / "results.csv"), scale=scale,
                                     save_path=str(out), colors=colors)
+    save_layout(out, make_layout(page.width, page.height, y0, y1, scale, view.width, view.height))
     if tif:
-        render_tif(page, annotation_path, result, tmp / "result.tif", scale=tif_scale, y_range=y_range, colors=colors)
+        render_tif(page, annotation_path, result, tmp / "result.tif", y_range=y_range, colors=colors)
     return out
 
 
 # ---------------------------------------------------------------------------------------------
-# High-quality TIF: same layout and colours as the notebook's visualize_results, but drawn at
-# (near) full page resolution with text, lines and the legend scaled up to match, so it stays
-# as sharp as the source scan. The notebook code itself (notebook_viz.py) is left unchanged.
+# Result TIF: same layout and colours as the notebook's visualize_results, but always drawn at full
+# page resolution (text, lines and the legend scaled up to match), so it is as sharp as the source
+# scan. The notebook code itself (notebook_viz.py) is left unchanged.
+#
+# Low memory: the full-size RGB picture is never held in memory. It is drawn CHUNK_ROWS rows at a
+# time (each chunk gets everything that overlaps it; Pillow clips the rest) and every chunk is
+# compressed and written to the TIF straight away (StripTiffWriter). The pixels are the same as
+# drawing the whole picture at once. Peak memory ~ one chunk (width x CHUNK_ROWS x 3 bytes) plus
+# the 1-bit page, instead of 2-3x the full RGB picture.
 
-TIF_MAX_PIXELS = 60_000_000  # full resolution unless the log is huge (then the largest scale that fits)
-NB_SCALE = 0.25              # the notebook's sizes (fonts, lines, legend) are meant for this scale
+NB_SCALE = 0.25      # the notebook's sizes (fonts, lines, legend) are meant for this scale
+CHUNK_ROWS = 2048    # rows drawn at a time
+STRIP_ROWS = 256     # rows per TIF strip (several strips per chunk)
 
 
 _FONTS = ("DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "arialbd.ttf", "Arial Bold.ttf",
@@ -116,8 +180,77 @@ def _font(size: int):
     return ImageFont.load_default(size)
 
 
-def tif_scale_for(width: int, height: int) -> float:
-    return min(1.0, (TIF_MAX_PIXELS / (width * height)) ** 0.5)
+class StripTiffWriter:
+    """Writes an RGB TIF (Deflate-compressed, lossless) strip by strip: rows go in with add(), each
+    strip is compressed and written as soon as it is complete, so the image is never in memory whole.
+    Plain baseline TIF (strips, like Pillow writes), readable by Pillow, libtiff, GDAL, etc."""
+
+    def __init__(self, path, width, height, dpi=None, rows_per_strip=STRIP_ROWS, level=6):
+        import struct
+        import zlib
+        self._struct, self._zlib = struct, zlib
+        self.f = open(path, "wb")
+        self.w, self.h, self.dpi, self.rps, self.level = width, height, dpi, rows_per_strip, level
+        self.offsets, self.counts, self.pending, self.rows_in = [], [], b"", 0
+        self.f.write(b"II*\x00" + struct.pack("<I", 0))  # little-endian header; IFD offset patched in close()
+
+    def add(self, rgb_image):
+        """Append the next rows (a PIL RGB image `width` px wide)."""
+        assert rgb_image.mode == "RGB" and rgb_image.width == self.w
+        self.pending += rgb_image.tobytes()
+        self.rows_in += rgb_image.height
+        strip = self.w * 3 * self.rps
+        while len(self.pending) >= strip:
+            self._strip(self.pending[:strip])
+            self.pending = self.pending[strip:]
+
+    def _strip(self, raw: bytes):
+        data = self._zlib.compress(raw, self.level)
+        self.offsets.append(self.f.tell())
+        self.counts.append(len(data))
+        self.f.write(data)
+        if self.f.tell() >= 2**32:
+            raise ValueError("TIF over 4 GB")
+
+    def close(self):
+        if self.pending:
+            self._strip(self.pending)
+            self.pending = b""
+        if self.rows_in != self.h:
+            raise ValueError(f"TIF got {self.rows_in} rows, expected {self.h}")
+        pk, f = self._struct.pack, self.f
+        if f.tell() % 2:
+            f.write(b"\x00")
+        extra = []  # (bytes) values that don't fit in a tag entry, written after the IFD
+
+        def tag(code, typ, values):
+            size = {3: 2, 4: 4, 5: 8}[typ]
+            fmt = {3: "H", 4: "I"}.get(typ)
+            raw = (b"".join(pk("<II", *v) for v in values) if typ == 5 else pk(f"<{len(values)}{fmt}", *values))
+            return code, typ, len(values), raw
+
+        xres = (round((self.dpi[0] if self.dpi else 72) * 100), 100)
+        yres = (round((self.dpi[1] if self.dpi else 72) * 100), 100)
+        tags = [tag(256, 4, [self.w]), tag(257, 4, [self.h]), tag(258, 3, [8, 8, 8]), tag(259, 3, [8]),
+                tag(262, 3, [2]), tag(273, 4, self.offsets), tag(277, 3, [3]), tag(278, 4, [self.rps]),
+                tag(279, 4, self.counts), tag(282, 5, [xres]), tag(283, 5, [yres]), tag(284, 3, [1]),
+                tag(296, 3, [2])]
+        ifd = f.tell()
+        data_at = ifd + 2 + 12 * len(tags) + 4
+        entries = b""
+        for code, typ, n, raw in tags:
+            if len(raw) <= 4:
+                entries += pk("<HHI", code, typ, n) + raw.ljust(4, b"\x00")
+            else:
+                entries += pk("<HHII", code, typ, n, data_at)
+                extra.append(raw)
+                data_at += len(raw) + len(raw) % 2
+        f.write(pk("<H", len(tags)) + entries + pk("<I", 0))
+        for raw in extra:
+            f.write(raw + b"\x00" * (len(raw) % 2))
+        f.seek(4)
+        f.write(pk("<I", ifd))
+        f.close()
 
 
 def _intervals_for(result, y_shift=0, y_clip=None):
@@ -134,9 +267,10 @@ def _intervals_for(result, y_shift=0, y_clip=None):
     return out
 
 
-def render_tif(page, annotation_path, result, out_path, scale=None, y_range=None, colors=None):
-    """Draw the results on the page (or the strip y_range of it) and save an LZW-compressed TIF
-    that keeps the source DPI (adjusted for the scale). Returns the path."""
+def render_tif(page, annotation_path, result, out_path, y_range=None, colors=None):
+    """Draw the results on the page (or the strip y_range of it) at full resolution and save a
+    Deflate-compressed TIF that keeps the source DPI, chunk by chunk (low memory, see above).
+    Returns the layout (see make_layout), which is also saved next to the TIF."""
     from PIL import ImageDraw
 
     page = page if isinstance(page, Image.Image) else Image.open(page)
@@ -145,83 +279,105 @@ def render_tif(page, annotation_path, result, out_path, scale=None, y_range=None
     y0, y1 = 0, page.height
     if y_range is not None:
         y0, y1 = max(0, int(y_range[0])), min(page.height, int(y_range[1]))
-    scale = scale or tif_scale_for(page.width, y1 - y0)
-    if page.width * (y1 - y0) * scale * scale > MAX_OUTPUT_PIXELS:
-        raise ValueError(f"output image would be {int(page.width * scale)}x{int((y1 - y0) * scale)} px; "
-                         "use a smaller scale")
+    scale = 1.0
     results = _intervals_for(result, y0, y1 - y0) if y_range is not None else _intervals_for(result)
     colors = colors or NB.build_color_map(r["lithology"] for r in results)
     k = max(1.0, scale / NB_SCALE)           # size factor for everything the notebook draws in fixed pixels
     px = lambda v: max(1, round(v * k))      # noqa: E731
+    W, H = page.width, y1 - y0
 
-    img = NB.crop_rgb(page, (0, y0, page.width, y1), scale)
-    draw = ImageDraw.Draw(img)
-    S = lambda v: v * scale                  # noqa: E731  page px -> output px
-    Y = lambda v: (v - y0) * scale           # noqa: E731
-
-    # annotation boxes
-    font = _font(px(12))
-    for i, (name, (bx0, by0, bx1, by1)) in enumerate(boxes.items()):
-        rect = [S(bx0), Y(by0), S(bx1) - 1, Y(by1) - 1]
-        if rect[3] < 0 or rect[1] > img.height:
-            continue
-        color = NB.BOX_COLORS.get(name, (0, 200, 0))
-        draw.rectangle(rect, outline=color, width=px(2))
-        draw.text((rect[0] + px(6), max(rect[1], 0) + px(4) + px(16) * i), name, fill=color, font=font)
-
-    # intervals: translucent fill over the left half of the column, boundaries + depths, cluster ids
-    col, dep = boxes["interpreted_lithology_column"], boxes["depth_column"]
-    x0, x1 = S(col[0]), S(col[2])
-    xm, xd = x0 + (x1 - x0) * 0.5, S(dep[0])
-    for r in results:
-        ty, by = Y(r["top_y"] + y0), Y(r["bottom_y"] + y0)
-        box = (round(x0), round(ty), round(xm), max(round(ty) + 1, round(by)))
-        region = img.crop(box)
-        img.paste(Image.blend(region, Image.new("RGB", region.size, colors[r["lithology"]]), 150 / 255), box[:2])
-    draw = ImageDraw.Draw(img)
-    font = _font(px(13))
-    stroke = dict(stroke_width=px(3), stroke_fill=(255, 255, 255))
-    boundaries = {}
-    for r in results:
-        ty, by = Y(r["top_y"] + y0), Y(r["bottom_y"] + y0)
-        color = colors[r["lithology"]]
-        draw.rectangle([x0, ty, xm, by], outline=color, width=px(1))
-        draw.text((x1 + px(8), (ty + by) / 2), f"cluster {r['cluster_id']}", fill=color, font=font, anchor="lm", **stroke)
-        boundaries.setdefault(r["top_y"], []).append(r["top_depth"])
-        boundaries.setdefault(r["bottom_y"], []).append(r["bottom_depth"])
-    for y, depths in boundaries.items():
-        yy = Y(y + y0)
-        draw.line([(xd, yy), (x1, yy)], fill=NB.LINE_COLOR, width=px(1))
-        label = " / ".join(f"{d:g}" for d in dict.fromkeys(depths))
-        draw.text((xd - px(6), yy), label, fill=NB.LINE_COLOR, font=font, anchor="rm", **stroke)
-
-    # colour key on top
+    # colour key layout (needs only the width), so the bar height is known before drawing
     clusters = {}
     for r in results:
         clusters.setdefault(r["lithology"], [])
         if r["cluster_id"] not in clusters[r["lithology"]]:
             clusters[r["lithology"]].append(r["cluster_id"])
-    font, row_h = _font(px(15)), px(34)
+    measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    key_font, row_h = _font(px(15)), px(34)
     texts = {n: n + (f"  (cluster {', '.join(clusters[n])})" if clusters.get(n) else "") for n in colors}
     slots, x, row = [], px(10), 0
     for n in colors:
-        w = px(26) + int(draw.textlength(texts[n], font=font)) + px(20)
-        if x + w > img.width and x > px(10):
+        w = px(26) + int(measure.textlength(texts[n], font=key_font)) + px(20)
+        if x + w > W and x > px(10):
             x, row = px(10), row + 1
         slots.append((n, x, row))
         x += w
     bar = row_h * (row + 1)
-    out = Image.new("RGB", (img.width, img.height + bar), (255, 255, 255))
-    out.paste(img, (0, bar))
-    del img
-    draw = ImageDraw.Draw(out)
-    for n, x, row in slots:
-        y = row * row_h
-        draw.rectangle([x, y + px(8), x + px(18), y + px(26)], fill=colors[n], outline=(0, 0, 0), width=px(1))
-        draw.text((x + px(26), y + px(17)), texts[n], fill=(0, 0, 0), font=font, anchor="lm")
+    out_h = bar + H
 
-    save = {"compression": "tiff_lzw"}
-    if dpi:
-        save["dpi"] = (dpi[0] * scale, dpi[1] * scale)
-    out.save(out_path, **save)
-    return Path(out_path)
+    # everything in output-image coordinates (bar on top, then the page from y0 down)
+    S = lambda v: v * scale                  # noqa: E731  page px -> output px
+    Y = lambda v: bar + (v - y0) * scale     # noqa: E731
+    col, dep = boxes["interpreted_lithology_column"], boxes["depth_column"]
+    x0, x1 = S(col[0]), S(col[2])
+    xm, xd = x0 + (x1 - x0) * 0.5, S(dep[0])
+    box_font, font = _font(px(12)), _font(px(13))
+    stroke = dict(stroke_width=px(3), stroke_fill=(255, 255, 255))
+    iv = [(r, Y(r["top_y"] + y0), Y(r["bottom_y"] + y0)) for r in results]
+    boundaries = {}
+    for r in results:
+        boundaries.setdefault(r["top_y"], []).append(r["top_depth"])
+        boundaries.setdefault(r["bottom_y"], []).append(r["bottom_depth"])
+    margin = px(60)  # text / strokes reach this far past their anchor point
+
+    writer = StripTiffWriter(out_path, W, out_h, dpi=(dpi[0] * scale, dpi[1] * scale) if dpi else None)
+    try:
+        for cs in range(0, out_h, CHUNK_ROWS):
+            ce = min(cs + CHUNK_ROWS, out_h)
+            img = Image.new("RGB", (W, ce - cs), (255, 255, 255))
+            ps, pe = max(cs, bar), ce                     # page rows of this chunk, in output px
+            if pe > ps:
+                img.paste(NB.crop_rgb(page, (0, y0 + ps - bar, W, y0 + pe - bar)), (0, ps - cs))
+            draw = ImageDraw.Draw(img)
+            near = lambda a, b: b >= cs - margin and a <= ce + margin  # noqa: E731
+
+            # annotation boxes
+            for i, (name, (bx0, by0, bx1, by1)) in enumerate(boxes.items()):
+                rect = [S(bx0), Y(by0), S(bx1) - 1, Y(by1) - 1]
+                if rect[3] < bar or rect[1] > out_h:
+                    continue
+                color = NB.BOX_COLORS.get(name, (0, 200, 0))
+                draw.rectangle([rect[0], rect[1] - cs, rect[2], rect[3] - cs], outline=color, width=px(2))
+                draw.text((rect[0] + px(6), max(rect[1], bar) + px(4) + px(16) * i - cs), name, fill=color,
+                          font=box_font)
+
+            # intervals: translucent fill over the left half of the column
+            for r, ty, by in iv:
+                top, bottom = round(ty), max(round(ty) + 1, round(by))
+                a, b = max(top, cs), min(bottom, ce)
+                if b > a:
+                    box = (round(x0), a - cs, round(xm), b - cs)
+                    region = img.crop(box)
+                    img.paste(Image.blend(region, Image.new("RGB", region.size, colors[r["lithology"]]), 150 / 255),
+                              box[:2])
+            draw = ImageDraw.Draw(img)
+            # outlines, cluster ids, boundaries + depths
+            for r, ty, by in iv:
+                if near(ty, by):
+                    color = colors[r["lithology"]]
+                    draw.rectangle([x0, ty - cs, xm, by - cs], outline=color, width=px(1))
+                    draw.text((x1 + px(8), (ty + by) / 2 - cs), f"cluster {r['cluster_id']}", fill=color, font=font,
+                              anchor="lm", **stroke)
+            for y, depths in boundaries.items():
+                yy = Y(y + y0)
+                if near(yy, yy):
+                    draw.line([(xd, yy - cs), (x1, yy - cs)], fill=NB.LINE_COLOR, width=px(1))
+                    label = " / ".join(f"{d:g}" for d in dict.fromkeys(depths))
+                    draw.text((xd - px(6), yy - cs), label, fill=NB.LINE_COLOR, font=font, anchor="rm", **stroke)
+
+            # colour key (top bar)
+            if cs < bar:
+                draw.rectangle([0, 0, W, bar - 1 - cs], fill=(255, 255, 255))
+                for n, x, row in slots:
+                    y = row * row_h - cs
+                    draw.rectangle([x, y + px(8), x + px(18), y + px(26)], fill=colors[n], outline=(0, 0, 0),
+                                   width=px(1))
+                    draw.text((x + px(26), y + px(17)), texts[n], fill=(0, 0, 0), font=key_font, anchor="lm")
+            writer.add(img)
+            del img, draw
+    except BaseException:
+        writer.f.close()
+        Path(out_path).unlink(missing_ok=True)
+        raise
+    writer.close()
+    return save_layout(out_path, make_layout(page.width, page.height, y0, y1, scale, W, out_h))

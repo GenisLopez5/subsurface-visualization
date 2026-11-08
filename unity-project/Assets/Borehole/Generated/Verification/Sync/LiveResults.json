@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "firstFrame": 4937,
+  "finalFrame": 5220,
+  "mismatchDetected": true,
+  "piecewiseMap": true,
+  "cylinderWheelScrollsDocument": true,
+  "documentWheelMovesCylinder": true,
+  "documentDragMovesCylinder": true,
+  "zoomChangesWindowHeightOnly": true,
+  "windowCentered": true,
+  "windowMatchesVisibleDepth": true,
+  "minimumZoomMatchesCamera": true,
+  "explicitOriginalDimensionsHonored": true,
+  "gapNavigation": true,
+  "orbitAndPicking": true,
+  "legendMode": true,
+  "invalidImportPreservesLinkedResult": true,
+  "imagePickerAndPngDecode": true
+}
