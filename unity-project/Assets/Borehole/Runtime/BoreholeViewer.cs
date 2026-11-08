@@ -99,7 +99,7 @@ namespace Subsurface.Borehole
             for(int i=0;i<24;i++)
             {
                 var connector=new VisualElement{name="intervalConnector"+i,pickingMode=PickingMode.Ignore};connector.AddToClassList("interval-connector");labelLayer.Add(connector);intervalConnectors.Add(connector);
-                var label=new Button();label.enableRichText=false;label.AddToClassList("interval-label");label.RegisterCallback<PointerDownEvent>(e=>e.StopPropagation());label.clicked+=()=>{if(label.userData is int index)SelectInterval(index,false);};labelLayer.Add(label);intervalLabels.Add(label);
+                var label=new Button();label.enableRichText=false;label.AddToClassList("interval-label");label.RegisterCallback<PointerDownEvent>(e=>e.StopPropagation());label.clicked+=()=>{if(label.userData is int index)SelectInterval(index,true);};labelLayer.Add(label);intervalLabels.Add(label);
             }
             viewport.RegisterCallback<GeometryChangedEvent>(_=>{ResizeTarget();poseDirty=true;});
             viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey)Zoom(Math.Pow(1.12,e.delta.y));else ScrollDepth(e.delta.y);e.StopPropagation();});
@@ -277,7 +277,8 @@ namespace Subsurface.Borehole
                 if(!selected&&(hide||(!float.IsNaN(selectedY)&&i%2==column.SelectedIndex%2&&Mathf.Abs(positions[n]-selectedY)<46)))continue;
                 var row=column.Document.Intervals[i];var label=intervalLabels[used++];
                 label.style.display=DisplayStyle.Flex;label.style.left=left?8:width*.62f;label.style.width=left?width*.28f:Mathf.Min(195,width*.36f);label.style.top=positions[n]-21;
-                string direction=selected&&anchors[n]<0?" ↑":selected&&anchors[n]>height?" ↓":"";
+                bool above=selected&&row.BottomFeet<VisibleTopFeet,below=selected&&row.TopFeet>VisibleBottomFeet;
+                string direction=above?" ↑":below?" ↓":"";label.tooltip=above?"Selected interval above. Activate to jump to selection.":below?"Selected interval below. Activate to jump to selection.":"Select "+Name(row);
                 label.text=Name(row)+direction+"\n"+Format(row.TopFeet)+"–"+Format(row.BottomFeet)+" ft";label.userData=i;label.style.borderLeftWidth=3;label.style.borderLeftColor=column.IdentifierColors[i];label.EnableInClassList("active",selected);
                 var connector=intervalConnectors[used-1];float anchorX=width*(left?.415f:.585f),edge=left?8+width*.28f:width*.62f;
                 float startX=left?edge:anchorX,endX=left?anchorX:edge,startY=left?positions[n]:anchors[n],endY=left?anchors[n]:positions[n];
