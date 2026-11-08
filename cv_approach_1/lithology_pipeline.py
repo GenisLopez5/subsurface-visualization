@@ -76,8 +76,9 @@ IMAGE_SUFFIXES = (".tif", ".tiff", ".png", ".jpg", ".jpeg", ".pdf")
 STAGES = {"lithology": ["column", "legend+naming", "segmentation", "depth", "render"],
           "cv": ["column", "segmentation", "legend+naming", "depth", "render"],
           "hybrid": ["column", "segmentation", "legend+naming", "depth", "render"],
-          "hybrid_v2": ["column", "legend+naming", "segmentation", "depth", "render"]}
-CHOICES = {"method": ["hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
+          "hybrid_v2": ["column", "legend+naming", "segmentation", "depth", "render"],
+          "hybrid_v3": ["column", "legend+naming", "segmentation", "depth", "render"]}
+CHOICES = {"method": ["hybrid_v3", "hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
 
 
 # ======================================================================================================================
@@ -87,7 +88,7 @@ CHOICES = {"method": ["hybrid_v2", "hybrid", "lithology", "cv"]}                
 class Config:
     """All settings. The web app builds its settings form from this class (the comments become the help text)."""
     # --- method -------------------------------------------------------------------------------------------------------
-    method: str = "hybrid_v2"           # "hybrid_v2" = revised hybrid (colour mode, blank fix, legend quality; hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
+    method: str = "hybrid_v3"           # "hybrid_v3" = hybrid_v2 + Pau's robust depth fit and full-resolution drawing (hybrid_v3.py); "hybrid_v2" = colour mode, blank fix, legend quality (hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
     # --- hybrid method ------------------------------------------------------------------------------------------------
     hybrid_prefer_rapidocr: bool = False  # read the legend with RapidOCR first (slower; default: Tesseract first, RapidOCR if it looks wrong)
     hybrid_depth_min_labels: int = 4    # fewer Tesseract depth labels than this -> also try RapidOCR
@@ -135,7 +136,7 @@ def cv_config(cfg: Config) -> cv.Config:
 # ======================================================================================================================
 def ocr_info(method: str = "lithology") -> dict:
     """{'ok', 'version', 'path' or 'message'} for the OCR engine the method needs."""
-    if method in ("cv", "hybrid", "hybrid_v2"):                                  # hybrid: Tesseract first, RapidOCR optional
+    if method in ("cv", "hybrid", "hybrid_v2", "hybrid_v3"):                                  # hybrid: Tesseract first, RapidOCR optional
         try:
             cv.check_tesseract()
             return dict(ok=True, version="Tesseract", path=str(cv.pytesseract.pytesseract.tesseract_cmd))
@@ -275,8 +276,9 @@ def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colo
     tif_path, tif_error = None, None
     if cfg.annotated_tif and intervals and calib and "depth_column" in boxes:
         try:
-            tif_path = str(LD.render_tif(image, log.annotation_path, dict(intervals=intervals),
-                                         out_dir / f"{log.stem}_annotated.tif"))
+            tif_out = out_dir / f"{log.stem}_annotated.tif"
+            LD.render_tif(image, log.annotation_path, dict(intervals=intervals), tif_out)   # returns its layout
+            tif_path = str(tif_out)
         except Exception as e:                                      # noqa: BLE001  (e.g. too large)
             tif_error = f"{type(e).__name__}: {e}"
     lap("render")
@@ -308,7 +310,10 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     colours = colours or cv.Colours()
-    if cfg.method == "hybrid_v2":
+    if cfg.method == "hybrid_v3":
+        import hybrid_v3
+        record = hybrid_v3.process_log_v3(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
+    elif cfg.method == "hybrid_v2":
         import hybrid_v2
         record = hybrid_v2.process_log_v2(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "hybrid":
@@ -398,7 +403,7 @@ def main(argv=None) -> int:
     ap.add_argument("data_dir", help="folder with <stem>.json + image, or a dataset folder with bbox_annotation/ + images/")
     ap.add_argument("--out", default="outputs", help="output folder (default: outputs)")
     ap.add_argument("--labels", default=None, help="ground-truth folder with <stem>.csv (default: <data_dir>/labels)")
-    ap.add_argument("--method", default="hybrid_v2", choices=CHOICES["method"])
+    ap.add_argument("--method", default="hybrid_v3", choices=CHOICES["method"])
     a = ap.parse_args(argv)
     s = run_folder(a.data_dir, a.out, a.labels, Config(method=a.method), on_progress=cv._print)
     print(f"outputs: {Path(a.out).resolve()}")

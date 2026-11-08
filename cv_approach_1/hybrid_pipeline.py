@@ -234,8 +234,9 @@ def process_log_hybrid(log, out_dir: Path, cfg, ccfg, colours, on_progress: Prog
     tif_path, tif_error = None, None
     if cfg.annotated_tif and intervals and depth_info and "depth_column" in boxes:
         try:
-            tif_path = str(LD.render_tif(image, log.annotation_path, dict(intervals=intervals),
-                                         out_dir / f"{log.stem}_annotated.tif"))
+            tif_out = out_dir / f"{log.stem}_annotated.tif"
+            tif_layout = LD.render_tif(image, log.annotation_path, dict(intervals=intervals), tif_out)  # returns its layout
+            tif_path = str(tif_out)
         except Exception as e:                                      # noqa: BLE001
             tif_error = f"{type(e).__name__}: {e}"
     lap("render")

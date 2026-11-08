@@ -366,7 +366,10 @@ def classify_colour_rows(ink, rgb, swatches, scale, describe, cfg, ccfg) -> tupl
 # ----------------------------------------------------------------------------------------------------------------------
 # One log
 # ----------------------------------------------------------------------------------------------------------------------
-def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: ProgressFn) -> dict:
+def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: ProgressFn, depth_reader=None,
+                   method_name: str = "hybrid_v2") -> dict:
+    """depth_reader / method_name let hybrid_v3 reuse this with Pau's robust depth fit."""
+    depth_reader = depth_reader or hy.read_depth
     timings, t0 = {}, time.perf_counter()
     tracemalloc.start()
 
@@ -427,7 +430,7 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
 
     y_to_depth, depth_info, depth_how = (None, None, ["no depth_column box"])
     if "depth_column" in boxes:
-        y_to_depth, depth_info, depth_how = hy.read_depth(image, boxes["depth_column"], cfg, ccfg)
+        y_to_depth, depth_info, depth_how = depth_reader(image, boxes["depth_column"], cfg, ccfg)
     lap("depth")
 
     def depth(y):
@@ -465,17 +468,18 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     fit = None if depth_info is None else cv.DepthFit(depth_info["a"], depth_info["b"], depth_info["n_used"],
                                                       depth_info["n_read"], depth_info["points"])
     depth_png = cv.plot_depth(fit, out_dir / f"{log.stem}_depth.png")
-    tif_path, tif_error = None, None
+    tif_path, tif_error, tif_layout = None, None, None
     if cfg.annotated_tif and intervals and depth_info and "depth_column" in boxes:
         try:
-            tif_path = str(LD.render_tif(image, log.annotation_path, dict(intervals=intervals),
-                                         out_dir / f"{log.stem}_annotated.tif"))
+            tif_out = out_dir / f"{log.stem}_annotated.tif"
+            tif_layout = LD.render_tif(image, log.annotation_path, dict(intervals=intervals), tif_out)  # returns its layout
+            tif_path = str(tif_out)
         except Exception as e:                                      # noqa: BLE001
             tif_error = f"{type(e).__name__}: {e}"
     lap("render")
 
     record = dict(
-        stem=log.stem, image=str(log.image_path), method="hybrid_v2", colour_scan=rgb is not None,
+        stem=log.stem, image=str(log.image_path), method=method_name, colour_scan=rgb is not None,
         segmentation="colour rows" if colour_mode else "texture clusters", segmentation_details=details,
         scale=asdict(scale), k=k, silhouette=silhouette, transition_clusters_removed=transitions,
         n_intervals=len(intervals), legend_method=f"{legend_method} (tried {', '.join(legend_tried)})",
@@ -487,7 +491,7 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
         peak_mb=round(peak / 1e6, 1),
         files=dict(csv=str(csv_path), page_png=str(page), column_png=str(column_png), legend_png=legend_png,
                    depth_png=depth_png, annotated_tif=tif_path),
-        annotated_tif_error=tif_error,
+        annotated_tif_error=tif_error, annotated_tif_layout=tif_layout,
     )
     if log.labels_path:
         record["metrics"] = cv.evaluate(intervals, pd.read_csv(log.labels_path).to_dict("records"))

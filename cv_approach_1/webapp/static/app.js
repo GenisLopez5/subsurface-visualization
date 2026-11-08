@@ -182,7 +182,8 @@ async function viewNew() {
         <p class="small muted">Ground truth = a <code>&lt;image name&gt;.csv</code> in <code id="defLabels">cv_approach_1/labels</code> (columns top_depth, bottom_depth, lithology, top_y, bottom_y). Add more CSVs there to evaluate more images.</p>
       </div>
       <div class="card"><h2>2 · Methods to compare</h2>
-        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v2" checked> <b>hybrid_v2</b>&nbsp;<span class="muted small">revised hybrid: colour mode, blank fix (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v3" checked> <b>hybrid_v3</b>&nbsp;<span class="muted small">hybrid_v2 + Pau's robust depth fit (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v2" checked> <b>hybrid_v2</b>&nbsp;<span class="muted small">colour mode, blank fix, legend quality</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology" checked> <b>lithology</b>&nbsp;<span class="muted small">Pau's lithology/ package only</span></label>
         <label class="check" style="display:flex;margin-bottom:12px"><input type="checkbox" data-method="cv" checked> <b>cv</b>&nbsp;<span class="muted small">clustering only</span></label>
