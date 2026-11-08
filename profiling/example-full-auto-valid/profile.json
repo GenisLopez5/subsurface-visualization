@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-08T09:57:42.837928+00:00",
+  "input_dir": "/home/jaume/CODE/subsurface-visualization/bbox-predictor/hack27-20261107T141707Z-1-001/hack27/project/example",
+  "output_dir": "/home/jaume/CODE/subsurface-visualization/profiling/example-full-auto-valid",
+  "method": "automatic_lithology_cv",
+  "repeats": 1,
+  "annotated_tif": false,
+  "bbox_python": "/home/jaume/CODE/subsurface-visualization/bbox-final/.venv/bin/python",
+  "documents_requested": 1,
+  "documents_completed": 1,
+  "machine": {
+    "architecture": "x86_64",
+    "logical_cpus": "8",
+    "model_name": "Intel(R) Core(TM) i5-8350U CPU @ 1.70GHz",
+    "threads_per_core": "2",
+    "cores_per_socket": "4",
+    "sockets": "1",
+    "cpu_max_mhz": "3600.0000",
+    "cpu_min_mhz": "400.0000",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12"
+  },
+  "runtime": {
+    "wall_s": 35.42,
+    "parent_python_cpu_s": 74.611,
+    "median_document_s": 35.379,
+    "mean_document_s": 35.379,
+    "p90_document_s": 35.379,
+    "peak_process_tree_rss_mb": 2216.7,
+    "peak_live_processes": 6,
+    "resource_samples": 652,
+    "sampling_interval_ms": 50.0,
+    "max_observed_process_tree_cpu_s": 78.65
+  },
+  "stage_summary": [
+    {
+      "stage": "boxes",
+      "label": "Column + legend detection",
+      "samples": 1,
+      "mean_s": 8.536,
+      "median_s": 8.536,
+      "p90_s": 8.536,
+      "sum_s": 8.536,
+      "share_percent": 24.13
+    },
+    {
+      "stage": "column",
+      "label": "Column preprocessing",
+      "samples": 1,
+      "mean_s": 0.262,
+      "median_s": 0.262,
+      "p90_s": 0.262,
+      "sum_s": 0.262,
+      "share_percent": 0.74
+    },
+    {
+      "stage": "legend+naming",
+      "label": "Legend extraction + OCR",
+      "samples": 1,
+      "mean_s": 23.093,
+      "median_s": 23.093,
+      "p90_s": 23.093,
+      "sum_s": 23.093,
+      "share_percent": 65.27
+    },
+    {
+      "stage": "segmentation",
+      "label": "Subsurface prediction",
+      "samples": 1,
+      "mean_s": 1.755,
+      "median_s": 1.755,
+      "p90_s": 1.755,
+      "sum_s": 1.755,
+      "share_percent": 4.96
+    },
+    {
+      "stage": "depth",
+      "label": "Depth OCR + calibration",
+      "samples": 1,
+      "mean_s": 0.0,
+      "median_s": 0.0,
+      "p90_s": 0.0,
+      "sum_s": 0.0,
+      "share_percent": 0.0
+    },
+    {
+      "stage": "render",
+      "label": "OpenCV rendering + outputs",
+      "samples": 1,
+      "mean_s": 1.733,
+      "median_s": 1.733,
+      "p90_s": 1.733,
+      "sum_s": 1.733,
+      "share_percent": 4.9
+    }
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "wall_s": 35.419,
+      "pipeline_reported_total_s": 35.42,
+      "documents_requested": 1,
+      "documents_completed": 1,
+      "errors": [],
+      "summary_path": "/home/jaume/CODE/subsurface-visualization/profiling/example-full-auto-valid/run-01/summary.json",
+      "documents": [
+        {
+          "stem": "0000000009_d-582_0000020435-0001_log06_fe_5in_md",
+          "timings_s": {
+            "boxes": 8.536,
+            "column": 0.262,
+            "legend+naming": 23.093,
+            "segmentation": 1.755,
+            "depth": 0.0,
+            "render": 1.733
+          },
+          "measured_stage_total_s": 35.379,
+          "pipeline_runtime_excluding_render_s": 33.646,
+          "python_heap_peak_mb": 251.7
+        }
+      ]
+    }
+  ],
+  "measurement_notes": [
+    "End-to-end wall time includes model startup, OCR, OpenCV work and normal output rendering.",
+    "Depth OCR runs in parallel; its stage timing is only the remaining wait after segmentation.",
+    "Peak RSS covers the profiler and currently alive descendants; peaks shorter than the sample interval may be missed.",
+    "The default run does not generate the optional full-resolution annotated TIFF unless --annotated-tif is set."
+  ]
+}

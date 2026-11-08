@@ -65,9 +65,14 @@ def detect(image_path, out_path, json_hint: Path | None = None) -> dict:
                     hint = None
             src, size = _render_pdf(image_path, Path(tmp), hint)
         raw = Path(tmp) / "boxes.json"
+        command = [str(BBOX_PYTHON), str(BBOX_DIR / "predict.py"), str(src), "--output", str(raw), "--device", "cpu"]
+        diagnostics_dir = os.environ.get("LITHO_BBOX_DIAGNOSTICS_DIR")
+        if diagnostics_dir:
+            diagnostics = Path(diagnostics_dir) / f"{image_path.stem}.json"
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            command.extend(["--diagnostics", str(diagnostics)])
         try:
-            p = subprocess.run([str(BBOX_PYTHON), str(BBOX_DIR / "predict.py"), str(src), "--output", str(raw),
-                                "--device", "cpu"], cwd=str(BBOX_DIR), capture_output=True, text=True,
+            p = subprocess.run(command, cwd=str(BBOX_DIR), capture_output=True, text=True,
                                timeout=TIMEOUT_S)
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"detector took longer than {TIMEOUT_S} s") from None

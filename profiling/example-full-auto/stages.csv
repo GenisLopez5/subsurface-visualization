@@ -1,0 +1,7 @@
+run,document,stage,stage_label,seconds,percent_of_measured_log
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,boxes,Column + legend detection,0.195,1.0
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,column,Column preprocessing,0.19,0.98
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,legend+naming,Legend extraction + OCR,15.073,77.4
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,segmentation,Subsurface prediction,2.226,11.43
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,depth,Depth OCR + calibration,0.0,0.0
+1,0000000009_d-582_0000020435-0001_log06_fe_5in_md,render,OpenCV rendering + outputs,1.79,9.19

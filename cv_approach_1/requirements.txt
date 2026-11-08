@@ -9,6 +9,7 @@ opencv-python-headless>=4.8
 pillow>=10.0
 pytesseract>=0.3.10
 matplotlib>=3.7
+psutil>=5.9
 
 # method "lithology" (default): the repository lithology/ package uses RapidOCR (pip-installable, no system OCR)
 rapidocr>=3.0

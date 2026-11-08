@@ -109,6 +109,51 @@ La configuració de llegenda prové del benchmark de 10 documents de
 desenvolupament: IoU mitjana 0,950 i 10/10 llegendes amb IoU ≥ 0,8, però només
 6/10 amb IoU ≥ 0,95. No són garanties de fidelitat sobre documents nous.
 
+## Benchmark sobre un test anotat
+
+`benchmark.py` executa inferència nova i seqüencial amb el workflow complet
+(detector general + especialista + reconstrucció de llegenda). Accepta
+directament el ZIP dels sponsors o una carpeta que contingui `images/` i
+`annotations/` (també admet `bbox_annotation/`):
+
+```bash
+python benchmark.py /ruta/test.zip --output outputs/sponsor-test
+```
+
+El mode `auto` reprodueix la selecció de producció: pesos `.pt` sobre CUDA si
+estan complets a `models-pt/`; altrament utilitza els models INT8 empaquetats.
+Per fixar explícitament la variant i el dispositiu:
+
+```bash
+# INT8/OpenVINO en CPU
+python benchmark.py /ruta/test.zip --output outputs/test-int8 \
+  --models int8 --device cpu
+
+# Pesos originals en CPU o GPU 0
+python benchmark.py /ruta/test.zip --output outputs/test-pt-cpu \
+  --models pt --device cpu
+python benchmark.py /ruta/test.zip --output outputs/test-pt-gpu \
+  --models pt --device 0
+```
+
+Els models es carreguen una sola vegada. Per a cada document, l'anotació
+s'obre només després d'acabar la inferència de la imatge. Les prediccions
+fallides continuen al denominador amb IoU zero. La carpeta de sortida ha de ser
+nova o buida i conté:
+
+- `index.html`: resum llegible i taula per document.
+- `report.json`: mètriques completes, configuració, versions, hashes i temps.
+- `per_document.csv`: IoU i rendiment per document.
+- `predictions/`, `diagnostics/`, `errors/` i `ground_truth/`: evidència de cada
+  execució.
+
+Es reporten IoU mitjana/mediana/p10 per regió, errors de vores, taxa
+d'absències, documents amb les tres IoU ≥ 0,8, temps end-to-end i pic de memòria
+RSS. El temps per document exclou la càrrega inicial dels models i l'escriptura
+de l'informe. RSS no inclou VRAM. Per comprovar ràpidament la instal·lació sense
+executar tot el test, es pot afegir `--limit 1`; aquest resultat no s'ha de
+presentar com el benchmark complet.
+
 ## Servei HTTP (per a una altra màquina)
 
 `server.py` exposa el mateix workflow amb FastAPI, perquè l'aplicació de litologia el cridi per xarxa:

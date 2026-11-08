@@ -47,5 +47,5 @@ chmod +x "$VENV/bin/tesseract"
 echo "== 4/4 checking"
 "$VENV/bin/tesseract" --version 2>&1 | head -1
 echo "   languages: $("$VENV/bin/tesseract" --list-langs 2>/dev/null | tail -n +2 | tr '\n' ' ')"
-"$VENV/bin/python" -c "import lithology_pipeline as lp, pytesseract; lp.check_tesseract(); print('   pipeline uses:', pytesseract.pytesseract.tesseract_cmd)"
+"$VENV/bin/python" -c "import lithology_pipeline as lp, pytesseract; lp.check_ocr('automatic_lithology_cv'); print('   pipeline uses:', pytesseract.pytesseract.tesseract_cmd)"
 echo "done. Activate with:  source $VENV/bin/activate"

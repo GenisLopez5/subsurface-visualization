@@ -1,0 +1,26 @@
+{
+  "image_name": "0000000009_d-582_0000020435-0001_log06_fe_5in_md.tif",
+  "width": 4864,
+  "height": 12050,
+  "bounding_boxes": {
+    "depth_column": [
+      1286,
+      4402,
+      1378,
+      10986
+    ],
+    "interpreted_lithology_column": [
+      2990,
+      4402,
+      3241,
+      10986
+    ],
+    "lithology_legend": [
+      1945,
+      563,
+      3033,
+      2658
+    ]
+  },
+  "source": "automatic bounding boxes (bbox-final int8)"
+}

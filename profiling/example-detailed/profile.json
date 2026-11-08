@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-08T10:00:20.393964+00:00",
+  "input_dir": "/home/jaume/CODE/subsurface-visualization/bbox-predictor/hack27-20261107T141707Z-1-001/hack27/project/example",
+  "output_dir": "/home/jaume/CODE/subsurface-visualization/profiling/example-detailed",
+  "method": "automatic_lithology_cv",
+  "repeats": 1,
+  "annotated_tif": false,
+  "bbox_python": "/home/jaume/CODE/subsurface-visualization/bbox-final/.venv/bin/python",
+  "documents_requested": 1,
+  "documents_completed": 1,
+  "machine": {
+    "architecture": "x86_64",
+    "logical_cpus": "8",
+    "model_name": "Intel(R) Core(TM) i5-8350U CPU @ 1.70GHz",
+    "threads_per_core": "2",
+    "cores_per_socket": "4",
+    "sockets": "1",
+    "cpu_max_mhz": "3600.0000",
+    "cpu_min_mhz": "400.0000",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12"
+  },
+  "runtime": {
+    "wall_s": 33.933,
+    "parent_python_cpu_s": 75.578,
+    "median_document_s": 33.909,
+    "mean_document_s": 33.909,
+    "p90_document_s": 33.909,
+    "peak_process_tree_rss_mb": 2220.6,
+    "peak_live_processes": 3,
+    "resource_samples": 618,
+    "sampling_interval_ms": 50.0,
+    "max_observed_process_tree_cpu_s": 79.75
+  },
+  "stage_summary": [
+    {
+      "stage": "boxes",
+      "label": "Column + legend detection",
+      "samples": 1,
+      "mean_s": 7.604,
+      "median_s": 7.604,
+      "p90_s": 7.604,
+      "sum_s": 7.604,
+      "share_percent": 22.42
+    },
+    {
+      "stage": "column",
+      "label": "Column preprocessing",
+      "samples": 1,
+      "mean_s": 0.176,
+      "median_s": 0.176,
+      "p90_s": 0.176,
+      "sum_s": 0.176,
+      "share_percent": 0.52
+    },
+    {
+      "stage": "legend+naming",
+      "label": "Legend extraction + OCR",
+      "samples": 1,
+      "mean_s": 22.846,
+      "median_s": 22.846,
+      "p90_s": 22.846,
+      "sum_s": 22.846,
+      "share_percent": 67.37
+    },
+    {
+      "stage": "segmentation",
+      "label": "Subsurface prediction",
+      "samples": 1,
+      "mean_s": 1.759,
+      "median_s": 1.759,
+      "p90_s": 1.759,
+      "sum_s": 1.759,
+      "share_percent": 5.19
+    },
+    {
+      "stage": "depth",
+      "label": "Depth OCR + calibration",
+      "samples": 1,
+      "mean_s": 0.0,
+      "median_s": 0.0,
+      "p90_s": 0.0,
+      "sum_s": 0.0,
+      "share_percent": 0.0
+    },
+    {
+      "stage": "render",
+      "label": "OpenCV rendering + outputs",
+      "samples": 1,
+      "mean_s": 1.524,
+      "median_s": 1.524,
+      "p90_s": 1.524,
+      "sum_s": 1.524,
+      "share_percent": 4.49
+    }
+  ],
+  "detector_summary": [
+    {
+      "name": "startup+orchestration",
+      "label": "Model startup + orchestration",
+      "samples": 1,
+      "mean_s": 3.393,
+      "median_s": 3.393,
+      "p90_s": 3.393,
+      "sum_s": 3.393,
+      "share_percent": 44.62
+    },
+    {
+      "name": "general_model",
+      "label": "General column model",
+      "samples": 1,
+      "mean_s": 2.354,
+      "median_s": 2.354,
+      "p90_s": 2.354,
+      "sum_s": 2.354,
+      "share_percent": 30.95
+    },
+    {
+      "name": "legend_model+geometry",
+      "label": "Legend specialist + geometry",
+      "samples": 1,
+      "mean_s": 1.858,
+      "median_s": 1.858,
+      "p90_s": 1.858,
+      "sum_s": 1.858,
+      "share_percent": 24.43
+    }
+  ],
+  "legend_reader_summary": [
+    {
+      "name": "size-groups",
+      "label": "Tesseract size groups",
+      "samples": 1,
+      "mean_s": 1.249,
+      "median_s": 1.249,
+      "p90_s": 1.249,
+      "sum_s": 1.249,
+      "share_percent": 5.47
+    },
+    {
+      "name": "text-anchored",
+      "label": "Tesseract text anchored",
+      "samples": 1,
+      "mean_s": 2.356,
+      "median_s": 2.356,
+      "p90_s": 2.356,
+      "sum_s": 2.356,
+      "share_percent": 10.31
+    },
+    {
+      "name": "grid",
+      "label": "RapidOCR grid reader",
+      "samples": 1,
+      "mean_s": 19.191,
+      "median_s": 19.191,
+      "p90_s": 19.191,
+      "sum_s": 19.191,
+      "share_percent": 84.0
+    },
+    {
+      "name": "other_legend_work",
+      "label": "Crop + swatch processing",
+      "samples": 1,
+      "mean_s": 0.05,
+      "median_s": 0.05,
+      "p90_s": 0.05,
+      "sum_s": 0.05,
+      "share_percent": 0.22
+    }
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "wall_s": 33.931,
+      "pipeline_reported_total_s": 33.93,
+      "documents_requested": 1,
+      "documents_completed": 1,
+      "errors": [],
+      "summary_path": "/home/jaume/CODE/subsurface-visualization/profiling/example-detailed/run-01/summary.json",
+      "documents": [
+        {
+          "stem": "0000000009_d-582_0000020435-0001_log06_fe_5in_md",
+          "timings_s": {
+            "boxes": 7.604,
+            "column": 0.176,
+            "legend+naming": 22.846,
+            "segmentation": 1.759,
+            "depth": 0.0,
+            "render": 1.524
+          },
+          "measured_stage_total_s": 33.909,
+          "pipeline_runtime_excluding_render_s": 32.385,
+          "python_heap_peak_mb": 251.7,
+          "bbox_diagnostics_path": "/home/jaume/CODE/subsurface-visualization/profiling/example-detailed/run-01/bbox-diagnostics/0000000009_d-582_0000020435-0001_log06_fe_5in_md.json",
+          "detector_breakdown_s": {
+            "startup+orchestration": 3.393,
+            "general_model": 2.354,
+            "legend_model+geometry": 1.858
+          },
+          "legend_reader_breakdown_s": {
+            "size-groups": 1.249,
+            "text-anchored": 2.356,
+            "grid": 19.191,
+            "other_legend_work": 0.05
+          }
+        }
+      ]
+    }
+  ],
+  "measurement_notes": [
+    "End-to-end wall time includes model startup, OCR, OpenCV work and normal output rendering.",
+    "Depth OCR runs in parallel; its stage timing is only the remaining wait after segmentation.",
+    "Peak RSS covers the profiler and currently alive descendants; peaks shorter than the sample interval may be missed.",
+    "The default run does not generate the optional full-resolution annotated TIFF unless --annotated-tif is set."
+  ]
+}

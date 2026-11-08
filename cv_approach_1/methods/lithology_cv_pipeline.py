@@ -80,10 +80,11 @@ def read_legend_lcv(image, boxes, cfg, ccfg) -> tuple:
     leg_crop = image.crop(tuple(leg_box))
     leg_ink = cv.to_ink(leg_crop, ccfg)
     leg_rgb = np.array(leg_crop.convert("RGB")) if cv.is_colour(leg_crop) else None
-    results, tried = [], []
+    results, tried, reader_timings = [], [], {}
     for src in ("size-groups", "text-anchored", "grid", "rapidocr"):
         if src == "rapidocr" and any(r[1] == "grid" and r[2] for r in results):
             continue                                             # grid supersedes Pau's older reader
+        reader_started = time.perf_counter()
         try:
             if src == "size-groups":
                 sw = cv.find_swatches(leg_ink, leg_rgb)
@@ -98,19 +99,21 @@ def read_legend_lcv(image, boxes, cfg, ccfg) -> tuple:
             else:
                 sw = hy.swatches_from_rapidocr(image, leg_box, leg_ink, leg_rgb)
         except Exception as e:                                   # noqa: BLE001  (e.g. OCR engine missing)
+            reader_timings[src] = round(time.perf_counter() - reader_started, 3)
             tried.append(f"{src}: {type(e).__name__}: {e}"[:160])
             continue
+        reader_timings[src] = round(time.perf_counter() - reader_started, 3)
         sw = h2.normalise_strip_swatches(h2._retidy(sw), leg_ink, leg_rgb)
         q = h2.name_quality(sw)
         tried.append(f"{src}: {len(sw)} (quality {q:.1f})")
         results.append((q, src, sw))
     if not results:
-        return [], "none", tried
+        return [], "none", tried, reader_timings
     q, src, sw = max(results, key=lambda r: r[0])                # max() keeps the first of equal scores
     if src == "grid":
         n = borrow_boxes(sw, [s for r in results if r[1] in ("size-groups", "text-anchored") for s in r[2]])
         tried.append(f"grid names + {n} swatch boxes from the Tesseract readers")
-    return sw, src, tried
+    return sw, src, tried, reader_timings
 
 
 def _box_iou(a, b) -> float:

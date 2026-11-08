@@ -405,7 +405,12 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     lap("column")
 
     # legend first: it decides between colour mode and the cluster path
-    swatches, legend_method, legend_tried = legend_reader(image, boxes, cfg, ccfg)
+    legend_result = legend_reader(image, boxes, cfg, ccfg)
+    if len(legend_result) == 4:
+        swatches, legend_method, legend_tried, legend_reader_timings = legend_result
+    else:
+        swatches, legend_method, legend_tried = legend_result
+        legend_reader_timings = {}
     groups = cv.lookalike_groups(swatches, describe)
     colour_mode = cfg.hybrid_colour_mode and use_colour_mode(rgb, swatches)
     lap("legend+naming")
@@ -500,6 +505,7 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
         segmentation="colour rows" if colour_mode else "texture clusters", segmentation_details=details,
         scale=asdict(scale), k=k, silhouette=silhouette, transition_clusters_removed=transitions,
         n_intervals=len(intervals), legend_method=f"{legend_method} (tried {', '.join(legend_tried)})",
+        legend_reader_timings_s=legend_reader_timings,
         swatches=[dict(name=s.name, look_alikes=[swatches[j].name for j in groups[i] if j != i]) for i, s in enumerate(swatches)],
         clusters=clusters, ambiguous=sorted({r["lithology"] for r in intervals if r["ambiguous"]}),
         depth=None if depth_info is None else {kk: v for kk, v in depth_info.items() if kk != "points"},

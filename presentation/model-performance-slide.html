@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Legend & Column Detection — Model Performance</title>
+  <style>
+    :root {
+      --background: #f8fafc;
+      --card: #ffffff;
+      --foreground: #0f172a;
+      --muted: #64748b;
+      --muted-bg: #f1f5f9;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success: #059669;
+      --success-soft: #ecfdf5;
+      --warning: #b45309;
+      --warning-soft: #fffbeb;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slide {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      padding: 56px 64px 42px;
+      display: grid;
+      grid-template-rows: 128px 1fr 188px;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .kicker {
+      margin: 0 0 10px;
+      color: var(--primary);
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 750;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 54px;
+      line-height: 1.02;
+      letter-spacing: -.04em;
+      font-weight: 760;
+    }
+
+    .header-note {
+      max-width: 510px;
+      padding-top: 6px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .header-note strong { color: var(--foreground); font-weight: 650; }
+
+    .main {
+      display: grid;
+      grid-template-columns: .96fr 1.04fr;
+      gap: 24px;
+      min-height: 0;
+    }
+
+    .left { min-height: 0; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      height: 100%;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
+    }
+
+    .metric {
+      padding: 26px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-label { color: var(--muted); font-size: 16px; font-weight: 620; }
+
+    .metric-value {
+      margin: 7px 0 6px;
+      font-size: 58px;
+      line-height: .96;
+      letter-spacing: -.055em;
+      font-weight: 730;
+    }
+
+    .metric-value span {
+      color: var(--muted);
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+    }
+
+    .metric-detail { color: var(--muted); font-size: 15px; line-height: 1.35; }
+    .metric-detail strong { color: var(--foreground); font-weight: 650; }
+
+    .metric.highlight {
+      border-color: #bfdbfe;
+      background: linear-gradient(145deg, var(--card), var(--primary-soft));
+    }
+    .metric.highlight .metric-value { color: var(--primary); }
+
+    .metric.success {
+      border-color: #a7f3d0;
+      background: linear-gradient(145deg, var(--card), var(--success-soft));
+    }
+    .metric.success .metric-value { color: var(--success); }
+
+    .right {
+      padding: 26px 30px 24px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .chart-title { margin: 0; font-size: 23px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; }
+    .chart-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 11px;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
+
+    .chart { display: grid; align-content: center; gap: 22px; padding: 4px 0 10px; }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 190px 1fr 74px;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .bar-label { font-size: 15px; font-weight: 620; line-height: 1.2; }
+    .bar-label small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
+
+    .bar-track {
+      height: 34px;
+      overflow: hidden;
+      border-radius: 7px;
+      background:
+        linear-gradient(90deg, transparent 24.8%, var(--border) 25%, transparent 25.2%, transparent 49.8%, var(--border) 50%, transparent 50.2%, transparent 74.8%, var(--border) 75%, transparent 75.2%),
+        var(--muted-bg);
+    }
+
+    .bar { height: 100%; border-radius: 7px; background: #94a3b8; }
+    .bar.fragments { background: #60a5fa; }
+    .bar.best { background: var(--primary); }
+
+    .bar-value { text-align: right; font-size: 20px; font-weight: 720; letter-spacing: -.025em; }
+    .bar-value.best { color: var(--primary); }
+
+    .chart-axis {
+      display: grid;
+      grid-template-columns: 190px 1fr 74px;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .ticks { display: flex; justify-content: space-between; padding: 0 2px; }
+
+    .chart-insight {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding-top: 17px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .chart-insight strong { color: var(--foreground); }
+    .delta { color: var(--success); font-size: 25px; font-weight: 740; letter-spacing: -.035em; white-space: nowrap; }
+
+    .timing-panel {
+      padding: 22px 26px;
+      display: grid;
+      grid-template-columns: 250px 1fr 360px;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .timing-summary {
+      align-self: stretch;
+      padding-right: 26px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .timing-kicker {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .timing-total {
+      margin: 7px 0 4px;
+      font-size: 52px;
+      line-height: 1;
+      font-weight: 750;
+      letter-spacing: -.05em;
+    }
+
+    .timing-note { color: var(--muted); font-size: 13px; }
+
+    .timing-chart-title {
+      margin-bottom: 13px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .time-stack {
+      height: 42px;
+      display: flex;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--muted-bg);
+    }
+
+    .time-segment { height: 100%; border-right: 2px solid var(--card); }
+    .time-segment:last-child { border-right: 0; }
+    .time-legend { width: 67.4%; background: #2563eb; }
+    .time-detection { width: 22.4%; background: #60a5fa; }
+    .time-subsurface { width: 5.2%; background: #10b981; }
+    .time-outputs { width: 4.5%; background: #f59e0b; }
+    .time-preprocess { width: .5%; min-width: 4px; background: #94a3b8; }
+
+    .time-labels {
+      margin-top: 13px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr .8fr .8fr;
+      gap: 14px;
+    }
+
+    .time-label { font-size: 12px; line-height: 1.25; color: var(--muted); }
+    .time-label strong { display: block; color: var(--foreground); font-size: 14px; }
+
+    .timing-details {
+      align-self: stretch;
+      padding-left: 26px;
+      border-left: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .detail-number {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 740;
+      letter-spacing: -.035em;
+    }
+
+    .detail-label {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .benchmark-note {
+      position: absolute;
+      right: 65px;
+      bottom: 15px;
+      color: #94a3b8;
+      font-size: 10px;
+    }
+
+    @media print {
+      @page { size: 16in 9in; margin: 0; }
+      html, body, .slide {
+        width: 1920px;
+        height: 1080px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <header>
+      <div>
+        <p class="kicker">Bounding-box detection</p>
+        <h1>Reliable legend &amp; column detection on CPU</h1>
+      </div>
+      <div class="header-note">
+        A general detector for both columns, a legend specialist, and conservative geometry.<br>
+        <strong>No paid APIs · no GPU required at inference.</strong>
+      </div>
+    </header>
+
+    <section class="main">
+      <div class="left">
+        <div class="metrics">
+          <article class="card metric">
+            <div class="metric-label">Depth column</div>
+            <div class="metric-value">96.3<span>% mean IoU</span></div>
+            <div class="metric-detail">P10: <strong>94.4%</strong> · Missing: <strong>0/10</strong></div>
+          </article>
+          <article class="card metric">
+            <div class="metric-label">Lithology column</div>
+            <div class="metric-value">94.4<span>% mean IoU</span></div>
+            <div class="metric-detail">P10: <strong>91.3%</strong> · Missing: <strong>0/10</strong></div>
+          </article>
+          <article class="card metric highlight">
+            <div class="metric-label">Reconstructed legend</div>
+            <div class="metric-value">94.3<span>% mean IoU</span></div>
+            <div class="metric-detail"><strong>9/10</strong> legends reach IoU ≥ 0.90</div>
+          </article>
+          <article class="card metric success">
+            <div class="metric-label">Complete documents</div>
+            <div class="metric-value">9/10</div>
+            <div class="metric-detail">All three regions simultaneously reach <strong>IoU ≥ 0.80</strong></div>
+          </article>
+        </div>
+
+      </div>
+
+      <article class="card right">
+        <div class="chart-header">
+          <div>
+            <h2 class="chart-title">Legend IoU by strategy</h2>
+            <p class="chart-subtitle">Same trained weights; development benchmark, n=10</p>
+          </div>
+          <div class="pill"><span class="pill-dot"></span>Mean IoU</div>
+        </div>
+
+        <div class="chart" role="img" aria-label="Legend IoU improves from 51.2 percent for the general model to 94.3 percent with geometric reconstruction">
+          <div class="bar-row">
+            <div class="bar-label">General model<small>Shared column Y bounds</small></div>
+            <div class="bar-track"><div class="bar" style="width:51.2%"></div></div>
+            <div class="bar-value">51.2%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Legend specialist<small>Single candidate</small></div>
+            <div class="bar-track"><div class="bar" style="width:47.4%"></div></div>
+            <div class="bar-value">47.4%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Merged fragments<small>Aligned detections</small></div>
+            <div class="bar-track"><div class="bar fragments" style="width:63.6%"></div></div>
+            <div class="bar-value">63.6%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Full geometry<small>Fragments + frame + title row</small></div>
+            <div class="bar-track"><div class="bar best" style="width:94.3%"></div></div>
+            <div class="bar-value best">94.3%</div>
+          </div>
+          <div class="chart-axis">
+            <div></div>
+            <div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+            <div></div>
+          </div>
+        </div>
+
+        <div class="chart-insight">
+          <div><strong>The gain comes from geometry, not retraining.</strong><br>The final stage rebuilds complete legends from partial but consistent evidence.</div>
+          <div class="delta">+43.1 pp</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="card timing-panel" aria-label="Provisional end-to-end runtime breakdown">
+      <div class="timing-summary">
+        <div class="timing-kicker">Provisional end-to-end</div>
+        <div class="timing-total">33.9 s</div>
+        <div class="timing-note">1 document · full automatic run</div>
+      </div>
+
+      <div>
+        <div class="timing-chart-title">Where the time goes</div>
+        <div class="time-stack" aria-label="Legend OCR 67.4%, detection 22.4%, subsurface prediction 5.2%, outputs 4.5%, preprocessing 0.5%">
+          <div class="time-segment time-legend"></div>
+          <div class="time-segment time-detection"></div>
+          <div class="time-segment time-subsurface"></div>
+          <div class="time-segment time-outputs"></div>
+          <div class="time-segment time-preprocess"></div>
+        </div>
+        <div class="time-labels">
+          <div class="time-label"><strong>22.85 s · 67.4%</strong>Legend extraction + OCR</div>
+          <div class="time-label"><strong>7.60 s · 22.4%</strong>Column + legend detection</div>
+          <div class="time-label"><strong>1.76 s · 5.2%</strong>Subsurface prediction</div>
+          <div class="time-label"><strong>1.70 s · 5.0%</strong>Preprocessing + outputs</div>
+        </div>
+      </div>
+
+      <div class="timing-details">
+        <div>
+          <div class="detail-number">19.19 s</div>
+          <div class="detail-label">RapidOCR grid reader<br>largest bottleneck</div>
+        </div>
+        <div>
+          <div class="detail-number">2.22 GB</div>
+          <div class="detail-label">Peak process-tree RSS<br>sampled every 50 ms</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="benchmark-note">Accuracy: development benchmark, n=10. Runtime: provisional local run, n=1; optional full-resolution TIFF excluded.</div>
+  </main>
+</body>
+</html>
