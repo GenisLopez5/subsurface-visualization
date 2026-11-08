@@ -119,3 +119,13 @@ def test_rejects_unsafe_zip_member(tmp_path):
         assert "Unsafe ZIP member" in str(error)
     else:
         raise AssertionError("Unsafe archive member was accepted")
+
+
+def test_auto_models_with_explicit_cpu_selects_packaged_int8(tmp_path):
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models-pt").mkdir()
+    with patch("benchmark.ROOT", tmp_path):
+        models, device, model_set = benchmark._select_models("auto", None, "cpu")
+    assert models == tmp_path / "models"
+    assert device == "cpu"
+    assert model_set == "int8"

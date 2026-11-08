@@ -370,6 +370,15 @@ def _select_models(choice: str, custom: Path | None, device: str) -> tuple[Path,
         return pt, device, "pt"
     if choice == "int8":
         return int8, "cpu" if device == "auto" else device, "int8"
+    normalized_device = device.strip().lower()
+    if normalized_device not in ("", "auto"):
+        if normalized_device.startswith(("cpu", "intel")):
+            return int8, device, "int8"
+        if not pt_ready():
+            raise FileNotFoundError(
+                f"A GPU device was requested, but PT models are incomplete in {pt}"
+            )
+        return pt, device, "pt"
     try:
         import torch
 
