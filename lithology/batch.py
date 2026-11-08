@@ -27,7 +27,13 @@ from .annotations import PAGE_EXT, IMAGE_EXT, load_annotation, norm
 RESULTS_NAME = "results"
 DEBUG_NAME = "debug"
 SUMMARY_COLS = ["log", "status", "intervals", "top_depth", "bottom_depth", "px_per_depth_unit", "depth_labels_used",
-                "depth_fit_rms_px", "legend_entries", "seconds", "error", "image", "json"]
+                "depth_fit_rms_px", "legend_entries", "header_date", "lat", "lon", "seconds", "error", "image", "json"]
+
+
+def header_cols(header: dict | None) -> dict:
+    """Flatten the header (date + location) into summary.csv columns."""
+    loc = (header or {}).get("location") or {}
+    return {"header_date": (header or {}).get("date") or "", "lat": loc.get("lat", ""), "lon": loc.get("lon", "")}
 
 
 def _annotations_in(d: Path):
@@ -138,7 +144,7 @@ def run_batch(scan: dict, cache_dir: Path, tmp_root: Path, force=False, log=prin
                     row = pipeline.process(pair["image"], pair["json"], out_dir, name, cache_dir, tmp_root,
                                            force=force, log=lambda m: log("    " + m), debug_dir=debug_dir)
                 row.pop("result", None)
-                row = {**base, **row}
+                row = {**base, **row, **header_cols(row.get("header"))}
         except Exception as e:
             row = {**base, "status": "error", "error": f"{type(e).__name__}: {e}"}
             log("    error: " + row["error"])

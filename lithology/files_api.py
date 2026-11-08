@@ -9,7 +9,7 @@
     GET    /api/v1/download?ids=a,b,c            ZIP with one folder per file, each holding those three
     GET    /api/v1/download/all                  the same for every file in the database
     GET    /api/v1/files/{id}/preview/{kind}     PNG of original | result_tif | legend_original |
-                                                 legend_generated for <img> (?width=)
+                                                 legend_generated | satellite_view for <img> (?width=)
     PUT    /api/v1/files/{id}/annotation         set/replace the bounding boxes, then (re)process
     POST   /api/v1/files/{id}/reprocess          compute again (?force=true ignores the extraction cache)
     DELETE /api/v1/files/{id}                    any status (a running job's results are discarded)
@@ -50,13 +50,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_matches, resolve_upload_annotation,
                           validate_annotation)
 from .config import Settings
-from . import drawing
+from . import drawing, header_meta
 from .db import BLOB_KINDS, DB, STATUSES, dumps
 from .worker import CONTENT_TYPES, Uploader, Worker, display_name, item_name, result_filename, safe_name, spool_dir
 
 MAX_JSON_BYTES = 5 * 1024 * 1024
 
-PREVIEW_KINDS = ("original", "result_tif", "legend_original", "legend_generated")
+PREVIEW_KINDS = ("original", "result_tif", "legend_original", "legend_generated", "satellite_view")
 
 
 # ------------------------------------------------------------------ response models
@@ -76,6 +76,7 @@ class Outputs(BaseModel):
     result_json: bool
     legend_original: bool = False   # the log's own legend, cut from the original image (PNG)
     legend_generated: bool = False  # the colour key drawn on top of the result TIF (PNG)
+    satellite_view: bool = False    # satellite image around the well location from the header (PNG)
 
 
 class Layout(BaseModel):
@@ -91,11 +92,37 @@ class Layout(BaseModel):
     image_height: int = Field(description="result TIF height = legend_height_px + drawn page height")
 
 
+class Location(BaseModel):
+    lat: float = Field(description="decimal degrees, + north / - south, 6 decimals")
+    lon: float = Field(description="decimal degrees, + east / - west, 6 decimals")
+    label: str | None = Field(None, description="as labelled on the log: wellhead, surface coordinates...")
+
+
+class Header(BaseModel):
+    """Date and location read from the log's header by a vision model (experimental).
+    Datum as printed on the log (often NAD27 offshore): fine for imagery lookups, not for surveying."""
+    model_config = ConfigDict(extra="allow")
+    date: str | None = Field(None, description="best single date, ISO YYYY-MM-DD: spud, else log start, else "
+                                               "the log's date", examples=["1999-05-17"])
+    dates: dict[str, str | None] | None = Field(None, description="spud, log_from, log_to, td, log (ISO or null)")
+    location: Location | None = Field(None, description="the well's surface location (wellhead / surface "
+                                                        "preferred over bottom hole)")
+    geojson: dict | None = Field(None, description='{"type": "Point", "coordinates": [lon, lat]}')
+    all_coordinates: list[Location] | None = None
+    grid: dict | None = Field(None, description="projected northing/easting as printed (not converted)")
+    plss: dict | None = Field(None, description="US land-survey location (section/township/range) as printed")
+    warnings: list[str] | None = None
+    model: str | None = None
+    error: str | None = Field(None, description="set when the model call failed (the lithology result is fine)")
+
+
 class Stats(BaseModel):
     """Extraction summary of a processed file (other keys may be added)."""
     model_config = ConfigDict(extra="allow")
     layout: Layout | None = Field(None, description="layout of the result TIF: the y shift between it and the "
                                                     "original image")
+    header: Header | None = Field(None, description="date + location from the log's header (null when "
+                                                    "header reading is off or the file was processed before it)")
 
 
 class Offset(BaseModel):
@@ -119,6 +146,22 @@ class ResultFile(BaseModel):
     base64: str | None = Field(None, description="the file as base64 (TIF, PNG)")
 
 
+class WellLocation(BaseModel):
+    """The well's location and date from the log's header, plus map links. Also `<name>_location.json`
+    in the result ZIP."""
+    model_config = ConfigDict(extra="allow")
+    lat: float | None = Field(None, description="decimal degrees, + north / - south", examples=[37.684831])
+    lon: float | None = Field(None, description="decimal degrees, + east / - west", examples=[-105.067631])
+    label: str | None = Field(None, description="as labelled on the log (wellhead, surface coordinates...)")
+    google_maps_url: str | None = Field(None, examples=["https://www.google.com/maps/search/?api=1&query=37.684831,-105.067631"])
+    google_maps_satellite_url: str | None = None
+    geojson: dict | None = Field(None, description='{"type": "Point", "coordinates": [lon, lat]}')
+    date: str | None = Field(None, description="ISO date: spud, else log start, else the log's date")
+    dates: dict[str, str | None] | None = None
+    warnings: list[str] = []
+    satellite_view: dict | None = Field(None, description="provider, attribution (show it with the image), km")
+
+
 class ResultOut(BaseModel):
     id: UUID
     name: str
@@ -130,6 +173,10 @@ class ResultOut(BaseModel):
     legend_generated: ResultFile | None = Field(None, description="PNG: the colour key drawn on top of the result "
                                                                   "TIF, same width, height = offset_y_px (null "
                                                                   "for older results)")
+    satellite_view: ResultFile | None = Field(None, description="PNG: satellite image around the well (null when "
+                                                                "the header gave no location)")
+    location: WellLocation | None = Field(None, description="where and when the well is, from the log's header "
+                                                            "(null when the header gave neither)")
 
 
 class RenameIn(BaseModel):
@@ -645,6 +692,9 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                        "original image) and `<name>_legend_generated.png` (the colour key drawn on top of the "
                        "result TIF); the offset is also in the `X-Offset-Y` header. The legend PNGs are missing "
                        "for results computed before they existed (reprocess to get them).\n\n"
+                       "When the log's header gave a location: `<name>_satellite_view.png` (satellite image around "
+                       "the well) and `<name>_location.json` (`WellLocation`: lat/lon, Google Maps links, date, "
+                       "the image's attribution).\n\n"
                        "`format=json`: everything in one JSON (`ResultOut`): the offset, the CSV as text and the "
                        "TIF and legend PNGs as base64 (about 4/3 of their size).\n\n"
                        "**The offset** is how many px the result TIF is taller than the original: the colour key "
@@ -655,6 +705,10 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                             "headers": {"X-Offset-Y": {"description": "offset_y_px: result TIF height - original "
                                                                       "height (the colour key bar on top)",
                                                        "schema": {"type": "integer"}},
+                                        "X-Latitude": {"description": "well latitude from the header (decimal "
+                                                                      "degrees), when known", "schema": {"type": "number"}},
+                                        "X-Longitude": {"description": "well longitude, when known",
+                                                        "schema": {"type": "number"}},
                                         **drawing.LAYOUT_OPENAPI_HEADERS}}})
     def get_result(fid: UUID, format: Literal["zip", "json"] = Query("zip", description="zip or json"),
                    db: DB = Depends(get_db)):
@@ -666,7 +720,12 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         headers = {"X-Offset-Y": str(off.offset_y_px), "X-Legend-Height": str(off.offset_y_px),
                    "X-Scale": f"{off.scale:.8g}", "X-Y-Start": "0"}
         tif_name, csv_name = result_filename(row["name"], "result_tif"), result_filename(row["name"], "result_csv")
-        legends = {k: b for k in ("legend_original", "legend_generated") if (b := db.get_blob(fid, k))}
+        legends = {k: b for k in ("legend_original", "legend_generated", "satellite_view") if (b := db.get_blob(fid, k))}
+        stats = row.get("stats") or {}
+        location = header_meta.well_location(stats.get("header"), stats.get("satellite") if "satellite_view" in legends
+                                             else None)
+        if location and location.get("lat") is not None:
+            headers.update({"X-Latitude": str(location["lat"]), "X-Longitude": str(location["lon"])})
         if format == "json":
             b64 = lambda data: base64.b64encode(bytes(data)).decode("ascii")  # noqa: E731
             return ResultOut(id=row["id"], name=item_name(row["name"]), offset=off,
@@ -674,7 +733,8 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                                             content=bytes(csv["data"]).decode("utf-8")),
                              result_tif=ResultFile(filename=tif_name, content_type="image/tiff", base64=b64(tif["data"])),
                              **{k: ResultFile(filename=result_filename(row["name"], k), content_type="image/png",
-                                              base64=b64(b["data"])) for k, b in legends.items()})
+                                              base64=b64(b["data"])) for k, b in legends.items()},
+                             location=location)
         stem = display_name(Path(row["name"]).stem)
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:
@@ -683,6 +743,9 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
             z.writestr(f"{stem}_offset.json", off.model_dump_json(indent=2), compress_type=zipfile.ZIP_DEFLATED)
             for k, b in legends.items():  # PNGs are already compressed
                 z.writestr(result_filename(row["name"], k), bytes(b["data"]), compress_type=zipfile.ZIP_STORED)
+            if location:
+                z.writestr(f"{stem}_location.json", json.dumps(location, indent=2, ensure_ascii=False),
+                           compress_type=zipfile.ZIP_DEFLATED)
         return Response(buf.getvalue(), media_type="application/zip",
                         headers={"Content-Disposition": content_disposition(f"{stem}_solved.zip"), **headers})
 
@@ -744,7 +807,8 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                        "the preview's width.\n\n" + drawing.LAYOUT_DOC,
            responses={200: {"content": {"image/png": {}}, "headers": drawing.LAYOUT_OPENAPI_HEADERS,
                             "description": "PNG (layout headers for `result_tif` only, at the preview's size)"}})
-    def preview(fid: UUID, kind: Literal["original", "result_tif", "legend_original", "legend_generated"],
+    def preview(fid: UUID, kind: Literal["original", "result_tif", "legend_original", "legend_generated",
+                                         "satellite_view"],
                 request: Request,
                 width: int = Query(1200, ge=64, le=4000), db: DB = Depends(get_db)):
         meta = db.blob_meta(fid, kind)

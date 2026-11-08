@@ -70,6 +70,41 @@ On Windows, path lists in `LITHO_ANNOTATION_DIRS` / `LITHO_IMAGE_DIRS` are separ
 or `old`. It is a server setting only (API users can't choose it). Changing it doesn't reuse cached
 results. Compare the methods on the review page, `/legend.html`.
 
+### Header metadata: date and well location (experimental)
+
+With `OLLAMA_BASE_URL` set, every processed log also gets its **date and coordinates** read from its
+header (the part of the page above the depth column) by a vision model on Ollama
+(`LITHO_HEADER_MODEL`, default `qwen3-vl:8b-instruct`; `off` disables it). The model only copies the
+text as printed; `lithology/header_meta.py` turns it into one format whatever the header looked like:
+
+```json
+"header": {
+  "date": "2012-11-06",
+  "dates": {"spud": "2012-11-06", "log_from": "2012-11-27", "log_to": "2012-12-05", "td": null, "log": null},
+  "location": {"lat": 37.684831, "lon": -105.067631, "label": null},
+  "geojson": {"type": "Point", "coordinates": [-105.067631, 37.684831]},
+  "grid": null, "plss": null, "warnings": [], "model": "qwen3-vl:8b-instruct"
+}
+```
+
+- `date`: ISO, the spud date if printed, else the log's start date, else any date on the header.
+- `location`: decimal degrees (6 decimals, west/south negative), the wellhead/surface point when the log
+  also gives a bottom-hole or seabed one (all of them in `all_coordinates`). Datum as printed on the log
+  (often NAD27 offshore, tens of metres off WGS84): fine for looking up imagery, not for surveying.
+- Not converted, kept as printed: projected `grid` (northing/easting) and US land-survey `plss`
+  (section/township/range). A log with only those has `location: null` and a warning.
+- `warnings`: anything doubtful, e.g. a log printing two coordinate pairs that disagree, or an `E`
+  longitude on a US well (used as W).
+
+It's in `stats.header` (`GET /api/v1/files/{id}`), `result_json`, `GET /api/jobs/{id}`,
+`/api/process?output=json`, and the `header_date` / `lat` / `lon` columns of batch `summary.csv`.
+It is cached like the extraction, adds ~5-25 s per log, and never fails a job: if the model server is
+unreachable, `header` is `{"error": ...}` and the lithology result is unaffected.
+On its own: `python -m lithology.header_meta IMAGE... --annotations DIR [--out results.json]`.
+
+On the 53 dataset logs (51 readable): a location for 48, a date for 44. Every miss checked was a header
+that doesn't print one (placeholder `xx xx'xx.xx`, land-survey location only, no date on the template).
+
 ## Main endpoint: `POST /api/process`
 
 Send a log image. You get back the annotated TIF and the CSV.
@@ -178,7 +213,7 @@ File status: `uploading` → `queued` (or `needs_annotation`) → `processing` �
 
 Item names are always returned **without the file extension** (`log.tif` → `log`), in every response.
 | `GET /api/v1/files?status=&q=&limit=&offset=` | list/search files, newest first |
-| `GET /api/v1/files/{id}/result` | the result TIF, the result CSV and the **offset** (result TIF height − original height: the colour key bar on top; `y_result = offset_y_px + y_original`). Default: `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, `<name>_offset.json`, `<name>_legend_original.png` (the log's own legend, cut from the original at the `lithology_legend` box, given as `offset.legend_original_box`) and `<name>_legend_generated.png` (the colour key bar on top of the result TIF: same width, height = `offset_y_px`), plus an `X-Offset-Y` header. `?format=json`: `{id, name, offset, csv: {filename, content}, result_tif, legend_original, legend_generated: {filename, base64}}`. The legends are missing/`null` for results computed before they existed (reprocess). 404 until finished. |
+| `GET /api/v1/files/{id}/result` | the result TIF, the result CSV and the **offset** (result TIF height − original height: the colour key bar on top; `y_result = offset_y_px + y_original`). Default: `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, `<name>_offset.json`, `<name>_legend_original.png` (the log's own legend, cut from the original at the `lithology_legend` box, given as `offset.legend_original_box`) and `<name>_legend_generated.png` (the colour key bar on top of the result TIF: same width, height = `offset_y_px`), plus an `X-Offset-Y` header. When the log's header gave a location (see [Header metadata](#header-metadata-date-and-well-location-experimental)), also `<name>_satellite_view.png` and `<name>_location.json` (`{lat, lon, label, google_maps_url, google_maps_satellite_url, geojson, date, dates, warnings, satellite_view: {provider, attribution, km}}`), plus `X-Latitude` / `X-Longitude` headers. `?format=json`: `{id, name, offset, csv: {filename, content}, result_tif, legend_original, legend_generated, satellite_view: {filename, base64}, location}`. The legends are missing/`null` for results computed before they existed (reprocess); `satellite_view` / `location` are missing/`null` without a location in the header. 404 until finished. |
 | `GET /api/v1/files/{id}/download` | `<name>_solved.zip` with the original image `<name>.tif`, the result TIF `<name>_solved.tif` and the result CSV `<name>_solved.csv` (404 until all three exist). `<name>` is the file name as uploaded, spaces included. |
 | `GET /api/v1/download?ids=a,b,c` | ZIP with one folder per file (named after the file), each holding its original image, result TIF and result CSV. Files without finished results are left out and listed in `skipped.txt`; 404 if an id is unknown or none is finished. At most 1000 ids. |
 | `GET /api/v1/download/all` | the same for every file in the database |

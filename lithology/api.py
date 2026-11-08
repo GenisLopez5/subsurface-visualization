@@ -56,7 +56,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from .annotations import IMAGE_EXT, AnnotationNotFound, AnnotationStore, ImageStore, load_annotation, resolve_annotation
 from .config import Settings
-from . import drawing
+from . import drawing, header_meta
 from .jobs import Job, JobManager
 
 
@@ -83,7 +83,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                               "**/api/v1**: file management for frontends (uploads, status, results in Postgres).")
     if s.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"],
-                           allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag", *drawing.LAYOUT_HEADERS])
+                           allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag", *drawing.LAYOUT_HEADERS,
+                                                                       "X-Offset-Y", "X-Latitude", "X-Longitude"])
     from . import files_api
     from .annotations import load_detector
 
@@ -184,6 +185,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "depth_range": [r["intervals"][0]["top_depth"], r["intervals"][-1]["bottom_depth"]] if r["intervals"] else None,
             }
             out["intervals"] = r["intervals"]
+            out["header"] = header_meta.summary(job.header)  # date + lat/lon from the log's header
             out["layout"] = job.overview_layout  # of overview.png
             out["files"] = {
                 "Overview image": str(job.overview.with_suffix(".tif").resolve()),
@@ -233,6 +235,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if output == "json":
             return {"id": job.id, "image": img.name, "annotation": ann_path.name, "notes": notes,
                     "intervals": job.result["intervals"],
+                    "header": header_meta.summary(job.header),
                     "layout": drawing.read_layout(tif),  # of the annotated TIF
                     "csv": (job.tmp / "results.csv").read_text(),
                     "annotated_tif_url": f"/api/jobs/{job.id}/annotated.tif",

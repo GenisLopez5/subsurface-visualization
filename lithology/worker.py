@@ -15,7 +15,7 @@ import threading
 import traceback
 from pathlib import Path
 
-from . import pipeline
+from . import header_meta, pipeline
 from .config import Settings
 from .db import DB, dumps
 
@@ -104,7 +104,8 @@ def display_name(name: str) -> str:
 
 # Results are named after the uploaded image + "_solved", so they never clash with the original
 RESULT_SUFFIXES = {"result_tif": "_solved.tif", "result_csv": "_solved.csv", "result_json": "_solved.json",
-                   "legend_original": "_legend_original.png", "legend_generated": "_legend_generated.png"}
+                   "legend_original": "_legend_original.png", "legend_generated": "_legend_generated.png",
+                   "satellite_view": "_satellite_view.png"}
 
 
 def result_filename(image_name: str, kind: str) -> str:
@@ -183,15 +184,28 @@ class Worker:
                 "result_tif": (result_filename(name, "result_tif"), "image/tiff", Path(files["tif"]).read_bytes()),
                 "result_csv": (result_filename(name, "result_csv"), "text/csv", Path(files["csv"]).read_bytes()),
                 "result_json": (result_filename(name, "result_json"), "application/json",
-                                dumps({**r["result"], "layout": r["layout"]})),
+                                dumps({**r["result"], "layout": r["layout"], "header": r.get("header")})),
             }
-            for kind in ("legend_original", "legend_generated"):  # the log's own legend + the colour key
+            # the log's own legend, the colour key, the satellite view around the well (not in the downloads)
+            for kind in ("legend_original", "legend_generated", "satellite_view"):
                 if files.get(kind):
                     results[kind] = (result_filename(name, kind), "image/png", Path(files[kind]).read_bytes())
             stats = {k: r[k] for k in ("seconds", "intervals", "top_depth", "bottom_depth", "px_per_depth_unit",
                                        "depth_labels_used", "depth_fit_rms_px", "legend_entries")}
             stats["layout"] = r["layout"]  # result TIF = legend bar on top + the page: y shift for the UI
-            self.db.finish(fid, stats, results)
+            stats["header"] = header_meta.summary(r.get("header"))  # date + lat/lon from the log's header
+            stats["satellite"] = r.get("satellite")  # provider + attribution (credit line) + km of satellite_view
+            try:
+                self.db.finish(fid, stats, results)
+            except Exception as e:
+                if "satellite_view" not in results:
+                    raise
+                # the satellite view is optional: never lose the lithology result over it (e.g. a database
+                # whose kind check doesn't know 'satellite_view' yet). finish() is one transaction: retry without.
+                log.append(f"storing the satellite view failed ({type(e).__name__}: {e}); stored without it")
+                results.pop("satellite_view")
+                stats["satellite"] = None
+                self.db.finish(fid, stats, results)
         except Exception as e:
             tail = "\n".join(log[-5:])
             msg = f"{type(e).__name__}: {e}"

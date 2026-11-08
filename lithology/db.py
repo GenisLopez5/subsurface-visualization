@@ -3,7 +3,8 @@ Postgres storage for the /api/v1 file API (works with any Postgres, e.g. Tiger D
 
     litho_files     one row per log image: status, where its annotation came from, stats, error
     litho_blobs     the files themselves (bytea): original, annotation, result_tif, result_csv, result_json,
-                    legend_original (legend cut from the original), legend_generated (the colour key)
+                    legend_original (legend cut from the original), legend_generated (the colour key),
+                    satellite_view (satellite image around the well, PNG; not in the downloads)
 
 Which results exist is read from litho_blobs, so "is it computed?" is always the truth on disk.
 """
@@ -18,7 +19,8 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 STATUSES = ("uploading", "needs_annotation", "queued", "processing", "done", "error")
-RESULT_KINDS = ("result_tif", "result_csv", "result_json", "legend_original", "legend_generated")
+RESULT_KINDS = ("result_tif", "result_csv", "result_json", "legend_original", "legend_generated",
+                "satellite_view")
 BLOB_KINDS = ("original", "annotation", *RESULT_KINDS)
 
 SCHEMA = """
@@ -57,7 +59,8 @@ CREATE TABLE IF NOT EXISTS litho_blobs (
 -- new blob kinds (the two legends): widen the kind check on older databases
 ALTER TABLE litho_blobs DROP CONSTRAINT IF EXISTS litho_blobs_kind_check;
 ALTER TABLE litho_blobs ADD CONSTRAINT litho_blobs_kind_check
-    CHECK (kind IN ('original','annotation','result_tif','result_csv','result_json','legend_original','legend_generated'));
+    CHECK (kind IN ('original','annotation','result_tif','result_csv','result_json','legend_original','legend_generated',
+                    'satellite_view'));
 """
 
 # file row + which blobs it has (never the blob data itself)

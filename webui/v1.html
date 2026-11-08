@@ -46,6 +46,7 @@
 <fieldset id="previewBox" hidden>
   <legend>Preview <button class="link" id="closePrev">close</button></legend>
   <img id="prev" alt="">
+  <div id="prevCap" hidden><small></small></div>
 </fieldset>
 
 <script>
@@ -53,6 +54,9 @@ const API = '/api/v1';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const selected = new Set();
+const PREV_LABEL = { original: 'original', result_tif: 'result', legend_original: 'legend',
+                     legend_generated: 'colour key', satellite_view: 'satellite' };
+const files = {};  // id -> last FileOut, for the preview caption
 
 async function health() {
   try { const h = await (await fetch(API + '/health')).json();
@@ -67,7 +71,8 @@ async function refresh() {
   if (!d.items) { $('rows').innerHTML = `<tr><td colspan="7">${esc(JSON.stringify(d))}</td></tr>`; return; }
   $('rows').innerHTML = d.items.map(f => {
     const dl = f.download ? `<a href="${f.download}">download zip</a>` : '';
-    const pv = Object.keys(f.preview).map(k => `<button class="link" data-prev="${f.preview[k]}">view ${k === 'original' ? 'original' : 'result'}</button>`).join('');
+    files[f.id] = f;
+    const pv = Object.keys(f.preview).map(k => `<button class="link" data-prev="${f.preview[k]}" data-kind="${k}" data-fid="${f.id}">view ${PREV_LABEL[k] ?? k}</button>`).join('');
     const fix = f.status === 'needs_annotation' || f.status === 'error'
       ? `<button class="link" data-ann="${f.id}">set boxes…</button>` : '';
     return `<tr>
@@ -102,7 +107,14 @@ $('up').onclick = async () => {
 $('rows').onclick = async e => {
   const t = e.target;
   if (t.dataset.sel) { t.checked ? selected.add(t.dataset.sel) : selected.delete(t.dataset.sel); return; }
-  if (t.dataset.prev) { $('prev').src = t.dataset.prev + '?width=1200'; $('previewBox').hidden = false; return; }
+  if (t.dataset.prev) {
+    $('prev').src = t.dataset.prev + '?width=1200'; $('previewBox').hidden = false;
+    const sat = t.dataset.kind === 'satellite_view' && files[t.dataset.fid]?.stats?.satellite;
+    $('prevCap').hidden = !sat;
+    if (sat) $('prevCap').firstChild.textContent =
+      `${sat.km} km around ${sat.lat}, ${sat.lon} (red ring = well) · ${sat.attribution}`;
+    return;
+  }
   if (t.dataset.del) { await fetch(`${API}/files/${t.dataset.del}`, { method: 'DELETE' }); selected.delete(t.dataset.del); }
   if (t.dataset.re) { const r = await fetch(`${API}/files/${t.dataset.re}/reprocess`, { method: 'POST' });
     if (!r.ok) console.log('reprocess:', await r.text()); }
@@ -129,7 +141,7 @@ $('delSel').onclick = async () => {
 $('dlSel').onclick = () => {
   if (selected.size) location.href = `${API}/download?ids=${[...selected].join(',')}`;
 };
-$('closePrev').onclick = () => { $('previewBox').hidden = true; $('prev').removeAttribute('src'); };
+$('closePrev').onclick = () => { $('previewBox').hidden = true; $('prevCap').hidden = true; $('prev').removeAttribute('src'); };
 
 health(); refresh();
 setInterval(() => { health(); refresh(); }, 2000);

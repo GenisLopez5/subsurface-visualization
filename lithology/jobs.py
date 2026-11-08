@@ -44,6 +44,7 @@ class Job:
         self.image = None  # PIL image of the page (kept for zooms)
         self.overview: Path | None = None
         self.overview_layout: dict | None = None
+        self.header: dict | None = None  # date + location from the log's header (None: switched off)
         self.finished = threading.Event()
 
 
@@ -71,6 +72,8 @@ class JobManager:
                 job.status = "running"
                 job.result, job.cache_file = pipeline.extract_cached(
                     job.image_path, job.annotation_path, self.s.cache, force=job.force, log=log)
+                job.header = pipeline.header_cached(job.image_path, job.annotation_path, self.s.cache,
+                                                    force=job.force, log=log)
                 job.tmp = self.s.tmp / job.id
                 job.tmp.mkdir(parents=True, exist_ok=True)
                 drawing.write_results_csv(job.result["intervals"], job.tmp / "results.csv")
