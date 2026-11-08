@@ -29,7 +29,6 @@ It delivers a **CSV** with one row per interval (`top_depth, bottom_depth, litho
 and an **annotated image** of the column. The judges look at correctness, generalisation, efficiency (runtime,
 memory, hardware, cost), simplicity and full automation, with the stress on **correctness and efficiency**.
 
-
 ## Authors
 
 - Arnau Claramunt
@@ -60,21 +59,11 @@ memory, hardware, cost), simplicity and full automation, with the stress on **co
 - **Unity 6 (URP, C#)**: the document explorer and the 3D borehole visualizer.
 
 
-## Table of Contents
+## Technical project summary:
 
-- [Project Overview](#project-overview)
-  - [1. Computer vision: from scan to intervals](#1-computer-vision-from-scan-to-intervals)
-  - [2. YOLO: finding the three boxes automatically](#2-yolo-finding-the-three-boxes-automatically)
-  - [3. Lithology Console: run, check and compare](#3-lithology-console-run-check-and-compare)
-  - [4. Processing API and a Drive-style document explorer](#4-processing-api-and-a-drive-style-document-explorer)
-  - [5. Unity: visualising the results in 3D](#5-unity-visualising-the-results-in-3d)
-- [Repository layout](#repository-layout)
-- [Results](#results)
-- [Challenges we ran into](#challenges-we-ran-into)
-- [Project Setup](#project-setup)
-- [Learning](#learning-)
-- [What's next](#whats-next)
-
+We built a system that turns scanned geological well logs into structured data, meaning which rock sits at which depth, and runs entirely on a local laptop CPU, with no GPU, no paid API. Two YOLO11s detectors, trained once on a free Colab GPU and quantised to int8 with OpenVINO, find the depth column, lithology column and legend automatically. A classic computer-vision pipeline then does the rest: it cleans the column, reads the legend with Tesseract and RapidOCR, segments the column by colour or by texture with k-means, matches each cluster to the nearest legend swatch, and converts pixel rows to depths.
+Around the pipeline we built local FastAPI backends: the Lithology Console web app to run, inspect and compare extractions; a processing API with a PostgreSQL queue; and the box detector as its own HTTP service. On top sits a Unity 6 viewer that shows each well as a 3D borehole, with procedural rock materials from a catalogue of 180 lithologies, synchronised with the scanned page and the CSV. On the organisers' labelled log the extraction is 99.6 % correct by pixel row, with a 1.3 px mean boundary error, fully automatic.
+The main trade-off is speed. We chose this on purpose, because it keeps the cost per page at zero, keeps confidential logs on the machine, and keeps every result explainable. The services already switch to a GPU when one is present, so on a server the same pipeline would take seconds, unlike vision-LLM approaches that add per-page fees, send data to a third party and are harder to audit.
 
 ## Project Overview
 
@@ -282,3 +271,13 @@ Open `unity-project/` with Unity **6000.5.9f1**, then:
 - **Unity 6**: procedural materials, URP and UI Toolkit, used for data visualisation rather than games.
 - **Measuring before optimising**: a regression test on the labelled log let us change the pipeline quickly without
   breaking it.
+
+## Screenshots
+<img width="1919" height="1008" alt="Captura de pantalla 2026-11-08 110600" src="https://github.com/user-attachments/assets/97cf9a76-e5b4-4300-bdb4-438cac08d103" />
+<img width="1919" height="1007" alt="Captura de pantalla 2026-11-08 111313" src="https://github.com/user-attachments/assets/ba63dc81-b56e-4384-ad84-28a76a2903e8" />
+<img width="1919" height="1007" alt="Captura de pantalla 2026-11-08 111354" src="https://github.com/user-attachments/assets/c835cc36-e3a5-49a3-bb8f-045542e8f789" />
+<img width="1919" height="1003" alt="Captura de pantalla 2026-11-08 105202" src="https://github.com/user-attachments/assets/16b89fd3-0b5f-4a15-b88e-9de91ba8f545" />
+<img width="1600" height="784" alt="WhatsApp Image 2026-11-08 at 11 57 09" src="https://github.com/user-attachments/assets/81e48d8a-95d0-4c47-b3d5-0988adcb9d6f" />
+
+Additionally we implemented a web app to upload scanned well logs, run the computer vision extraction and follow its progress live.
+It shows the detected rock layers, depths and legend next to the original scan, so every result can be checked and downloaded.
