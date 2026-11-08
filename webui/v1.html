@@ -28,6 +28,12 @@
   <legend>Upload</legend>
   <p><input type="file" id="files" multiple accept=".tif,.tiff,.pdf,.png,.jpg,.jpeg,.json"></p>
   <p>Annotations JSON (optional, e.g. from the box algorithm):<br><textarea id="ann" rows="3" placeholder='{"bounding_boxes": {...}}  or  {"log.tif": {...}}'></textarea></p>
+  <p>Bounding boxes for images without a JSON:
+    <select id="boxes">
+      <option value="">server default</option>
+      <option value="dataset">find the JSON in the dataset</option>
+      <option value="detector">detect them (bbox server)</option>
+    </select></p>
   <button id="up">Upload</button>
   <pre id="upOut" hidden></pre>
 </fieldset>
@@ -70,6 +76,8 @@ async function refresh() {
     const pv = Object.keys(f.preview).map(k => `<button class="link" data-prev="${f.preview[k]}">view ${k === 'original' ? 'original' : 'result'}</button>`).join('');
     const fix = f.status === 'needs_annotation' || f.status === 'error'
       ? `<button class="link" data-ann="${f.id}">set boxes…</button>` : '';
+    const det = ['processing', 'uploading'].includes(f.status) ? ''
+      : `<button class="link" data-det="${f.id}">detect boxes</button>`;
     return `<tr>
       <td><input type="checkbox" data-sel="${f.id}" ${selected.has(f.id) ? 'checked' : ''}></td>
       <td>${esc(f.name)}<br><small>${f.id}</small></td>
@@ -77,7 +85,7 @@ async function refresh() {
       <td>${f.computed ? 'yes' : 'no'}</td>
       <td>${esc(f.annotation_source || '-')}</td>
       <td>${f.stats?.intervals ?? ''}</td>
-      <td>${dl}${pv}${fix}<button class="link" data-re="${f.id}">reprocess</button><button class="link" data-del="${f.id}">delete</button></td>
+      <td>${dl}${pv}${fix}${det}<button class="link" data-re="${f.id}">reprocess</button><button class="link" data-del="${f.id}">delete</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="7">no files yet</td></tr>';
 }
@@ -86,6 +94,7 @@ $('up').onclick = async () => {
   const fd = new FormData();
   for (const f of $('files').files) fd.append('files', f);
   if ($('ann').value.trim()) fd.append('annotations', $('ann').value.trim());
+  if ($('boxes').value) fd.append('boxes', $('boxes').value);
   $('up').disabled = true; $('upOut').hidden = false; $('upOut').textContent = 'uploading…';
   try {
     const r = await fetch(API + '/uploads', { method: 'POST', body: fd });
@@ -104,6 +113,11 @@ $('rows').onclick = async e => {
   if (t.dataset.sel) { t.checked ? selected.add(t.dataset.sel) : selected.delete(t.dataset.sel); return; }
   if (t.dataset.prev) { $('prev').src = t.dataset.prev + '?width=1200'; $('previewBox').hidden = false; return; }
   if (t.dataset.del) { await fetch(`${API}/files/${t.dataset.del}`, { method: 'DELETE' }); selected.delete(t.dataset.del); }
+  if (t.dataset.det) {
+    t.disabled = true; t.textContent = 'detecting…';
+    const r = await fetch(`${API}/files/${t.dataset.det}/detect-boxes`, { method: 'POST' });
+    if (!r.ok) { $('upOut').hidden = false; $('upOut').textContent = 'detect boxes: ' + await r.text(); }
+  }
   if (t.dataset.re) { const r = await fetch(`${API}/files/${t.dataset.re}/reprocess`, { method: 'POST' });
     if (!r.ok) console.log('reprocess:', await r.text()); }
   if (t.dataset.ann) {

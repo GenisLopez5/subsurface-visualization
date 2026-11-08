@@ -13,7 +13,8 @@ app (webapp/) and the command line: same inputs (image + bounding-box JSON), sam
 and one summary.json for the whole folder (plus metrics when ground-truth labels are available).
 Methods (Config.method, code in methods/): "automatic_lithology_cv" (default; lithology_cv + automatic bounding
 boxes, falling back to the .json), "lithology_cv" (hybrid_v3 + Pau's grid legend reader),
-"hybrid_v3", "hybrid_v2", "hybrid", "lithology" (lithology/ package only), "cv" (classic computer vision only).
+"hybrid_v3", "hybrid_v2", "hybrid", "lithology" (lithology/ package only), "lithology2" (lithology + clean-up of
+its intervals, methods/lithology2.py), "cv" (classic computer vision only).
 
 How it works (method "lithology_cv"; the web app's "How it works" page explains it step by step)
 ----------------------------------------------------------------------------------------
@@ -77,13 +78,15 @@ Log = cv.Log
 EXAMPLE_STEM = cv.EXAMPLE_STEM
 IMAGE_SUFFIXES = (".tif", ".tiff", ".png", ".jpg", ".jpeg", ".pdf")
 STAGES = {"lithology": ["column", "legend+naming", "segmentation", "depth", "render"],
+          "lithology2": ["column", "legend+naming", "segmentation", "depth", "render"],
           "cv": ["column", "segmentation", "legend+naming", "depth", "render"],
           "hybrid": ["column", "segmentation", "legend+naming", "depth", "render"],
           "hybrid_v2": ["column", "legend+naming", "segmentation", "depth", "render"],
           "hybrid_v3": ["column", "legend+naming", "segmentation", "depth", "render"],
           "lithology_cv": ["column", "legend+naming", "segmentation", "depth", "render"],
           "automatic_lithology_cv": ["boxes", "column", "legend+naming", "segmentation", "depth", "render"]}
-CHOICES = {"method": ["automatic_lithology_cv", "lithology_cv", "hybrid_v3", "hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
+CHOICES = {"method": ["lithology2", "lithology", "automatic_lithology_cv", "lithology_cv", "hybrid_v3", "hybrid_v2", "hybrid", "cv"],
+           "legend_method": list(LX.LEGEND_METHODS)}                     # settings with a fixed set of values (a select in the UI)
 
 
 # ======================================================================================================================
@@ -93,13 +96,15 @@ CHOICES = {"method": ["automatic_lithology_cv", "lithology_cv", "hybrid_v3", "hy
 class Config:
     """All settings. The web app builds its settings form from this class (the comments become the help text)."""
     # --- method -------------------------------------------------------------------------------------------------------
-    method: str = "automatic_lithology_cv"  # "automatic_lithology_cv" = lithology_cv + automatic bounding boxes (methods/lithology_cv_pipeline.py); "lithology_cv" = hybrid_v3 + Pau's grid legend reader, boxes from the .json; "hybrid_v3" = hybrid_v2 + Pau's robust depth fit and full-resolution drawing (hybrid_v3.py); "hybrid_v2" = colour mode, blank fix, legend quality (hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
+    method: str = "lithology"  # "lithology2" = lithology + clean-up: shape fingerprint for B/W patterns, one name per look-alike group, no "?", noise takes the previous/next name or stays blank (methods/lithology2.py); "lithology" = the main branch's lithology/ package, same steps and defaults as lithology.extract.extract(); "automatic_lithology_cv" = lithology_cv + automatic bounding boxes (methods/lithology_cv_pipeline.py); "lithology_cv" = hybrid_v3 + Pau's grid legend reader, boxes from the .json; "hybrid_v3" = hybrid_v2 + Pau's robust depth fit and full-resolution drawing (hybrid_v3.py); "hybrid_v2" = colour mode, blank fix, legend quality (hybrid_v2.py); "hybrid" = first hybrid; "cv" = clustering only
     automatic_bounding_boxes: bool = True  # Automatic bounding boxes (automatic_lithology_cv): find the depth column, lithology column and legend with the detector, even when a .json is uploaded; if it fails, use the .json
     # --- hybrid method ------------------------------------------------------------------------------------------------
     hybrid_prefer_rapidocr: bool = False  # read the legend with RapidOCR first (slower; default: Tesseract first, RapidOCR if it looks wrong)
     hybrid_depth_min_labels: int = 4    # fewer Tesseract depth labels than this -> also try RapidOCR
     hybrid_colour_mode: bool = True     # hybrid_v2: read colour logs row by row by fill colour (thin colour bands)
     # --- lithology method ---------------------------------------------------------------------------------------------
+    legend_method: str = LX.DEFAULT_LEGEND_METHOD  # legend reader of lithology/ (main default "grid"; "old" = parse_legend)
+    main_depth_settings: bool = True    # depth: use lithology/'s own calibrate_depth defaults (as main) instead of depth_chunk / depth_max_chunks
     window_px: int = 0                  # classification window height in px; 0 = median legend swatch height (8-40)
     ambiguous_conf: float = 0.15        # intervals whose confidence is below this are flagged ambiguous
     keep_blank: bool = False            # also output intervals where the column is empty ("Blank")
@@ -107,6 +112,16 @@ class Config:
     depth_chunk: int = 1600             # depth column is OCR'd in chunks of this many rows
     depth_max_chunks: int = 12          # at most this many evenly spaced chunks (a line needs few labels; 40 = slow)
     annotated_tif: bool = False         # write <stem>_annotated.tif during the run (slow on long logs); off = drawn on demand by the Output download
+    # --- lithology2 method --------------------------------------------------------------------------------------------
+    lith2_group_dist: float = 0.45      # B/W: intervals whose shape fingerprints differ less than this (L1, 0-2) are one pattern -> one name
+    lith2_noise_dist: float = 0.9       # B/W: an interval farther than this from every swatch (and alone in its group) is noise -> previous/next name, else blank
+    lith2_group_dist_colour: float = 0.25  # colour logs: same, on lithology/'s colour fingerprint distance
+    lith2_noise_dist_colour: float = 0.8   # colour logs: noise distance on lithology/'s colour fingerprint
+    lith2_weak_dist: float = 9.0        # (9 = off; 0.3 also merges real thin beds) B/W: a group of only short intervals whose swatch is farther than this is boundary mix -> each joins its more similar neighbour
+    lith2_blank_ink: float = 0.012      # B/W: an interval with less pattern ink than this (share of pixels, frames and boxes excluded) is blank
+    lith2_split: bool = True            # B/W: split an interval where the dominant pattern shape changes (thin beds lithology/ did not cut)
+    lith2_split_px: int = 0             # B/W: shortest piece a split may create, px; 0 = median legend swatch height (8-40)
+    lith2_tiebreak: float = 0.15        # B/W: weight of lithology/'s spacing/ink fingerprint when two swatches have the same shapes (e.g. Shale / Clay)
     # --- output -------------------------------------------------------------------------------------------------------
     page_scale: float = 0.25            # size of <stem>_page.png relative to the scan
     column_scale: float = 0.5           # size of <stem>_column.png relative to the scan
@@ -197,7 +212,10 @@ def plot_legend(img: Image.Image, entries: list, path: Path) -> Optional[str]:
     return str(path)
 
 
-def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colours, on_progress: ProgressFn) -> dict:
+def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colours, on_progress: ProgressFn,
+                          refine: Optional[Callable] = None, method_name: str = "lithology") -> dict:
+    """Method "lithology" (refine=None) and its variants: refine(image, column_box, entries, runs, colour_scan, cfg)
+    -> (runs, info) changes lithology/'s intervals before the outputs are written (method "lithology2")."""
     timings, t0 = {}, time.perf_counter()
     tracemalloc.start()
 
@@ -216,19 +234,25 @@ def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colo
     lap("column")
 
     with _quiet():
-        entries = LX.parse_legend(image, boxes["lithology_legend"])
+        entries = LX.legend_parser(cfg.legend_method)(image, boxes["lithology_legend"])
     lap("legend+naming")
 
     with _quiet():
         runs = LX.classify_column(image, cb, entries, win=cfg.window_px or None) if entries else []
+    refine_info = None
+    if refine is not None and runs:
+        runs, refine_info = refine(image, cb, entries, runs, colour_scan, cfg)
     lap("segmentation")
 
     y_to_depth, calib, depth_error = None, None, None
     if "depth_column" in boxes:
         try:
             with _quiet():
-                y_to_depth, calib = LX.calibrate_depth(image, boxes["depth_column"], chunk=cfg.depth_chunk,
-                                                       max_chunks=cfg.depth_max_chunks)
+                if cfg.main_depth_settings:
+                    y_to_depth, calib = LX.calibrate_depth(image, boxes["depth_column"])
+                else:
+                    y_to_depth, calib = LX.calibrate_depth(image, boxes["depth_column"], chunk=cfg.depth_chunk,
+                                                           max_chunks=cfg.depth_max_chunks)
         except RuntimeError as e:                                   # no readable labels: depths stay empty
             depth_error = str(e)
     lap("depth")
@@ -247,13 +271,14 @@ def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colo
         cid = ids.setdefault(name, len(ids))
         conf_by_name.setdefault(name, []).append((conf, bottom - top))
         intervals.append(dict(top_y=int(top), bottom_y=int(bottom), cluster_id=cid, lithology=name,
-                              top_depth=depth(top), bottom_depth=depth(bottom), ambiguous=bool(conf < cfg.ambiguous_conf),
+                              top_depth=depth(top), bottom_depth=depth(bottom),
+                              ambiguous=bool(refine is None and conf < cfg.ambiguous_conf),   # lithology2: no "?"
                               confidence=round(float(conf), 3)))
     clusters = {}
     for name, cid in ids.items():
         c = conf_by_name[name]
         mean = float(np.average([x for x, _ in c], weights=[max(1, w) for _, w in c]))
-        clusters[str(cid)] = dict(name=name, ambiguous=bool(mean < cfg.ambiguous_conf), alternatives=[],
+        clusters[str(cid)] = dict(name=name, ambiguous=bool(refine is None and mean < cfg.ambiguous_conf), alternatives=[],
                                   margin=round(mean, 4), distances={})
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -290,9 +315,9 @@ def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colo
     lap("render")
 
     record = dict(
-        stem=log.stem, image=str(log.image_path), method="lithology", colour_scan=colour_scan, scale=None,
+        stem=log.stem, image=str(log.image_path), method=method_name, colour_scan=colour_scan, scale=None,
         window_px=cfg.window_px or None, k=len(ids), silhouette=None, transition_clusters_removed=[],
-        n_intervals=len(intervals), legend_method="ocr-labels (lithology/extract.py)",
+        n_intervals=len(intervals), legend_method=f"{LX.legend_method(cfg.legend_method)} (lithology/extract.py)",
         swatches=[dict(name=e["label"], look_alikes=[], ignored=e.get("ignored"), raw_text=e.get("raw_text"))
                   for e in entries],
         clusters=clusters, ambiguous=sorted({r["lithology"] for r in intervals if r["ambiguous"]}),
@@ -305,6 +330,8 @@ def process_log_lithology(log: Log, out_dir: Path, cfg: Config, colours: cv.Colo
                    depth_png=depth_png, annotated_tif=tif_path),
         annotated_tif_error=tif_error,
     )
+    if refine_info is not None:
+        record["refine"] = refine_info
     if log.labels_path:
         record["metrics"] = cv.evaluate(intervals, pd.read_csv(log.labels_path).to_dict("records"))
     return record
@@ -334,10 +361,19 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
     elif cfg.method == "cv":
         record = cv.process_log(log, out_dir, cv_config(cfg), colours, lambda e: e.get("event") != "log_done" and on_progress(e))
         record["method"] = "cv"
+    elif cfg.method == "lithology2":
+        from methods import lithology2
+        record = process_log_lithology(log, out_dir, cfg, colours, on_progress, refine=lithology2.refine,
+                                       method_name="lithology2")
     else:
         record = process_log_lithology(log, out_dir, cfg, colours, on_progress)
+    # the log's record next to its outputs right away: the web app shows its legend, clusters and depth fit
+    # as soon as the log is done, not only when summary.json is written at the end of the run
+    (out_dir / f"{log.stem}_record.json").write_text(json.dumps(record, indent=2, default=str))
     on_progress(dict(event="log_done", log=log.stem, n_intervals=record["n_intervals"], runtime_s=record["runtime_s"],
-                     metrics=record.get("metrics"), ambiguous=record["ambiguous"]))
+                     metrics=record.get("metrics"), ambiguous=record["ambiguous"],
+                     legend=[dict(name=sw["name"], ignored=sw.get("ignored")) for sw in record.get("swatches") or []],
+                     legend_png=(record.get("files") or {}).get("legend_png")))
     return record
 
 
@@ -422,6 +458,16 @@ def run_folder(data_dir, out_dir, labels_dir=None, cfg: Config = Config(), on_pr
     return summary
 
 
+def _print(e: dict) -> None:
+    """Command-line progress: cv's lines + the legend of each log as soon as that log is done."""
+    cv._print(e)
+    if e.get("event") == "log_done" and e.get("legend") is not None:
+        names = [x["name"] + (" (ignored)" if x.get("ignored") else "") for x in e["legend"]]
+        print(f"      legend ({len(names)}): {', '.join(names) if names else 'no swatches found'}")
+        if e.get("legend_png"):
+            print(f"      legend picture: {e['legend_png']}")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Extract the interpreted lithology column of well-log scans.")
     ap.add_argument("data_dir", help="folder with <stem>.json + image, or a dataset folder with bbox_annotation/ + images/")
@@ -429,7 +475,7 @@ def main(argv=None) -> int:
     ap.add_argument("--labels", default=None, help="ground-truth folder with <stem>.csv (default: <data_dir>/labels)")
     ap.add_argument("--method", default=Config.method, choices=CHOICES["method"])
     a = ap.parse_args(argv)
-    s = run_folder(a.data_dir, a.out, a.labels, Config(method=a.method), on_progress=cv._print)
+    s = run_folder(a.data_dir, a.out, a.labels, Config(method=a.method), on_progress=_print)
     print(f"outputs: {Path(a.out).resolve()}")
     return 1 if s["n_errors"] else 0
 

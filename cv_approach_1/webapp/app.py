@@ -279,6 +279,66 @@ def list_data(d: Path):
     return files, labels
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Annotation folder: where an image without a .json gets its bounding boxes when they are not found automatically
+# (or as the fallback when they are). A bbox_annotation/ folder, or a dataset folder that contains one.
+# ---------------------------------------------------------------------------------------------------------------------
+_ANN_INDEX: dict = {}
+
+
+def annotation_dirs(folder: Optional[str]) -> list:
+    """The folder itself and its bbox_annotation/ (or *annotation*) subfolder, the ones that exist."""
+    if not folder:
+        return []
+    p = Path(os.path.expanduser(str(folder).strip()))
+    if not p.is_absolute() or not p.is_dir():
+        return []
+    subs = [q for q in sorted(p.iterdir()) if q.is_dir() and "annotation" in q.name.lower()] if p.is_dir() else []
+    return [p] + subs
+
+
+def _image_name_index(folder: Path) -> dict:
+    """image_name -> .json for every annotation in a folder (cached until the folder changes)."""
+    try:
+        key = (str(folder), folder.stat().st_mtime)
+    except OSError:
+        return {}
+    if key not in _ANN_INDEX:
+        idx = {}
+        for jp in sorted(folder.glob("*.json")):
+            try:
+                name = json.loads(jp.read_text()).get("image_name")
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                continue
+            if name:
+                idx.setdefault(name, jp)
+        _ANN_INDEX[key] = idx
+    return _ANN_INDEX[key]
+
+
+def find_annotation(folder: Optional[str], image: Path) -> Optional[Path]:
+    """The .json for an image in the annotation folder: <stem>.json, else the one whose image_name is the image."""
+    dirs = annotation_dirs(folder)
+    for d in dirs:
+        p = d / f"{image.stem}.json"
+        if p.is_file():
+            return p
+    for d in dirs:
+        p = _image_name_index(d).get(image.name)
+        if p is not None:
+            return p
+    return None
+
+
+def default_annotation_dir() -> Optional[str]:
+    """LITHO_ANNOTATION_DIR, else the first bbox_annotation/ folder found on this computer (e.g. dataset/)."""
+    env = os.environ.get("LITHO_ANNOTATION_DIR")
+    if env and Path(env).expanduser().is_dir():
+        return str(Path(env).expanduser())
+    found = suggestions().get("annotations") or []
+    return found[0] if found else None
+
+
 def check_labels(p: Path) -> Optional[str]:
     try:
         with open(p, encoding="utf-8", errors="replace") as f:
@@ -289,13 +349,24 @@ def check_labels(p: Path) -> Optional[str]:
     return f"missing column(s): {', '.join(missing)}" if missing else None
 
 
-def preflight(d: Path, auto: bool = False) -> dict:
+def preflight(d: Path, auto: bool = False, annotations: Optional[str] = None) -> dict:
     """One row per log. auto = automatic bounding boxes on: an image needs no .json (its .json, if any, is the
-    fallback when detection fails)."""
+    fallback when detection fails). annotations = an annotation folder: an image without its own .json gets the
+    matching one from there (linked, never copied; row json_source "folder")."""
     files, label_files = list_data(d)
     by_name = {p.name: p for p in files}
     jsons = sorted(p for p in files if p.suffix.lower() == ".json")
     images = [p for p in files if p.suffix.lower() in IMAGE_EXT]
+    # (name in the run, file, from the annotation folder?) - a folder .json is named after its image in the run
+    entries = [(jp.name, jp, False) for jp in jsons]
+    if annotations:
+        have = {jp.stem for jp in jsons}
+        for img in sorted(images):
+            if img.stem not in have:
+                ext = find_annotation(annotations, img)
+                if ext is not None:
+                    entries.append((f"{img.stem}.json", ext, True))
+                    have.add(img.stem)
     csvs = {p.stem: p for p in label_files}
     csvs.update({p.stem: p for p in files if p.suffix.lower() == ".csv" and p.name != "example.csv"})
     example = by_name.get("example.csv")
@@ -326,9 +397,11 @@ def preflight(d: Path, auto: bool = False) -> dict:
             if err:
                 row["warnings"].append(f"labels ignored: {err}")
 
-    for jp in jsons:
-        row = dict(stem=jp.stem, json=jp.name, errors=[], warnings=[], json_ok=False, image=None, labels=None,
-                   boxes_source="automatic" if auto else "json")
+    for jname, jp, from_folder in entries:
+        row = dict(stem=Path(jname).stem, json=jname, errors=[], warnings=[], json_ok=False, image=None, labels=None,
+                   boxes_source="automatic" if auto else "json",
+                   json_source="folder" if from_folder else "run", json_path=str(jp) if from_folder else None)
+        jstem = Path(jname).stem
         ann = None
         try:
             ann = json.loads(jp.read_text())
@@ -355,16 +428,18 @@ def preflight(d: Path, auto: bool = False) -> dict:
             row["errors"] = []
         # image: JSON's image_name first, then <stem>.<image ext>
         img = None
-        if isinstance(ann, dict) and ann.get("image_name") in by_name:
+        if from_folder:                                             # matched to this image by find_annotation
+            img = next((p for p in images if p.stem == jstem), None)
+        if img is None and isinstance(ann, dict) and ann.get("image_name") in by_name:
             img = by_name[ann["image_name"]]
         if img is None:
-            img = next((p for p in images if p.stem == jp.stem), None)
-        if img is not None and img.stem != jp.stem:
-            row["errors"].append(f"name mismatch: the annotation is '{jp.name}' but its image is '{img.name}'. "
+            img = next((p for p in images if p.stem == jstem), None)
+        if img is not None and img.stem != jstem:
+            row["errors"].append(f"name mismatch: the annotation is '{jname}' but its image is '{img.name}'. "
                                  f"Rename one of them so both have the same name ('{img.stem}.json').")
-            row["mismatch"] = dict(json=jp.name, image=img.name)
+            row["mismatch"] = dict(json=jname, image=img.name)
         if img is None:
-            want = ann.get("image_name") if isinstance(ann, dict) and ann.get("image_name") else f"{jp.stem}.tif"
+            want = ann.get("image_name") if isinstance(ann, dict) and ann.get("image_name") else f"{jstem}.tif"
             row["errors"].append(f"image not found (expected '{want}')")
         else:
             add_image(row, img, ann)
@@ -390,7 +465,8 @@ def preflight(d: Path, auto: bool = False) -> dict:
     unmatched = []
     for p in images:
         if p.name not in used:
-            unmatched.append(dict(name=p.name, problem="image without a matching .json annotation"))
+            unmatched.append(dict(name=p.name, problem="image without a matching .json annotation" + (
+                " (not in the annotation folder either)" if annotations else "")))
     for stem, p in csvs.items():
         if stem not in stems:
             unmatched.append(dict(name=p.name, problem="labels CSV without a matching log"))
@@ -413,7 +489,8 @@ def preflight(d: Path, auto: bool = False) -> dict:
                                        message=f"'{j}' has no image with the same name; the image(s) "
                                                f"{', '.join(repr(i) for i in imgs)} have no annotation with the same name."))
     return dict(rows=rows, unmatched=unmatched, mismatches=mismatches, n_ok=sum(r["ok"] for r in rows), n_logs=len(rows),
-                auto=auto)
+                auto=auto, annotations=annotations or None, annotations_ok=bool(annotation_dirs(annotations)),
+                n_from_folder=sum(1 for r in rows if r.get("json_source") == "folder"))
 
 
 def auto_from(cfg: dict) -> bool:
@@ -717,7 +794,7 @@ def pick_folder(body: dict = Body(default={})):
 def suggestions():
     """Folders on this computer that look like log data or pipeline results (to pre-fill the forms)."""
     skip = {".venv", ".git", "node_modules", "__pycache__", "runs", "tiles", "bbox_vis", "images", "bbox_annotation"}
-    data, results, labels = [], [], []
+    data, results, labels, annotations = [], [], [], []
     for base, depth in ((ROOT.parent.parent, 3),):
         stack = [(base, 0)]
         while stack:
@@ -730,11 +807,14 @@ def suggestions():
                 results.append(str(p))
             elif _looks_like_data(p):
                 data.append(str(p))
+            if (p / "bbox_annotation").is_dir():
+                annotations.append(str(p / "bbox_annotation"))
             if p.name == "labels" and any(p.glob("*.csv")):
                 labels.append(str(p))
             if k < depth:
                 stack += [(q, k + 1) for q in subs]
-    return dict(data=sorted(data), results=sorted(results), labels=sorted(labels))
+    return dict(data=sorted(data), results=sorted(results), labels=sorted(labels),
+                annotations=sorted(annotations, key=lambda p: (not re.search(r"dataset", p, re.I), p)))
 
 
 # ======================================================================================================================
@@ -910,6 +990,7 @@ def clone_run(rid: str, body: Optional[dict] = Body(None)):
         raise HTTPException(400, "this run has no input files to clone (imported results)")
     nd = new_run((body or {}).get("name") or f"{meta.get('name') or rid} (copy)", mode="folder",
                  config_overrides=meta.get("config_overrides") or {}, cloned_from=rid,
+                 annotation_dir=meta.get("annotation_dir"),
                  source=meta.get("source"), sources=meta.get("sources"))
     files, labels = list_data(d)
     for p in files:
@@ -919,12 +1000,21 @@ def clone_run(rid: str, body: Optional[dict] = Body(None)):
     return read_meta(nd)
 
 
+@app.get("/api/annotation-folder")
+def annotation_folder(path: Optional[str] = None):
+    """Check an annotation folder (default: LITHO_ANNOTATION_DIR or the dataset's bbox_annotation/ found here)."""
+    folder = path if path is not None else default_annotation_dir()
+    dirs = annotation_dirs(folder)
+    n = sum(1 for d in dirs for _ in d.glob("*.json"))
+    return dict(path=folder, ok=bool(dirs), n_json=n, default=default_annotation_dir())
+
+
 @app.get("/api/runs/{rid}/preflight")
-def get_preflight(rid: str, auto: bool = False):
+def get_preflight(rid: str, auto: bool = False, annotations: Optional[str] = None):
     d = run_path(rid)
     if not (d / "data").is_dir():
         return dict(rows=[], unmatched=[], mismatches=[], n_ok=0, n_logs=0, auto=auto)
-    return preflight(d, auto=auto)
+    return preflight(d, auto=auto, annotations=annotations)
 
 
 @app.post("/api/runs/{rid}/start")
@@ -944,7 +1034,8 @@ def prepare_run(d: Path, body: dict) -> None:
     """Validate settings + selection, link the selected logs into work/, write job.json (no start)."""
     overrides = body.get("config") or {}
     cfg = validate_config(overrides)
-    pf = preflight(d, auto=auto_from(cfg))
+    annotations = str(body.get("annotations") or "").strip() or None
+    pf = preflight(d, auto=auto_from(cfg), annotations=annotations)
     if pf["mismatches"]:
         raise HTTPException(400, "file names do not match: " + " ".join(m["message"] for m in pf["mismatches"])
                             + " The .json must have the same name as the image (e.g. log.tif + log.json).")
@@ -956,8 +1047,8 @@ def prepare_run(d: Path, body: dict) -> None:
     work = d / "work"
     (work / "labels").mkdir(parents=True, exist_ok=True)
     for r in sel:                                                   # only the selected logs, as symlinks
-        if r["json"]:
-            place_symlink(work / r["json"], d / "data" / r["json"])
+        if r["json"]:                                               # the run's .json, or the annotation folder's
+            place_symlink(work / r["json"], Path(r["json_path"]) if r.get("json_path") else d / "data" / r["json"])
         place_symlink(work / r["image"]["name"], d / "data" / r["image"]["name"])
         if r["labels"] and r["labels"]["ok"]:
             place_symlink(work / "labels" / f"{r['stem']}.csv", d / "data" / r["labels"]["rel"])
@@ -965,7 +1056,8 @@ def prepare_run(d: Path, body: dict) -> None:
                                                 labels_dir=str(work / "labels"), config=cfg), indent=2))
     defaults = validate_config({})
     write_meta(d, config=cfg, config_overrides={k: v for k, v in cfg.items() if v != defaults[k]},
-               selected=[r["stem"] for r in sel], n_logs=len(sel), n_labelled=sum(1 for r in sel if r["labels"]))
+               selected=[r["stem"] for r in sel], n_logs=len(sel), n_labelled=sum(1 for r in sel if r["labels"]),
+               annotation_dir=annotations, n_json_from_folder=sum(1 for r in sel if r.get("json_path")))
     for f in ("events.jsonl", "result.json"):
         (d / f).unlink(missing_ok=True)
 
@@ -1058,6 +1150,13 @@ def get_summary(rid: str):
     logs = [dict(stem=r["stem"], n_intervals=r.get("n_intervals"), runtime_s=r.get("runtime_s"), metrics=r.get("metrics"),
                  ambiguous=r.get("ambiguous", []), timings_s=r["stages"], partial=True)
             for r in p["logs"] if r["status"] == "done"]
+    for i, r in enumerate(logs):                                     # the full record once the log has written it
+        f = d / "outputs" / f"{r['stem']}_record.json"
+        if f.is_file():
+            try:
+                logs[i] = dict(json.loads(f.read_text()), partial=True)
+            except (OSError, json.JSONDecodeError):
+                pass
     errors = [dict(log=r["stem"], error=r.get("error")) for r in p["logs"] if r["status"] == "error"]
     meta = read_meta(d)
     return dict(partial=True, n_logs=p["total"], n_errors=len(errors), total_s=p["elapsed_s"], errors=errors,
@@ -1107,6 +1206,11 @@ def log_detail(rid: str, stem: str):
     if (out_dir / "summary.json").is_file():
         summary = json.loads((out_dir / "summary.json").read_text())
     record = next((r for r in (summary or {}).get("logs", []) if r["stem"] == stem), None)
+    if record is None and (out_dir / f"{stem}_record.json").is_file():  # finished, run still going: per-log record
+        try:
+            record = json.loads((out_dir / f"{stem}_record.json").read_text())
+        except (OSError, json.JSONDecodeError):
+            record = None
     error = next((e["error"] for e in (summary or {}).get("errors", []) if e["log"] == stem), None)
     files = {}
     for key, suffix in (("csv", ".csv"), ("page_png", "_page.png"), ("column_png", "_column.png"),

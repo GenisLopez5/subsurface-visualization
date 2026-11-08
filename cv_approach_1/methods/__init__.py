@@ -11,4 +11,7 @@ The extraction methods. lithology_pipeline.py (one level up) is the entry point:
     cv_pipeline.py            "cv"                      classic computer vision (clustering); also the shared building
                                                         blocks: ink masks, texture features, rendering, metrics
 The "lithology" method is Pau's lithology/ package on its own (called from lithology_pipeline.py).
+    lithology2.py             "lithology2"              the "lithology" method + clean-up of its intervals: shape
+                                                        fingerprint naming on B/W logs, one name per look-alike group,
+                                                        noise -> previous/next name (else blank), no "?"
 """

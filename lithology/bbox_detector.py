@@ -11,7 +11,8 @@ Plugs into the app as a `BoxDetector` (annotations.py) via LITHO_DETECTOR=lithol
     LITHO_BBOX_URL=http://<host>:8100   remote service (recommended)
     LITHO_BBOX_LOCAL=1                  run the models in this process (needs torch/ultralytics/openvino;
                                         LITHO_BBOX_DIR points to bbox-final, default: next to this package)
-    neither                             no automatic detection (uploaded / dataset JSONs only)
+    neither                             the local models if bbox-final + openvino are there, else no detection
+    LITHO_BBOX_LOCAL=0                  no automatic detection (uploaded / dataset JSONs only)
 LITHO_BBOX_TIMEOUT: seconds to wait for the service per image (default 300).
 """
 from __future__ import annotations
@@ -131,9 +132,18 @@ def _from_env():
     url = os.environ.get("LITHO_BBOX_URL", "").strip()
     if url:
         return RemoteBoxDetector(url, float(os.environ.get("LITHO_BBOX_TIMEOUT", "300")))
-    if os.environ.get("LITHO_BBOX_LOCAL", "") in ("1", "true", "yes"):
+    local = os.environ.get("LITHO_BBOX_LOCAL", "").strip().lower()
+    if local in ("1", "true", "yes"):
         return LocalBoxDetector()
-    return None  # load_detector() turns this into "no detector"
+    if local in ("0", "false", "no"):
+        return None  # load_detector() turns this into "no detector"
+    # not set: the local int8 models when bbox-final and openvino are there (the setup that used to be the default)
+    det = LocalBoxDetector()
+    try:
+        import openvino  # noqa: F401
+    except ImportError:
+        return None
+    return det if det.bbox_dir.is_dir() else None
 
 
 detector = _from_env()

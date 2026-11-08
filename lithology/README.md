@@ -51,8 +51,23 @@ LITHO_BBOX_URL=http://<model machine ip>:8100
 ```
 
 The app does the preprocessing (PDFs are rendered to a PNG) and sends the image; boxes come back in
-original-image pixels. Order: a JSON sent with the image wins, then the service, then a matching JSON from
-`--annotations` if the service fails or is unreachable. Without `LITHO_BBOX_URL` there is no automatic
+original-image pixels.
+
+**Where the boxes come from** (`boxes=`, server default `LITHO_BOX_SOURCE`). A JSON sent with the image
+always wins. Otherwise:
+
+| `boxes` | |
+|---|---|
+| `dataset` (default) | the matching JSON from `--annotations` (by file name and image size). The detector is not called. Not found: `/api/process` / `/api/jobs` answer `{"need": "json"}`, `/api/v1` files wait in `needs_annotation` |
+| `detector` | the bbox service first, the matching `--annotations` JSON if it fails or is unreachable |
+
+Set it per request: `boxes` query parameter on `POST /api/process`, form field on `POST /api/jobs` and
+`POST /api/v1/uploads`, `--boxes` on `python -m lithology process`. In the web UI: the *Detect boxes* checkbox
+(and a *detect the boxes* link when no JSON is found) on `/`, the *Bounding boxes* choice on `/v1.html`.
+For a file already uploaded, `POST /api/v1/files/{id}/detect-boxes` runs the detector on it and processes it
+again (the *detect boxes* action on `/v1.html`).
+
+Without `LITHO_BBOX_URL` there is no automatic
 detection (`LITHO_BBOX_LOCAL=1` runs the models in-process instead, if torch/ultralytics/openvino are
 installed). `LITHO_BBOX_TIMEOUT` (default 300 s) bounds each call.
 
@@ -195,8 +210,8 @@ Where each image's bounding boxes come from (first match wins), recorded in `ann
 `uploaded` (a JSON in the same upload, paired by `image_name` or file name), `provided` (the
 `annotations` form field: one annotation object, `{"<image file name>": annotation}` or a list
 matched by `image_name`, e.g. from a box-extraction algorithm), `dataset` (existing JSONs from
-`--annotations` folders), `detector` (see below). With none of them the file waits in
-`needs_annotation` until `PUT .../annotation`.
+`--annotations` folders), `detector` (only with `boxes=detector`, see [Run the API](#run-the-api)). With
+none of them the file waits in `needs_annotation` until `PUT .../annotation` or `POST .../detect-boxes`.
 
 Uploads are spooled to disk and stored in Postgres in the background, so the request returns at once.
 Processing runs one file at a time from a queue kept in the database, so queued and interrupted files
@@ -256,8 +271,8 @@ Logs that already have results are skipped.
 Implement `annotations.BoxDetector`: `detect(image_path) -> dict`, returning the same format as the
 JSONs (`width`, `height`, `bounding_boxes` with `depth_column`, `interpreted_lithology_column`,
 `lithology_legend`). For `/api/v1`, set `LITHO_DETECTOR=package.module:object` (an instance, a class or a
-plain function `image_path -> dict`). Uploaded, provided and existing JSONs are still used first, and
-the detector runs only when none matches. No other code needs to change.
+plain function `image_path -> dict`). It runs when `boxes=detector` (or `LITHO_BOX_SOURCE=detector`) and no
+JSON was uploaded or provided, and for `POST /api/v1/files/{id}/detect-boxes`. No other code needs to change.
 
 ## How the extraction works
 

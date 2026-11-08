@@ -47,8 +47,8 @@ from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, 
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_matches, resolve_upload_annotation,
-                          validate_annotation)
+from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_matches, bbox_log,
+                          resolve_upload_annotation, validate_annotation)
 from .config import Settings
 from . import drawing
 from .db import BLOB_KINDS, DB, STATUSES, dumps
@@ -464,6 +464,11 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                annotations: str | None = Form(None, description="bounding boxes as JSON data, e.g. from an "
                                               "extraction algorithm: one annotation object, "
                                               "{\"<image file name>\": annotation}, or a list matched by image_name"),
+               boxes: Literal["dataset", "detector"] | None = Form(
+                   None, description="for images without a JSON: `dataset` (the matching JSON from the annotation "
+                                     "folders) or `detector` (automatic detection, dataset JSON as fallback; slower, "
+                                     f"the upload waits for it). Default: the server's LITHO_BOX_SOURCE "
+                                     f"({settings.box_source})"),
                db: DB = Depends(get_db)):
         try:
             provided = json.loads(annotations) if annotations else None
@@ -514,7 +519,8 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
             for fname, path in images:
                 try:
                     ann, source, note = resolve_upload_annotation(
-                        fname, path, jsons, _provided_for(provided, fname, len(images)), store, detector)
+                        fname, path, jsons, _provided_for(provided, fname, len(images)), store, detector,
+                        source=boxes or settings.box_source)
                 except ValueError as e:
                     ann, source, note = None, None, f"provided annotation rejected: {e}"
                 if source == "uploaded":
@@ -789,6 +795,42 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         name = file_or_404(db, fid)["name"]
         try:
             db.set_annotation(fid, dumps(ann), f"{Path(name).stem}.json", src)
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+        notify()
+        return file_out(db.get_file(fid))
+
+    @r.post("/files/{fid}/detect-boxes", response_model=FileOut,
+            summary="Find the bounding boxes with the detector (bbox service), replace the file's boxes and re-queue",
+            description="For a file whose boxes came from the dataset, or that has none (`needs_annotation`): runs "
+                        "the automatic detector on the stored original and processes the file again with its boxes "
+                        "(`annotation_source: detector`). Waits for the detector (seconds to minutes). 503 without a "
+                        "detector (LITHO_BBOX_URL), 409 while the original is uploading or the file is processing, "
+                        "502 if the detector fails (the file is left as it was).")
+    def detect_boxes(fid: UUID, db: DB = Depends(get_db)):
+        row = file_or_404(db, fid)
+        if detector is None:
+            raise HTTPException(503, "no bounding-box detector configured (set LITHO_BBOX_URL to the bbox service)")
+        if row["status"] in ("processing", "uploading"):
+            raise HTTPException(409, f"file is {row['status']}; try again when it has finished")
+        orig = db.get_blob(fid, "original")
+        if not orig:
+            raise HTTPException(409, "the original image is not stored yet")
+        work = Path(tempfile.mkdtemp(prefix="detect_", dir=settings.tmp))
+        try:
+            img = work / safe_name(row["name"])
+            img.write_bytes(bytes(orig["data"]))
+            try:
+                ann = validate_annotation(detector.detect(img))
+            except Exception as e:
+                bbox_log(img, f"detector failed: {type(e).__name__}: {e}")
+                raise HTTPException(502, f"detector failed: {type(e).__name__}: {e}")
+            bbox_log(img, "bounding boxes detected automatically (detect-boxes)")
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        try:
+            db.set_annotation(fid, dumps(ann), f"{Path(row['name']).stem}.json", "detector",
+                              note="boxes from the detector (detect-boxes)")
         except ValueError as e:
             raise HTTPException(409, str(e))
         notify()
