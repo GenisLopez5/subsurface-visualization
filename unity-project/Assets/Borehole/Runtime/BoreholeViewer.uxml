@@ -14,7 +14,7 @@
           <ui:VisualElement name="documentSelection" class="document-selection" picking-mode="Ignore" />
           <ui:VisualElement name="documentPlaceholder" class="placeholder" picking-mode="Ignore"><ui:Label text="THE SOURCE, IN CONTEXT" class="placeholder-title" /><ui:Label text="Load the segmented document to link image pixels with depth. The cylinder remains available while you choose a page." class="placeholder-copy" /></ui:VisualElement>
           <ui:Label name="documentNotice" class="document-notice" picking-mode="Ignore" />
-          <ui:VisualElement name="csvOverlay" class="csv-overlay hidden"><ui:VisualElement class="csv-toolbar"><ui:Label text="CSV" /><ui:Button name="hideCsv" text="Close" /></ui:VisualElement><ui:ScrollView name="csvHorizontal" mode="Horizontal"><ui:VisualElement name="csvHeader" class="csv-row" /><ui:ListView name="csvRows" /></ui:ScrollView></ui:VisualElement>
+          <ui:VisualElement name="csvOverlay" class="csv-overlay hidden"><ui:VisualElement class="csv-toolbar"><ui:Label text="CSV" /><ui:Button name="downloadCsv" text="Download CSV" tooltip="Save the original CSV for this document" /><ui:Button name="hideCsv" text="Close" /></ui:VisualElement><ui:ScrollView name="csvHorizontal" mode="Horizontal"><ui:VisualElement name="csvHeader" class="csv-row" /><ui:ListView name="csvRows" /></ui:ScrollView></ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement class="pane-footer"><ui:Button name="toggleCsv" text="CSV" /><ui:Label name="pixelReadout" /><ui:Label name="syncState" /></ui:VisualElement>
       </ui:VisualElement>

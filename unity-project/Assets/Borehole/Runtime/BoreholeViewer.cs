@@ -29,6 +29,7 @@ namespace Subsurface.Borehole
         public string LastError {get;private set;}
         public int AdvancingFrames {get;private set;}
         public string SourceName {get;private set;}
+        public string SourceCsv {get;private set;}
         public Texture2D SegmentedImage {get;private set;}
         public double PixelDisplacement {get;private set;}
         public string FullResolutionDocumentPath {get;private set;}
@@ -125,7 +126,7 @@ namespace Subsurface.Borehole
         {
             try
             {
-                var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);SourceName=sourceName;SourceCsv=csv;csvOverlay?.Bind(document);PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
                 LastError=null;error.text="";error.AddToClassList("hidden");filename.text=sourceName;range.text=Format(document.TopFeet)+" – "+Format(document.BottomFeet)+" ft · "+document.SourceIntervalCount+" source intervals";
                 WindowFeet=Math.Min(document.SpanFeet*1.15,Math.Max(Math.Min(100,document.SpanFeet),Math.Min(300,document.SpanFeet*.35)));FocusDepthFeet=document.TopFeet+WindowFeet*.5;SetDepth(FocusDepthFeet);UpdateDocumentImage();
                 root.Q("selectionCard").AddToClassList("hidden");selectedName.text="";selectedDepths.text="";selectedInfo.text="";SetDocumentMode(false);
