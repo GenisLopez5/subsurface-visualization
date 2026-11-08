@@ -24,10 +24,10 @@ namespace Subsurface.Borehole
             try
             {
                 texture=new Texture2D(2,2);if(!texture.LoadImage(data))throw new FormatException("Invalid legend PNG.");textures[index]=texture;
-                var scroll=new ScrollView();scroll.AddToClassList("legend-scroll");var image=new Image{image=texture,scaleMode=ScaleMode.StretchToFill};image.AddToClassList("legend-image");scroll.Add(image);
-                Action resize=()=>{float width=Mathf.Max(40,foldout.contentRect.width-30);image.style.width=width;image.style.height=width*texture.height/texture.width;};
+                var scroll=new ScrollView(ScrollViewMode.Vertical);scroll.AddToClassList("legend-scroll");var image=new Image{image=texture,scaleMode=ScaleMode.ScaleToFit};image.AddToClassList("legend-image");scroll.Add(image);
+                Action resize=()=>{float width=scroll.contentViewport.contentRect.width;if(width<=0)return;image.style.width=width;image.style.height=width*texture.height/texture.width;};
                 foldout.Add(scroll);
-                foldout.RegisterCallback<GeometryChangedEvent>(_=>resize());resize();
+                scroll.contentViewport.RegisterCallback<GeometryChangedEvent>(_=>resize());resize();
             }
             catch(Exception){if(texture!=null)UnityEngine.Object.Destroy(texture);textures[index]=null;foldout.Add(new Label("This legend could not be decoded."));}
         }

@@ -7,6 +7,19 @@ namespace Subsurface.Borehole.Tests
 {
     public class BoreholeSynchronizationTests
     {
+        [TestCase(800,100)] [TestCase(100,800)] [TestCase(320,240)]
+        public void LegendsPreserveTheirIntrinsicAspectRatio(int width,int height)
+        {
+            var root=new UnityEngine.UIElements.VisualElement();var viewport=new UnityEngine.UIElements.VisualElement{name="documentViewport"};root.Add(viewport);viewport.Add(new UnityEngine.UIElements.VisualElement{name="csvOverlay"});
+            var texture=new Texture2D(width,height);var png=texture.EncodeToPNG();UnityEngine.Object.DestroyImmediate(texture);
+            using(var legends=new BoreholeLegends(root))
+            {
+                legends.Bind(png,png);
+                var images=UnityEngine.UIElements.UQueryExtensions.Query<UnityEngine.UIElements.Image>(root).ToList();
+                Assert.That(images.Count,Is.EqualTo(2));
+                foreach(var image in images){Assert.That(image.scaleMode,Is.EqualTo(ScaleMode.ScaleToFit));Assert.That(image.image.width/(double)image.image.height,Is.EqualTo(width/(double)height));}
+            }
+        }
         [Test]public void TablePreservesOriginalColumnValuesAndOrderWhileGeometrySortsByDepth()
         {
             var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,cluster_id\n20,30,Sandstone,alpha\n0,10,Shale,beta");
