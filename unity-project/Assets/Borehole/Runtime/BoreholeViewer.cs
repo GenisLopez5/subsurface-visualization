@@ -126,6 +126,7 @@ namespace Subsurface.Borehole
             try
             {
                 var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                UpdateComposition(document);
                 LastError=null;error.text="";error.AddToClassList("hidden");filename.text=sourceName;range.text=Format(document.TopFeet)+" – "+Format(document.BottomFeet)+" ft · "+document.SourceIntervalCount+" source intervals";
                 WindowFeet=Math.Min(document.SpanFeet*1.15,Math.Max(Math.Min(100,document.SpanFeet),Math.Min(300,document.SpanFeet*.35)));FocusDepthFeet=document.TopFeet+WindowFeet*.5;SetDepth(FocusDepthFeet);UpdateDocumentImage();
                 root.Q("selectionCard").AddToClassList("hidden");selectedName.text="";selectedDepths.text="";selectedInfo.text="";SetDocumentMode(false);
@@ -289,6 +290,25 @@ namespace Subsurface.Borehole
             }
             foreach(var tick in ticks){tick.style.left=width*.30f;tick.style.width=width*.10f;}
             for(int i=used;i<intervalLabels.Count;i++){intervalLabels[i].style.display=DisplayStyle.None;intervalConnectors[i].style.display=DisplayStyle.None;}
+        }
+        void UpdateComposition(BoreholeDocument document)
+        {
+            var totals=new Dictionary<string,double>(StringComparer.Ordinal);double analysed=0,gaps=0,unknown=0;
+            foreach(var row in document.Intervals)
+            {
+                if(row.IsGap){gaps+=row.ThicknessFeet;continue;}
+                string label=Name(row);if(!totals.ContainsKey(label))totals[label]=0;totals[label]+=row.ThicknessFeet;analysed+=row.ThicknessFeet;
+                if(!column.catalog.Resolve(row.Lithology).IsResolved)unknown+=row.ThicknessFeet;
+            }
+            var entries=new List<KeyValuePair<string,double>>(totals);entries.Sort((a,b)=>{int order=b.Value.CompareTo(a.Value);return order!=0?order:string.CompareOrdinal(a.Key,b.Key);});
+            var full=new List<string>();var compact=new List<string>();double other=0;
+            for(int i=0;i<entries.Count;i++){string text=entries[i].Key+" "+(entries[i].Value/analysed*100).ToString("0.0",CultureInfo.InvariantCulture)+"%";full.Add(text);if(i<2)compact.Add(text);else other+=entries[i].Value;}
+            if(other>0)compact.Add("Other "+(other/analysed*100).ToString("0.0",CultureInfo.InvariantCulture)+"%");
+            full.Add("Depth-weighted; denominator "+Format(analysed)+" ft of source intervals. No-data gaps: "+Format(gaps)+" ft (excluded). Unrecognized labels: "+Format(unknown)+" ft (included under their source labels).");
+            var summary=root.Q("composition");summary.Clear();summary.Add(new Label("Depth %"));
+            for(int i=0;i<Math.Min(2,entries.Count);i++){var chip=new Label(compact[i]){enableRichText=false};chip.AddToClassList("composition-chip");int index=document.Intervals.FindIndex(row=>Name(row)==entries[i].Key);if(index>=0)chip.style.borderLeftColor=column.IdentifierColors[index];summary.Add(chip);}
+            if(other>0)summary.Add(new Label(compact[compact.Count-1]));
+            summary.Add(new Label("Unknown: "+Format(unknown)+" ft · No-data: "+Format(gaps)+" ft"));summary.tooltip=string.Join("\n",full);summary.focusable=true;summary.RemoveFromClassList("hidden");
         }
         void ShowError(string message){LastError=message;if(error!=null){error.text=message;error.RemoveFromClassList("hidden");}}
         static string Name(BoreholeInterval row)=>string.IsNullOrWhiteSpace(row.Lithology)?"Unspecified lithology":row.Lithology;

@@ -2,7 +2,7 @@
   <ui:Style src="BoreholeViewer.uss" />
   <ui:VisualElement class="app">
     <ui:VisualElement class="header">
-      <ui:VisualElement class="source"><ui:Label name="filename" class="filename" /><ui:Label name="range" class="source-range" /></ui:VisualElement>
+      <ui:VisualElement class="source"><ui:Label name="filename" class="filename" /><ui:Label name="range" class="source-range" /><ui:VisualElement name="composition" class="composition hidden" /></ui:VisualElement>
     </ui:VisualElement>
     <ui:Label name="error" class="error hidden" />
     <ui:VisualElement class="workspace">
