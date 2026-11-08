@@ -117,20 +117,25 @@ class BoxDetector(Protocol):
     def detect(self, image_path: Path) -> dict: ...
 
 
-def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector | None = None,
-                       out_dir: Path | None = None) -> tuple[Path, str]:
-    """Annotation JSON for an image: the detector first (if any), then an existing JSON from the store
-    (also used when the detector fails). A detected annotation is written to out_dir as a file."""
-    image_path = Path(image_path)
-    failure = ""
-    if detector is not None:
-        try:
-            ann = validate_annotation(detector.detect(image_path))
-            out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
-            out.write_text(json.dumps(ann, indent=2))
-            return out, "bounding boxes detected automatically"
-        except Exception as e:
-            failure = f"detector failed: {type(e).__name__}: {e}"
+def bbox_log(image_path, message: str):
+    """Backend log line saying where an image's bounding boxes came from."""
+    print(f"[bbox] {Path(image_path).name}: {message}", flush=True)
+
+
+def _detect(image_path: Path, detector: BoxDetector) -> tuple[dict | None, str]:
+    """(annotation, "") from the detector, or (None, failure reason). Logs either way."""
+    try:
+        ann = validate_annotation(detector.detect(image_path))
+        bbox_log(image_path, "bounding boxes detected automatically")
+        return ann, ""
+    except Exception as e:
+        failure = f"detector failed: {type(e).__name__}: {e}"
+        bbox_log(image_path, failure)
+        return None, failure
+
+
+def _find_in_store(image_path: Path, store: AnnotationStore, why: str) -> tuple[Path, str]:
+    """Existing annotation JSON for the image, logging that the dataset JSON is used (and why)."""
     size = None
     if image_path.suffix.lower() != ".pdf":
         from PIL import Image
@@ -139,9 +144,30 @@ def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector
             size = im.size
     try:
         path, how = store.find(image_path.name, size)
-        return path, "; ".join(x for x in (how, failure) if x)
+    except AnnotationNotFound:
+        bbox_log(image_path, f"no existing JSON found either ({why}); no bounding boxes")
+        raise
+    bbox_log(image_path, f"USING EXISTING JSON {path} ({why})" + (f"; {how}" if how else ""))
+    return path, how
+
+
+def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector | None = None,
+                       out_dir: Path | None = None) -> tuple[Path, str]:
+    """Annotation JSON for an image: the detector first (if any), then an existing JSON from the store
+    (also used when the detector fails). A detected annotation is written to out_dir as a file."""
+    image_path = Path(image_path)
+    failure = "no automatic detector configured"
+    if detector is not None:
+        ann, failure = _detect(image_path, detector)
+        if ann is not None:
+            out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
+            out.write_text(json.dumps(ann, indent=2))
+            return out, "bounding boxes detected automatically"
+    try:
+        path, how = _find_in_store(image_path, store, failure)
+        return path, "; ".join(x for x in (how, f"existing JSON used: {failure}") if x)
     except AnnotationNotFound as e:
-        raise AnnotationNotFound(f"{e}" + (f" ({failure})" if failure else "")) from None
+        raise AnnotationNotFound(f"{e} ({failure})") from None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -185,20 +211,23 @@ def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[
     already chosen for this image from the request data."""
     for json_name, ann in uploaded:
         if annotation_matches(ann, image_name, json_name):
+            bbox_log(image_name, f"using the JSON uploaded with it ({json_name})")
             return ann, "uploaded", json_name
     if provided is not None:
+        bbox_log(image_name, "using the bounding boxes sent with the request")
         return validate_annotation(provided), "provided", ""
-    failure = ""
+    failure = "no automatic detector configured"
     if detector is not None:
-        try:
-            return validate_annotation(detector.detect(Path(image_path))), "detector", ""
-        except Exception as e:  # a failing detector falls back to the dataset JSONs
-            failure = f"detector failed: {type(e).__name__}: {e}"
+        ann, failure = _detect(Path(image_path), detector)
+        if ann is not None:
+            return ann, "detector", ""
     if store is not None:
         try:
-            path, how = resolve_annotation(image_path, store)
+            path, how = _find_in_store(Path(image_path), store, failure)
             ann = load_annotation(path)
             return ann, "dataset", "; ".join(x for x in (path.name + (f" ({how})" if how else ""), failure) if x)
         except AnnotationNotFound:
             pass
-    return None, None, failure or "no annotation JSON uploaded, provided or found in the dataset"
+    else:
+        bbox_log(image_name, f"no bounding boxes ({failure}; no annotation folders configured)")
+    return None, None, f"{failure}; no annotation JSON uploaded, provided or found in the dataset"
