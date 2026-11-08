@@ -24,6 +24,15 @@ namespace Subsurface.Explorer
                 return content;
             }
         }
+        public static string ReadSource(string archivePath,string destination)
+        {
+            using(var archive=ZipFile.OpenRead(archivePath))
+            {
+                var entries=archive.Entries.Where(x=>new[]{"_source.tif","_source.tiff","_source.png","_source.jpg","_source.jpeg"}.Any(s=>x.Name.EndsWith(s,StringComparison.OrdinalIgnoreCase))).ToArray();
+                if(entries.Length==0)return null;if(entries.Length!=1||entries[0].Length>512L*1024*1024)throw new IOException("Invalid unannotated source image.");
+                string target=destination+Path.GetExtension(entries[0].Name);try{using(var input=entries[0].Open())using(var output=File.Create(target))input.CopyTo(output);return target;}catch{if(File.Exists(target))File.Delete(target);throw;}
+            }
+        }
         static ZipArchiveEntry Find(ZipArchive archive,string suffix)
         {
             var matches=archive.Entries.Where(x=>x.Name.EndsWith(suffix,StringComparison.OrdinalIgnoreCase)).ToArray();

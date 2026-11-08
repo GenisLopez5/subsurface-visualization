@@ -30,6 +30,30 @@ namespace Subsurface.Borehole
         public int AdvancingFrames {get;private set;}
         public string SourceName {get;private set;}
         public Texture2D SegmentedImage {get;private set;}
+        bool annotationsVisible=true;BoreholeDocumentImage cleanPage;string cleanPath,annotatedPath;Texture2D annotatedTexture;int annotatedWidth,annotatedHeight;double annotatedOffset;
+        public void SetAnnotationSource(string path)
+        {
+            annotatedPath=FullResolutionDocumentPath;annotatedTexture=SegmentedImage;annotatedWidth=DocumentPixelWidth;annotatedHeight=DocumentPixelHeight;annotatedOffset=PixelDisplacement;
+            try
+            {
+                cleanPage=BoreholeDocumentImage.Load(path);cleanPath=Path.Combine(Application.temporaryCachePath,"source-"+Guid.NewGuid()+Path.GetExtension(path));File.Copy(path,cleanPath);
+                annotatedPath=FullResolutionDocumentPath;annotatedTexture=SegmentedImage;annotatedWidth=DocumentPixelWidth;annotatedHeight=DocumentPixelHeight;annotatedOffset=PixelDisplacement;
+                var button=root.Q<Button>("toggleAnnotations");button.SetEnabled(true);button.tooltip="Show or hide generated annotations; the green interval selection stays visible";ApplyAnnotations();
+            }
+            catch(Exception ex){ClearAnnotationSource();root.Q<Button>("toggleAnnotations").tooltip="Source image unavailable: "+ex.Message;}
+        }
+        void ApplyAnnotations()
+        {
+            if(cleanPage==null)return;double previousOffset=PixelDisplacement;documentPane?.ClearTiles();
+            SegmentedImage=annotationsVisible?annotatedTexture:cleanPage.Texture;FullResolutionDocumentPath=annotationsVisible?annotatedPath:cleanPath;
+            DocumentPixelWidth=annotationsVisible?annotatedWidth:cleanPage.OriginalWidth;DocumentPixelHeight=annotationsVisible?annotatedHeight:cleanPage.OriginalHeight;PixelDisplacement=annotationsVisible?annotatedOffset:0;
+            root.Q<Button>("toggleAnnotations").text=annotationsVisible?"Annotations: on":"Annotations: off";documentPane?.ReplacePage(column.Document,SegmentedImage,DocumentPixelWidth,DocumentPixelHeight,previousOffset);
+        }
+        void ClearAnnotationSource()
+        {
+            if(cleanPage!=null){var pending=documentPane?.PendingDocumentWork;documentPane?.ClearTiles();FullResolutionDocumentPath=annotatedPath;SegmentedImage=annotatedTexture;DocumentPixelWidth=annotatedWidth;DocumentPixelHeight=annotatedHeight;PixelDisplacement=annotatedOffset;var texture=cleanPage.Texture;if(Application.isPlaying)Destroy(texture);else DestroyImmediate(texture);string path=cleanPath;if(pending!=null&&!pending.IsCompleted)pending.ContinueWith(_=>DeleteDocumentSource(path));else DeleteDocumentSource(path);}
+            cleanPage=null;cleanPath=null;var button=root?.Q<Button>("toggleAnnotations");if(button!=null){button.SetEnabled(false);button.text="Annotations: on";}
+        }
         public double PixelDisplacement {get;private set;}
         public string FullResolutionDocumentPath {get;private set;}
         public int DocumentDetailTileCount=>documentPane?.Tiles.ResidentTiles??0;
@@ -92,6 +116,7 @@ namespace Subsurface.Borehole
             zoomSlider=root.Q<Slider>("zoomSlider");zoomPercent=root.Q<Label>("zoomPercent");
             zoomSlider.RegisterValueChangedCallback(e=>{if(column.Document==null)return;double target=column.Document.SpanFeet*1.4*Math.Pow(1d/1400,e.newValue);Zoom(target/WindowFeet);});
             root.Q<Button>("fit").clicked+=FitColumn;
+            root.Q<Button>("toggleAnnotations").SetEnabled(false);root.Q<Button>("toggleAnnotations").clicked+=()=>{annotationsVisible=!annotationsVisible;ApplyAnnotations();};
             var appearance=root.Q<DropdownField>("appearance");appearance.choices=new List<string>{"Textured lithology","Legend / patterns"};appearance.index=0;
             appearance.RegisterValueChangedCallback(e=>{displayMode=e.newValue=="Legend / patterns"?DisplayMode.Legend:DisplayMode.Texture;column.SetMode(displayMode);});
             ruler.Clear();labelLayer.Clear();ticks.Clear();intervalLabels.Clear();intervalConnectors.Clear();
@@ -125,7 +150,7 @@ namespace Subsurface.Borehole
         {
             try
             {
-                var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                var document=BoreholeCsv.Parse(csv);ClearAnnotationSource();legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
                 LastError=null;error.text="";error.AddToClassList("hidden");filename.text=sourceName;range.text=Format(document.TopFeet)+" – "+Format(document.BottomFeet)+" ft · "+document.SourceIntervalCount+" source intervals";
                 WindowFeet=Math.Min(document.SpanFeet*1.15,Math.Max(Math.Min(100,document.SpanFeet),Math.Min(300,document.SpanFeet*.35)));FocusDepthFeet=document.TopFeet+WindowFeet*.5;SetDepth(FocusDepthFeet);UpdateDocumentImage();
                 root.Q("selectionCard").AddToClassList("hidden");selectedName.text="";selectedDepths.text="";selectedInfo.text="";SetDocumentMode(false);
@@ -296,7 +321,7 @@ namespace Subsurface.Borehole
         void ReleaseTarget(){if(texture==null)return;if(columnCamera!=null)columnCamera.targetTexture=null;texture.Release();if(Application.isPlaying)Destroy(texture);else DestroyImmediate(texture);texture=null;}
         void OnDisable()
         {
-            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;legends?.Dispose();legends=null;ReleaseTarget();ReleaseDocumentSource();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
+            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;legends?.Dispose();legends=null;ClearAnnotationSource();ReleaseTarget();ReleaseDocumentSource();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
         }
     }
 }

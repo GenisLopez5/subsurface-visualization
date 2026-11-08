@@ -128,7 +128,7 @@ namespace Subsurface.Explorer
             opening=true;openingName=file.name;Say("Opening "+file.name+"…");byte[] originalLegend=null,generatedLegend=null;string csv=null;double displacement=0;string temp=Path.Combine(Application.temporaryCachePath,Guid.NewGuid()+".tif"),archive=temp+".zip";
             try
             {
-                using(var request=UnityWebRequest.Get(Url("/api/v1/files/"+file.id+"/result?format=zip")))
+                using(var request=UnityWebRequest.Get(Url("/api/v1/files/"+file.id+"/result?format=zip&include_source=true")))
                 {
                     request.downloadHandler=new DownloadHandlerFile(archive){removeFileOnAbort=true};request.timeout=180;yield return request.SendWebRequest();if(request.result!=UnityWebRequest.Result.Success){Say(request.responseCode==404?"This document's result is not available yet. Refresh and try again.":"Result download failed: "+request.error);yield break;}
                 }
@@ -141,6 +141,7 @@ namespace Subsurface.Explorer
                 }
                 catch(Exception e){if(image!=null)Destroy(image.Texture);Say("Cannot open document result: "+e.Message);yield break;}
                 if(!viewer.SetAnalysisResult(csv,image.Texture,file.name,image.OriginalWidth,image.OriginalHeight,displacement,temp)){Destroy(image.Texture);Say(viewer.LastError);yield break;}
+                string source=null;try{source=DocumentResultArchive.ReadSource(archive,temp+".source");if(source!=null)viewer.SetAnnotationSource(source);}catch(Exception ex){Debug.LogWarning("Unannotated source unavailable: "+ex.Message);}finally{if(source!=null)File.Delete(source);}
                 viewer.SetLegends(originalLegend,generatedLegend);if(activeImage!=null)Destroy(activeImage);activeImage=image.Texture;viewer.Root.style.display=DisplayStyle.Flex;page.style.display=DisplayStyle.None;visualizing=true;ClearFinishedUploads();RenderActivity();
                 var header=viewer.Root.Q(className:"header");var back=viewer.Root.Q<Button>("backToDocuments");if(back==null){back=new Button(ShowLibrary){name="backToDocuments",text="← Documents"};back.AddToClassList("header-button");header.Insert(0,back);}
                 Say("");

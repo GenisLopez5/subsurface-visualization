@@ -16,7 +16,7 @@
           <ui:Label name="documentNotice" class="document-notice" picking-mode="Ignore" />
           <ui:VisualElement name="csvOverlay" class="csv-overlay hidden"><ui:VisualElement class="csv-toolbar"><ui:Label text="CSV" /><ui:Button name="hideCsv" text="Close" /></ui:VisualElement><ui:ScrollView name="csvHorizontal" mode="Horizontal"><ui:VisualElement name="csvHeader" class="csv-row" /><ui:ListView name="csvRows" /></ui:ScrollView></ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement class="pane-footer"><ui:Button name="toggleCsv" text="CSV" /><ui:Label name="pixelReadout" /><ui:Label name="syncState" /></ui:VisualElement>
+        <ui:VisualElement class="pane-footer"><ui:Button name="toggleCsv" text="CSV" /><ui:Button name="toggleAnnotations" text="Annotations: on" tooltip="An unannotated source image is required to hide generated annotations" /><ui:Label name="pixelReadout" /><ui:Label name="syncState" /></ui:VisualElement>
       </ui:VisualElement>
       <ui:VisualElement class="column-pane">
         <ui:VisualElement name="viewport" class="viewport">

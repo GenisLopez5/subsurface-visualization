@@ -35,6 +35,8 @@ namespace Subsurface.Borehole
             if(data==null)problem="Load a CSV.";else if(!BoreholeImageMap.TryCreate(data,out map,out problem,viewer.PixelDisplacement)){}else if(page==null)problem="Load the matching document.";else if(width<=0||height<=0||map.LastPixel>height)problem="Image size mismatch. Load the matching original document; synchronization is paused.";else IsSynchronized=true;
             center=IsSynchronized?map.ToPixel(viewer.FocusDepthFeet):0;initialized=true;placeholder.EnableInClassList("hidden",page!=null);state.text=IsSynchronized?"Linked":"Unlinked";Refresh();
         }
+        public void ReplacePage(BoreholeDocument data,Texture2D page,int width,int height,double previousOffset)
+        {double previousCenter=center;Bind(data,page,width,height);center=previousCenter+viewer.PixelDisplacement-previousOffset;Refresh();}
         public void CenterOnDepth(double feet){if(IsSynchronized)center=map.ToPixel(feet);Refresh();}
         public void Fit(){center=originalHeight*.5;Refresh();}
         public void PanDepth(double feet)

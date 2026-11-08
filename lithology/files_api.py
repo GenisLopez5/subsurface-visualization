@@ -657,6 +657,7 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                                                        "schema": {"type": "integer"}},
                                         **drawing.LAYOUT_OPENAPI_HEADERS}}})
     def get_result(fid: UUID, format: Literal["zip", "json"] = Query("zip", description="zip or json"),
+                   include_source: bool = Query(False, description="Include the unannotated source image in ZIP results"),
                    db: DB = Depends(get_db)):
         row = file_or_404(db, fid)
         tif, csv = db.get_blob(fid, "result_tif"), db.get_blob(fid, "result_csv")
@@ -678,6 +679,9 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         stem = display_name(Path(row["name"]).stem)
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:
+            if include_source:
+                from .result_bundle import write_source_image
+                write_source_image(z, db.get_blob(fid, "original"), row["name"], stem)
             z.writestr(tif_name, bytes(tif["data"]), compress_type=zipfile.ZIP_STORED)
             z.writestr(csv_name, bytes(csv["data"]), compress_type=zipfile.ZIP_DEFLATED)
             z.writestr(f"{stem}_offset.json", off.model_dump_json(indent=2), compress_type=zipfile.ZIP_DEFLATED)
