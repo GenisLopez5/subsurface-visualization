@@ -13,6 +13,16 @@ namespace Subsurface.Borehole.Tests
             Assert.That(data.Headers[3],Is.EqualTo("cluster_id"));Assert.That(data.SourceRows[0].TopFeet,Is.EqualTo(20));Assert.That(data.SourceRows[0].SourceValues[3],Is.EqualTo("alpha"));Assert.That(data.Intervals[0].TopFeet,Is.EqualTo(0));
         }
         const string Header="top_depth,bottom_depth,lithology,top_y,bottom_y\n";
+        [Test]public void LegendDisplacementShiftsBothDirectionsWithoutChangingCsvOrScale()
+        {
+            var data=BoreholeCsv.Parse(Header+"100,110,Shale,200,300");
+            Assert.That(BoreholeImageMap.TryCreate(data,out var map,out var reason,72),Is.True,reason);
+            Assert.That(map.ToPixel(100),Is.EqualTo(272));
+            Assert.That(map.ToPixel(105),Is.EqualTo(322));
+            Assert.That(map.ToDepth(322),Is.EqualTo(105));
+            Assert.That(data.Intervals[0].TopPixel,Is.EqualTo(200));
+            Assert.That(map.LastPixel-map.FirstPixel,Is.EqualTo(100));
+        }
         [Test]public void MappingUsesEachIntervalAndInterpolatesAcrossNoDataGaps()
         {
             var data=BoreholeCsv.Parse(Header+"100,110,Shale,200,300\n120,140,Sandstone,350,750");
@@ -55,6 +65,32 @@ namespace Subsurface.Borehole.Tests
             string path=Path.Combine(Application.temporaryCachePath,"Borehole-tall-fixture.tif");Texture2D texture=null;
             try{WriteTiff(path,2,20000);var page=BoreholeDocumentImage.Load(path);texture=page.Texture;Assert.That(page.OriginalHeight,Is.EqualTo(20000));Assert.That(texture.height,Is.LessThanOrEqualTo(Math.Min(SystemInfo.maxTextureSize,16384)));}
             finally{if(texture!=null)UnityEngine.Object.DestroyImmediate(texture);if(File.Exists(path))File.Delete(path);}
+        }
+        [Test]public void TallTiffDetailReadsNativePixelsAtOriginalCoordinates()
+        {
+            string path=Path.Combine(Application.temporaryCachePath,"Borehole-native-region.tif");
+            try
+            {
+                WriteTiff(path,40,20000);
+                var pixels=BoreholeDocumentImage.ReadRegion(path,new RectInt(3,13000,8,1024));
+                Assert.That(pixels.Width,Is.EqualTo(8));Assert.That(pixels.Height,Is.EqualTo(1024));
+                Assert.That(pixels.OriginalWidth,Is.EqualTo(40));Assert.That(pixels.OriginalHeight,Is.EqualTo(20000));
+                // Buffer is Unity bottom-up BGRA: bottom is blue, top is green.
+                Assert.That(pixels.Bgra[0],Is.EqualTo(255));Assert.That(pixels.Bgra[1],Is.EqualTo(0));
+                int top=(pixels.Height-1)*pixels.Width*4;Assert.That(pixels.Bgra[top+1],Is.EqualTo(255));Assert.That(pixels.Bgra[top],Is.EqualTo(0));
+                Assert.Throws<ArgumentException>(()=>BoreholeDocumentImage.ReadRegion(path,new RectInt(39,19999,2,2)));
+            }
+            finally{if(File.Exists(path))File.Delete(path);}
+        }
+        [Test]public void DetailOverviewSamplingPreservesTheRequestedRegion()
+        {
+            string path=Path.Combine(Application.temporaryCachePath,"Borehole-region-level.tif");
+            try
+            {
+                WriteTiff(path,40,20000);var pixels=BoreholeDocumentImage.ReadRegion(path,new RectInt(0,14000,40,2048),2);
+                Assert.That(pixels.Width,Is.EqualTo(20));Assert.That(pixels.Height,Is.EqualTo(1024));Assert.That(pixels.Bgra[0],Is.EqualTo(255));
+            }
+            finally{if(File.Exists(path))File.Delete(path);}
         }
         static void WriteTiff(string path,int width,int height)
         {

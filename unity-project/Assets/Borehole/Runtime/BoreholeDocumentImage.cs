@@ -9,12 +9,31 @@ namespace Subsurface.Borehole
     {
         public Texture2D Texture;
         public int OriginalWidth,OriginalHeight;
+        public sealed class Pixels
+        {
+            public int Width,Height,OriginalWidth,OriginalHeight;public byte[] Bgra;
+            public Texture2D CreateTexture()
+            {
+                var texture=new Texture2D(Width,Height,TextureFormat.BGRA32,false){name="Document source pixels",hideFlags=HideFlags.DontSave,wrapMode=TextureWrapMode.Clamp,filterMode=FilterMode.Bilinear};
+                texture.LoadRawTextureData(Bgra);texture.Apply(false,true);return texture;
+            }
+        }
+        public static Pixels ReadRegion(string path,RectInt rectangle,int sample=1)
+        {
+            if(rectangle.width<=0||rectangle.height<=0||sample<1||rectangle.width>1024*sample||rectangle.height>1024*sample)throw new ArgumentException("Document tiles must fit their requested resolution.");
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            return ReadWindows(path,rectangle,1024,sample);
+#else
+            throw new PlatformNotSupportedException("Full-resolution TIFF regions currently require Windows.");
+#endif
+        }
         public static BoreholeDocumentImage Load(string path)
         {
             if(string.IsNullOrWhiteSpace(path)||!File.Exists(path))throw new IOException("Choose an existing document image.");
             if(new FileInfo(path).Length>512L*1024*1024)throw new IOException("The debug image loader supports files up to 512 MB.");
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-            return LoadWindows(Path.GetFullPath(path));
+            var pixels=ReadWindows(Path.GetFullPath(path),null,Math.Min(SystemInfo.maxTextureSize,16384));
+            return new BoreholeDocumentImage{Texture=pixels.CreateTexture(),OriginalWidth=pixels.OriginalWidth,OriginalHeight=pixels.OriginalHeight};
 #else
             string extension=Path.GetExtension(path).ToLowerInvariant();
             if(extension==".tif"||extension==".tiff")throw new PlatformNotSupportedException("TIFF file decoding is available on Windows. Supply a decoded texture through SetAnalysisResult on this platform.");
@@ -38,31 +57,36 @@ namespace Subsurface.Borehole
         [DllImport("ole32.dll")]static extern void CoUninitialize();
         static T Method<T>(IntPtr instance,int slot) where T:Delegate=>Marshal.GetDelegateForFunctionPointer<T>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(instance),slot*IntPtr.Size));
         static void Check(int result){if(result<0)Marshal.ThrowExceptionForHR(result);}
-        static BoreholeDocumentImage LoadWindows(string path)
+        [StructLayout(LayoutKind.Sequential)]struct WicRect{public int X,Y,Width,Height;}
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]delegate int Clip(IntPtr self,IntPtr source,ref WicRect rectangle);
+        static Pixels ReadWindows(string path,RectInt? region,int limit,int sample=1)
         {
-            IntPtr factory=IntPtr.Zero,decoder=IntPtr.Zero,frame=IntPtr.Zero,scaler=IntPtr.Zero,converter=IntPtr.Zero;Texture2D texture=null;bool uninitialize=false;
+            IntPtr factory=IntPtr.Zero,decoder=IntPtr.Zero,frame=IntPtr.Zero,scaler=IntPtr.Zero,converter=IntPtr.Zero,clipper=IntPtr.Zero;bool uninitialize=false;
             try
             {
-                int initialized=CoInitializeEx(IntPtr.Zero,2);if(initialized>=0)uninitialize=true;else if(initialized!=unchecked((int)0x80010106))Check(initialized);
+                int initialized=CoInitializeEx(IntPtr.Zero,0);if(initialized>=0)uninitialize=true;else if(initialized!=unchecked((int)0x80010106))Check(initialized);
                 var clsid=new Guid("cacaf262-9370-4615-a13b-9f5539da4c0a");var iid=new Guid("ec5ec8a9-c395-4314-9c77-54d7a935ff70");
                 Check(CoCreateInstance(ref clsid,IntPtr.Zero,1,ref iid,out factory));
                 Check(Method<CreateDecoder>(factory,3)(factory,path,IntPtr.Zero,0x80000000,0,out decoder));
                 Check(Method<GetUInt>(decoder,12)(decoder,out uint pages));if(pages!=1)throw new IOException("Use a single-page image. This TIFF contains "+pages+" pages.");
                 Check(Method<GetFrame>(decoder,13)(decoder,0,out frame));Check(Method<GetSize>(frame,3)(frame,out uint width,out uint height));
                 if(width==0||height==0||width>1000000||height>1000000)throw new IOException("Invalid or unsupported document dimensions.");
-                int limit=Math.Min(SystemInfo.maxTextureSize,16384);double factor=Math.Min(1,Math.Min(limit/(double)Math.Max(width,height),Math.Sqrt(32_000_000d/(width*(double)height))));
-                uint w=(uint)Math.Max(1,Math.Round(width*factor)),h=(uint)Math.Max(1,Math.Round(height*factor));IntPtr source=frame;
-                if(w!=width||h!=height){Check(Method<CreateObject>(factory,11)(factory,out scaler));Check(Method<Scale>(scaler,8)(scaler,frame,w,h,3));source=scaler;}
+                int originalWidth=(int)width,originalHeight=(int)height;IntPtr source=frame;
+                if(region.HasValue)
+                {
+                    var rect=region.Value;if(rect.x<0||rect.y<0||rect.xMax>width||rect.yMax>height)throw new ArgumentException("Document tile lies outside the source image.");
+                    var native=new WicRect{X=rect.x,Y=rect.y,Width=rect.width,Height=rect.height};Check(Method<CreateObject>(factory,12)(factory,out clipper));Check(Method<Clip>(clipper,8)(clipper,frame,ref native));source=clipper;width=(uint)rect.width;height=(uint)rect.height;
+                }
+                double factor=region.HasValue?1d/sample:Math.Min(1,Math.Min(limit/(double)Math.Max(width,height),Math.Sqrt(32_000_000d/(width*(double)height))));
+                uint w=(uint)Math.Max(1,Math.Round(width*factor)),h=(uint)Math.Max(1,Math.Round(height*factor));
+                if(w!=width||h!=height){Check(Method<CreateObject>(factory,11)(factory,out scaler));Check(Method<Scale>(scaler,8)(scaler,source,w,h,3));source=scaler;}
                 Check(Method<CreateObject>(factory,10)(factory,out converter));var bgra=new Guid("6fddc324-4e03-4bfe-b185-3d77768dc90f");
                 Check(Method<ConvertPixels>(converter,8)(converter,source,ref bgra,0,IntPtr.Zero,0,0));
                 int stride=checked((int)w*4);var bytes=new byte[checked(stride*(int)h)];Check(Method<CopyPixels>(converter,7)(converter,IntPtr.Zero,(uint)stride,(uint)bytes.Length,bytes));
                 var row=new byte[stride];for(int y=0;y<h/2;y++){int a=y*stride,b=((int)h-1-y)*stride;Buffer.BlockCopy(bytes,a,row,0,stride);Buffer.BlockCopy(bytes,b,bytes,a,stride);Buffer.BlockCopy(row,0,bytes,b,stride);}
-                texture=new Texture2D((int)w,(int)h,TextureFormat.BGRA32,false){name="Borehole document image",hideFlags=HideFlags.DontSave,wrapMode=TextureWrapMode.Clamp};
-                texture.LoadRawTextureData(bytes);texture.Apply(false,true);
-                return new BoreholeDocumentImage{Texture=texture,OriginalWidth=(int)width,OriginalHeight=(int)height};
+                return new Pixels{Width=(int)w,Height=(int)h,OriginalWidth=originalWidth,OriginalHeight=originalHeight,Bgra=bytes};
             }
-            catch{if(texture!=null)UnityEngine.Object.Destroy(texture);throw;}
-            finally{if(converter!=IntPtr.Zero)Marshal.Release(converter);if(scaler!=IntPtr.Zero)Marshal.Release(scaler);if(frame!=IntPtr.Zero)Marshal.Release(frame);if(decoder!=IntPtr.Zero)Marshal.Release(decoder);if(factory!=IntPtr.Zero)Marshal.Release(factory);if(uninitialize)CoUninitialize();}
+            finally{if(converter!=IntPtr.Zero)Marshal.Release(converter);if(scaler!=IntPtr.Zero)Marshal.Release(scaler);if(clipper!=IntPtr.Zero)Marshal.Release(clipper);if(frame!=IntPtr.Zero)Marshal.Release(frame);if(decoder!=IntPtr.Zero)Marshal.Release(decoder);if(factory!=IntPtr.Zero)Marshal.Release(factory);if(uninitialize)CoUninitialize();}
         }
 #endif
     }
