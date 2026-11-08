@@ -11,26 +11,20 @@ app (webapp/) and the command line: same inputs (image + bounding-box JSON), sam
     * <stem>_depth.png        the depth labels OCR read and the fitted pixel -> depth line
     * <stem>_annotated.tif    high-resolution result in the challenge notebook's style (lithology/drawing.py)
 and one summary.json for the whole folder (plus metrics when ground-truth labels are available).
-Methods: "hybrid" (default), "lithology" (lithology/ package only), "cv" (cv_pipeline.py only).
+Methods (Config.method, code in methods/): "lithology_cv" (default; hybrid_v3 + Pau's grid legend parser),
+"hybrid_v3", "hybrid_v2", "hybrid", "lithology" (lithology/ package only), "cv" (classic computer vision only).
 
-How it works (method "hybrid", hybrid_pipeline.py; the default "hybrid_v2" adds colour mode, see hybrid_v2.py)
+How it works (method "lithology_cv"; the web app's "How it works" page explains it step by step)
 ----------------------------------------------------------------------------------------
- 1. Column        crop the lithology column, strip its frame and track borders, blank isolated grid lines (cv).
- 2. Scale         measure the vertical pattern period and size every window and kernel from it (cv).
- 3. Clusters      describe sliding windows by stroke directions, blobs, density and fill colour; k-means with k by
-                  silhouette; a guard removes "transition" clusters; boundaries snap to the exact row (cv).
- 4. Legend        fast Tesseract swatch finder first; if it looks wrong, RapidOCR legend reader (lithology/ package,
-                  robust on mud logs); then a text-anchored fallback.
- 5. Naming        each cluster is matched to the legend against resized and thickened copies of every swatch, so a
-                  column drawn at another size or stroke weight still matches; identical swatches use a commonness
-                  prior and are flagged ambiguous, like near-ties.
- 6. Depth         Tesseract reads sideways or upright ("3,000") labels in seconds; if too few, RapidOCR reads them in
-                  any orientation (a few chunks first) and fits a line, piecewise when needed.
- 7. Merge         neighbouring intervals with the same name become one.
- 8. Output        CSV in the organisers' format, painted PNGs, legend and depth plots, the notebook-style TIF, metrics.
-
-Other methods: "lithology" (lithology/extract.py only: RapidOCR legend + per-window fingerprint matching) and "cv"
-(cv_pipeline.py only).
+ 1. Open          image + JSON with the depth column, lithology column and legend boxes.
+ 2. Column        crop, remove frame and grid lines, measure the pattern period (all sizes scale with it).
+ 3. Legend        swatches + names; readers compete on name quality (Tesseract size-groups, text-anchored, Pau's grid).
+ 4. Segment       colour logs: per-row fill colour vs legend colours; black-and-white: texture windows + k-means;
+                  boundaries snapped to the exact row.
+ 5. Cluster       intervals with the same pattern share a cluster id.
+ 6. Match         each cluster named after the most similar swatch (several sizes/stroke weights); ties flagged.
+ 7. Depth         Tesseract labels in strips (RapidOCR fallback), robust line fit; runs in parallel with 2-6.
+ 8. Output        merge equal neighbours, CSV, painted PNGs, legend and depth plots, annotated TIF on demand.
 
 Usage
 -----
@@ -71,7 +65,7 @@ for p in (str(HERE), str(REPO)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-import cv_pipeline as cv                                      # noqa: E402  (method "cv" + shared rendering/metrics)
+from methods import cv_pipeline as cv                        # noqa: E402  (method "cv" + shared rendering/metrics)
 from lithology import drawing as LD                           # noqa: E402
 from lithology import extract as LX                           # noqa: E402
 
@@ -319,16 +313,16 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
     out_dir.mkdir(parents=True, exist_ok=True)
     colours = colours or cv.Colours()
     if cfg.method == "lithology_cv":
-        import lithology_cv_pipeline
+        from methods import lithology_cv_pipeline
         record = lithology_cv_pipeline.process_log_lcv(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "hybrid_v3":
-        import hybrid_v3
+        from methods import hybrid_v3
         record = hybrid_v3.process_log_v3(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "hybrid_v2":
-        import hybrid_v2
+        from methods import hybrid_v2
         record = hybrid_v2.process_log_v2(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "hybrid":
-        import hybrid_pipeline
+        from methods import hybrid_pipeline
         record = hybrid_pipeline.process_log_hybrid(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "cv":
         record = cv.process_log(log, out_dir, cv_config(cfg), colours, lambda e: e.get("event") != "log_done" and on_progress(e))

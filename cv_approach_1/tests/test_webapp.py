@@ -72,8 +72,6 @@ def test_health_and_config(client):
     tie = next(f for f in cfg["fields"] if f["name"] == "tie_ratio")
     assert tie["type"] == "float" and tie["default"] == 0.1 and "tie" in tie["help"]
     assert client.get("/").status_code == 200
-    how = client.get("/api/how").json()
-    assert [s["n"] for s in how["steps"]] == list(range(1, 9))
 
 
 @needs_sample

@@ -26,10 +26,10 @@ from __future__ import annotations
 
 import numpy as np
 
-import cv_pipeline as cv
-import hybrid_pipeline as hy                                     # noqa: F401  (sets sys.path for lithology/)
-import hybrid_v2 as h2
-import hybrid_v3 as h3
+from . import cv_pipeline as cv
+from . import hybrid_pipeline as hy                              # also puts the repo root on sys.path for lithology/
+from . import hybrid_v2 as h2
+from . import hybrid_v3 as h3
 from lithology import extract as LX
 
 try:

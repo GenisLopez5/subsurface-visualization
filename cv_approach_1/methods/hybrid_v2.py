@@ -39,8 +39,8 @@ import cv2
 import numpy as np
 import pandas as pd
 
-import cv_pipeline as cv
-import hybrid_pipeline as hy
+from . import cv_pipeline as cv
+from . import hybrid_pipeline as hy
 from lithology import drawing as LD
 from lithology import extract as LX
 

@@ -449,8 +449,110 @@ async function cloneRun(id) {
 // ---------------------------------------------------------------------------------------------------------------------
 // How it works
 // ---------------------------------------------------------------------------------------------------------------------
-async function viewHow() {
-  view(`<div class="page-head"><div class="title"><h1>How it works</h1><div class="muted" id="howNote"></div></div></div><ol class="how" id="howList"></ol>
+function viewHow() {
+  const step = (n, title, task, text, eg) => `<li><div class="n">${n}</div><div><div class="t">${title}${task ? ` <span class="badge">${task}</span>` : ""}</div>
+    <div class="d">${text}</div>${eg ? `<div class="eg">${eg}</div>` : ""}</div></li>`;
+  view(`<div class="page-head"><div class="title"><h1>How it works</h1>
+    <div class="muted">The default method, <b>lithology_cv</b> (<code>methods/lithology_cv_pipeline.py</code>), explained step by step.</div></div></div>
+
+  <details class="group how-more"><summary>📋 Project description: the challenge we are solving</summary><div class="how-body">
+    <h3>Viridien challenge: lithology segmentation and clustering</h3>
+    <p><b>The problem:</b> Take scanned images of geological well logs and automatically pull out the lithology column as structured data. That means which rock type sits at which depth.</p>
+    <p><b>Background</b></p>
+    <ul><li>A lithology column is a vertical strip in a well log. It uses colours and patterns (dots, dashes and so on) to show the rock type at each depth: shale, siltstone, sandstone and others.</li>
+      <li>A lot of this data is stuck in PDFs and scans. Extracting it by hand is slow and repetitive. The data is useful for geothermal, carbon storage, critical minerals, hydrogen, and oil and gas.</li></ul>
+    <p><b>What your solution must do</b></p>
+    <ol><li><b>Segment</b> the column into intervals and find each interval’s top and bottom boundary in pixels.</li>
+      <li><b>Cluster</b> intervals that have the same or a similar visual pattern.</li>
+      <li><b>Match</b> each cluster to the legend to get the rock name.</li>
+      <li><b>Convert</b> pixel positions to real depths using the depth column, giving top and base depth.</li>
+      <li><b>Bonus:</b> find the depth column, lithology column and legend automatically, without the bounding boxes they supply.</li></ol>
+    <p><b>Data</b></p>
+    <ul><li>50 document images, with annotations giving bounding boxes for the depth column, the lithology column and the legend.</li>
+      <li>You’re allowed to label the development images by hand for training and tuning.</li>
+      <li>Hidden evaluation images are released near the end, so the solution has to generalise.</li></ul>
+    <p><b>What you deliver for each document</b></p>
+    <ul><li>A <b>CSV</b> with one row per interval: <code>top_y, bottom_y, cluster_id, lithology, top_depth, base_depth</code></li>
+      <li>An <b>annotated image</b> of the column showing the boundaries, depths and cluster or lithology labels.</li></ul>
+    <p><b>How it’s judged</b></p>
+    <ul><li>The criteria are correctness, generalisation, efficiency (runtime, memory, hardware, cost), simplicity and full automation, with no manual fixes in the final predictions.</li>
+      <li>In the demo you explain your approach, show results and limitations, and report runtime and resource use.</li>
+      <li>They stress <b>correctness and efficiency</b>.</li></ul>
+  </div></details>
+
+  <div class="card"><h2>The idea in one picture</h2>
+    <div class="flow">
+      <div class="fbox"><b>Input</b><span>scanned log + JSON with 3 boxes</span></div><div class="farrow">→</div>
+      <div class="fcol">
+        <div class="fbox"><b>Legend</b><span>which pattern = which rock</span></div>
+        <div class="fbox"><b>Lithology column</b><span>where the patterns change</span></div>
+        <div class="fbox"><b>Depth column</b><span>which pixel row = which depth</span></div>
+      </div><div class="farrow">→</div>
+      <div class="fbox"><b>Intervals</b><span>top, bottom, rock name, depth</span></div><div class="farrow">→</div>
+      <div class="fbox"><b>Output</b><span>CSV + annotated image</span></div>
+    </div>
+    <p class="muted small" style="margin:10px 0 0">The three boxes are read separately and combined at the end. Like a person would: look up the patterns in the
+      legend, follow the column from top to bottom, and read the depth off the scale next to it.</p>
+  </div>
+
+  <ol class="how">
+    ${step(1, "Open the log", "", "Load the scanned image and the JSON that says where the three boxes are: the <b>depth column</b>, the <b>lithology column</b> and the <b>legend</b>.")}
+    ${step(2, "Clean the column", "", "Cut out the lithology column. Remove its frame and the thin grid lines printed across it, so only the rock patterns remain. Measure how big the pattern repeats (e.g. dots every 12 px): every later step adapts to that size, so small and large scans work the same way.")}
+    ${step(3, "Read the legend", "", "Find every little sample box in the legend (a <i>swatch</i>) and read the word next to it with OCR. Several readers try in turn, from fast to slow, and the one whose names look most like real rock names wins. Pau's new <b>grid reader</b> is one of them: it is slow but the most careful, so it only runs when the fast ones struggle.",
+      "Swatch <span class='sw-dots'></span> + text “Sandstone” → the rock <b>Sandstone</b> looks like dots.")}
+    ${step(4, "Cut the column into intervals", "Segment", "Go down the column row by row and notice where the pattern changes. A change = a boundary between two rock layers. <b>Coloured logs</b>: compare each row's colour with the legend colours. <b>Black-and-white logs</b>: describe the texture (dots? lines? how dense?) and look for where it changes. Every boundary is then snapped to the exact pixel row.")}
+    ${step(5, "Group similar intervals", "Cluster", "Intervals that look the same get the same cluster number, even if they are far apart in the column (e.g. three separate sandstone layers = one cluster).")}
+    ${step(6, "Give each group its rock name", "Match", "Compare each cluster with every legend swatch and take the most similar one. The swatches are compared at several sizes and line thicknesses, because the column is rarely drawn at exactly the legend's size. If two swatches look identical, the name is marked as <b>ambiguous (?)</b>.")}
+    ${step(7, "Turn pixels into depths", "Convert", "Read the numbers printed in the depth column with OCR. Each number gives one point: <i>pixel row → depth</i>. Draw the best straight line through the points, ignoring misread numbers. Now every pixel row has a depth. (This runs at the same time as steps 2–6, on the second processor core.)",
+      "Row 1 200 says 1 000 m, row 3 200 says 1 100 m → 1 row = 0.05 m.")}
+    ${step(8, "Write the results", "", "Join neighbouring intervals with the same rock, then write the <b>CSV</b> (one row per interval) and draw the <b>annotated image</b> (boundaries, depths and names on the column).")}
+  </ol>
+
+  <details class="group how-more"><summary>🔬 More details: the technical version</summary><div class="how-body">
+    <h3>Column and segmentation</h3>
+    <ul>
+      <li><b>Ink mask</b>: each pixel is ink or paper; for colour logs, “relative ink” = pixels darker than the median lightness − 30, so thin dark lines on a coloured fill still count.</li>
+      <li><b>Pattern period P</b>: measured from the column's vertical autocorrelation; windows, kernels and minimum interval lengths are all expressed in multiples of P.</li>
+      <li><b>Colour mode</b> (≥ 3 legend swatches with real colour): every row's fill colour in CIE Lab is matched to legend colour groups (ΔE76 &lt; 10); swatches that share a colour are told apart by texture inside the group (density and stroke-direction floors). A row is blank only if it has no ink <i>and</i> paper colour (keeps white Chalk).</li>
+      <li><b>Texture mode</b> (black-and-white): sliding windows described by stroke directions, blobs, ink density; k-means with k chosen by silhouette score; a guard removes short “transition” clusters between two real layers; boundaries are refined to the exact row.</li>
+    </ul>
+    <h3>Legend</h3>
+    <ul>
+      <li>Readers: <b>size-groups</b> (Tesseract, boxes of equal size) → <b>text-anchored</b> (Tesseract, words first) → <b>grid</b> (Pau's <code>lithology/legend_grid.py</code>, RapidOCR, one OCR per swatch column, non-overlapping cells) → Pau's older parser only if grid finds nothing.</li>
+      <li>Each result gets a <b>name-quality score</b> (real rock words, no glued or junk names). Stop early when ≥ 3 swatches and quality ≥ 80 %; otherwise the best score wins.</li>
+      <li>Strip-shaped legends are normalised (swatch boxes re-aligned to a common column/row grid). Look-alike swatches are grouped; ties are broken by how common the rock is, and flagged.</li>
+    </ul>
+    <h3>Depth</h3>
+    <ul>
+      <li><b>Tesseract</b> in 3 000-row strips: the middle strip is read both sideways and upright to find the label orientation, then 8 evenly spaced strips (16 if fewer than 8 labels fit).</li>
+      <li><b>Robust fit</b> (Pau's algorithm): RANSAC over label pairs, then drop labels far from the line (MAD) and refit; piecewise-linear if one line leaves rms &gt; 3 px.</li>
+      <li>Accepted with ≥ 4 labels and rms ≤ 5 px; otherwise the other orientation, then <b>RapidOCR</b> on 4 → 8 → 12 chunks.</li>
+    </ul>
+    <h3>Speed</h3>
+    <ul>
+      <li>Depth OCR runs in a background thread while the column is analysed. Tesseract uses one OpenMP thread per call (2–3× faster on small crops).</li>
+      <li>Legend picture drawn with PIL instead of matplotlib; the full-resolution annotated TIF is only drawn when you download the Output zip.</li>
+      <li>Typical: ~10 s for a normal log, ~25 s for a long mud log (Callaway) on 2 CPU cores, no GPU.</li>
+    </ul>
+    <h3>Other methods (for comparison on the Evaluation page)</h3>
+    <dl class="kv">
+      <dt><code>hybrid_v3</code></dt><dd>Same as lithology_cv without Pau's grid legend reader.</dd>
+      <dt><code>hybrid_v2</code></dt><dd>Colour mode, blank fix and legend quality score; simpler depth fit. The shared engine the newer methods plug into.</dd>
+      <dt><code>hybrid</code></dt><dd>First hybrid: classic CV segmentation with OCR fallbacks.</dd>
+      <dt><code>lithology</code></dt><dd>Pau's <code>lithology/</code> package on its own (classifies windows directly against the legend).</dd>
+      <dt><code>cv</code></dt><dd>Classic computer vision only (clustering, Tesseract).</dd>
+    </dl>
+    <h3>Code map</h3>
+    <dl class="kv">
+      <dt><code>lithology_pipeline.py</code></dt><dd>Entry point: settings (<code>Config</code>), picks the method, runs a folder, command line.</dd>
+      <dt><code>methods/lithology_cv_pipeline.py</code></dt><dd>Legend readers competition + wiring of the steps above.</dd>
+      <dt><code>methods/hybrid_v3.py</code></dt><dd>Depth reading (Tesseract strips, robust fit, RapidOCR fallback), fast legend picture.</dd>
+      <dt><code>methods/hybrid_v2.py</code></dt><dd>The engine: column, colour mode, segmentation, naming, outputs.</dd>
+      <dt><code>methods/cv_pipeline.py</code></dt><dd>Building blocks: ink masks, texture features, clustering, rendering, metrics.</dd>
+      <dt><code>lithology/</code></dt><dd>Pau's package: RapidOCR, legend grid parser, depth fit, TIF drawing.</dd>
+    </dl>
+  </div></details>
+
   <div class="card"><h2>What each output shows</h2><dl class="kv">
     <dt><code>&lt;stem&gt;.csv</code></dt><dd>One row per interval: top/bottom depth, lithology, top/bottom pixel row, cluster (submission format).</dd>
     <dt>Column view</dt><dd>Depth + lithology columns zoomed in; a coloured band per interval, a line and the depth at each boundary, the cluster id on the right (<b>?</b> = ambiguous name).</dd>
@@ -458,11 +560,6 @@ async function viewHow() {
     <dt>Legend</dt><dd>The swatches found in the legend box and the names OCR read; look-alike swatches in red.</dd>
     <dt>Depth</dt><dd>Depth labels read by OCR (blue = used, red = rejected) and the fitted line depth = a·y + b.</dd>
     <dt>Accuracy</dt><dd>Only for logs with ground truth: % of pixel rows with the right rock, boundary error in px, boundary F1 within 10 px.</dd></dl></div>`);
-  try {
-    const h = await api("/api/how");
-    $("#howNote").textContent = h.note ? `Classic computer vision: ${h.note}.` : "";
-    $("#howList").innerHTML = h.steps.map((s) => `<li><div class="n">${s.n}</div><div class="t">${esc(s.title)}</div><div class="d">${esc(s.text)}</div></li>`).join("");
-  } catch (e) { fail(e); }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1204,8 +1301,7 @@ async function viewLog(id, stem) {
     <div class="row">
       <button id="prevBtn" ${prev ? "" : "disabled"} title="Previous log (←)">← Prev</button><button id="nextBtn" ${next ? "" : "disabled"} title="Next log (→)">Next →</button>
       ${d.files.annotated_tif ? `<a class="btn" href="/api/runs/${id}/files/outputs/${enc(d.files.annotated_tif)}?download=true" title="High-resolution result in the challenge notebook's style">⬇ Annotated TIF</a>` : ""}
-      ${d.files.csv ? `<a class="btn primary" href="/api/runs/${id}/files/outputs/${enc(d.files.csv)}?download=true">⬇ CSV</a>
-        <a class="btn primary" id="outputBtn" href="/api/runs/${id}/logs/${enc(stem)}/output" title="Zip with the CSV and the annotated image (.tif)">⬇ Output</a>` : ""}
+      ${d.files.csv ? `<a class="btn primary" id="outputBtn" href="/api/runs/${id}/logs/${enc(stem)}/output" title="Zip with the CSV and the annotated image (.tif)">⬇ Output</a>` : ""}
     </div></div>
   ${d.error ? `<div class="notice err"><strong>This log failed:</strong> ${esc(d.error)}</div>` : ""}
   ${!r && !d.error ? `<div class="notice">Details (clusters, legend, depth, timings) appear when the whole run has finished; intervals come from the CSV.</div>` : ""}

@@ -595,30 +595,6 @@ def save_preset(body: dict = Body(...)):
     return load_presets()
 
 
-@app.delete("/api/presets/{name}")
-def delete_preset(name: str):
-    user = load_presets()["user"]
-    user.pop(name, None)
-    PRESETS.write_text(json.dumps(user, indent=2))
-    return load_presets()
-
-
-@app.get("/api/how")
-def how_it_works():
-    doc = lp.__doc__ or ""
-    block = doc.split("How it works", 1)[-1].split("Usage", 1)[0]
-    steps, cur = [], None
-    for line in block.splitlines():
-        m = re.match(r"\s*(\d+)\.\s+(\w[\w+ ]*?)\s{2,}(.*)", line)
-        if m:
-            cur = dict(n=int(m.group(1)), title=m.group(2).strip(), text=m.group(3).strip())
-            steps.append(cur)
-        elif cur and line.strip() and not set(line.strip()) <= {"-"}:
-            cur["text"] += " " + line.strip()
-    head = re.search(r"\((.*?)\)", block)
-    return dict(steps=steps, note=head.group(1) if head else "")
-
-
 def _looks_like_data(p: Path) -> bool:
     if (p / "bbox_annotation").is_dir():
         return True

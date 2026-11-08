@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import contextlib
 import io
-from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
 
-import cv_pipeline as cv
-import hybrid_v2 as h2
+from . import cv_pipeline as cv
+from . import hybrid_v2 as h2
 from lithology import extract as LX
 
 
@@ -173,13 +172,12 @@ def plot_legend_fast(swatches, groups, path) -> str | None:
     matplotlib). Each swatch is shown 3x with its OCR name; look-alikes in red."""
     if not swatches:
         return None
-    from cv_pipeline import _font
     ncol = min(len(swatches), 8)
     cell_w, cell_h, z = 200, 92, 3
     rows = int(np.ceil(len(swatches) / ncol))
     out = Image.new("RGB", (ncol * cell_w, rows * cell_h), "white")
     d = ImageDraw.Draw(out)
-    font = _font(12)
+    font = cv._font(12)
     for i, s in enumerate(swatches):
         cx, cy = (i % ncol) * cell_w, (i // ncol) * cell_h
         look = [swatches[j].name for j in groups.get(i, {i}) if j != i]

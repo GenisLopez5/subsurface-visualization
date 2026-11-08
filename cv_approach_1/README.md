@@ -17,10 +17,21 @@ Extracts the interpreted lithology column of scanned well logs (intervals, rock 
 3. **Monitor**: progress bar, current log and stage, ETA, memory, live event log, **Cancel**.
 4. **Results**: summary cards, flags (no legend, no depth, …), sortable/filterable table, runtime and accuracy charts,
    confusion matrix. Click a log for the zoomable column/page viewer, intervals, clusters, legend and depth fit.
-5. **Clone & re-run** a run to try other settings on the same files. Downloads: CSVs (.zip) or everything.
+5. **Clone & re-run** a run to try other settings on the same files. Downloads: per log an Output zip (CSV + annotated TIF); per run CSVs (.zip) or everything.
 
 Runs live in `runs/<YYYYmmdd-HHMMSS>/`. Accuracy needs ground truth in a labels folder (`<stem>.csv`) or the
 organisers' `example.csv`.
+
+## Files
+
+```
+lithology_pipeline.py      entry point: Config (every setting), method dispatch, batch runner, CLI
+methods/                   the extraction methods (default "lithology_cv"; see methods/__init__.py)
+webapp/                    the web app: app.py (FastAPI server), worker.py (runs a batch), static/ (page)
+labels/                    ground-truth CSVs used for accuracy and the Evaluation page
+tests/                     web app + regression tests
+runs/, outputs*/           results (not in git)
+```
 
 ## Command line
 

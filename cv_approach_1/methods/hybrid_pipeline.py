@@ -25,17 +25,17 @@ import time
 import tracemalloc
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 import numpy as np
 import pandas as pd
 
 import sys
-_REPO = str(Path(__file__).resolve().parent.parent)                 # the repository root holds lithology/
+_REPO = str(Path(__file__).resolve().parents[2])                    # the repository root holds lithology/
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
-import cv_pipeline as cv                                            # noqa: E402
+from . import cv_pipeline as cv                                     # noqa: E402
 from lithology import drawing as LD                                 # noqa: E402
 from lithology import extract as LX  # noqa: E402
 
