@@ -1,0 +1,8 @@
+{
+  "name": "Explorer.Runtime",
+  "rootNamespace": "Subsurface.Explorer",
+  "references": [
+    "Borehole.Runtime"
+  ],
+  "autoReferenced": true
+}

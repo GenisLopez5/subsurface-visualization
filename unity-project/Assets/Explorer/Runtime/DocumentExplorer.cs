@@ -17,7 +17,31 @@ namespace Subsurface.Explorer
         public BoreholeViewer viewer;
         public UIDocument document;
         public StyleSheet stylesheet;
-        [Serializable]public class Entry {public string id,name,status,error,created_at,updated_at;}
+        [Serializable]public class GeoLocation
+        {
+            public double latitude,longitude,lat,lon,lng;
+            public double[] coordinates;
+            public string name,label,place,location_name;
+            public bool has_coordinates;
+        }
+        [Serializable]public class EntryStats
+        {
+            public GeoLocation location,geo_location;
+            public double latitude,longitude,lat,lon,lng;
+            public double[] coordinates;
+            public string location_name,location_label,place;
+            public bool has_location;
+        }
+        [Serializable]public class Entry
+        {
+            public string id,name,status,error,created_at,updated_at;
+            public GeoLocation location,geo_location;
+            public EntryStats stats;
+            public double latitude,longitude,lat,lon,lng;
+            public double[] coordinates;
+            public string location_name,location_label,place;
+            public bool has_location;
+        }
         [Serializable]class DeleteResult {public string[] deleted,not_found;}
         [Serializable]class Listing {public int total;public Entry[] items;}
         [Serializable]class Rejected {public string filename,reason;}
@@ -27,13 +51,13 @@ namespace Subsurface.Explorer
         readonly List<Entry> files=new List<Entry>();
         readonly HashSet<string> selected=new HashSet<string>();
         Tracking tracking=new Tracking();
-        VisualElement root,page,activity,activityBody;
+        VisualElement root,page,activity,activityBody,libraryContent,locationCard;
         ScrollView rows;
-        Label message,selection,activityTitle;
+        Label message,selection,activityTitle,locationTitle,locationCoordinates,locationDescription;
         TextField search;
         VisualElement contextMenu,confirmation;
         Button downloadAll,activityToggle,activityClose,searchClear;
-        ExplorerSpinner feedbackSpinner;VisualElement busyOverlay;Label busyFile,searchPlaceholder;string openingName;bool listing;
+        ExplorerSpinner feedbackSpinner;VisualElement busyOverlay;Label busyFile,searchPlaceholder;WorldLocationMap locationMap;string openingName,hoveredLocationId;bool listing;
         Texture2D activeImage;
         int anchor=-1,revision,openRevision;
         bool uploading,opening,downloading,descending,deleting,visualizing,activityDismissed,activityCollapsed;
@@ -55,8 +79,14 @@ namespace Subsurface.Explorer
             var actions=Line(page,"actions");selection=new Label("Select documents");selection.AddToClassList("grow");actions.Add(selection);
             
             CreateHostControls(actions,"explorerHost");downloadAll=AddButton(actions,"Download all",()=>Download(true));
-            var fileCard=new VisualElement();fileCard.AddToClassList("file-card");page.Add(fileCard);var header=Line(fileCard,"file-header");AddButton(header,"Name ↕",()=>{descending=!descending;Sort();Render();},"name");
+            libraryContent=Line(page,"library-content");libraryContent.RegisterCallback<GeometryChangedEvent>(e=>libraryContent.EnableInClassList("compact",e.newRect.width<820));
+            var fileCard=new VisualElement();fileCard.AddToClassList("file-card");libraryContent.Add(fileCard);var header=Line(fileCard,"file-header");AddButton(header,"Name ↕",()=>{descending=!descending;Sort();Render();},"name");
             rows=new ScrollView();rows.AddToClassList("file-list");fileCard.Add(rows);
+            locationCard=new VisualElement();locationCard.AddToClassList("location-card");libraryContent.Add(locationCard);
+            var locationHeader=Line(locationCard,"location-header");var locationKicker=new Label("LOCATION");locationKicker.AddToClassList("location-kicker");locationHeader.Add(locationKicker);var liveDot=new VisualElement();liveDot.AddToClassList("location-live-dot");locationHeader.Add(liveDot);
+            locationMap=new WorldLocationMap();locationCard.Add(locationMap);locationTitle=new Label();locationTitle.enableRichText=false;locationTitle.AddToClassList("location-title");locationCard.Add(locationTitle);
+            locationCoordinates=new Label();locationCoordinates.enableRichText=false;locationCoordinates.AddToClassList("location-coordinates");locationCard.Add(locationCoordinates);
+            locationDescription=new Label();locationDescription.AddToClassList("location-description");locationCard.Add(locationDescription);ClearLocationPreview();
             var feedback=Line(page,"feedback");feedbackSpinner=new ExplorerSpinner();feedback.Add(feedbackSpinner);message=new Label();message.AddToClassList("message");feedback.Add(message);
             busyOverlay=new VisualElement{name="openingOverlay"};busyOverlay.AddToClassList("opening-overlay");var busyCard=new VisualElement();busyCard.AddToClassList("opening-card");busyOverlay.Add(busyCard);var largeSpinner=new ExplorerSpinner();largeSpinner.AddToClassList("spinner-large");busyCard.Add(largeSpinner);var busyTitle=new Label("Opening document");busyTitle.AddToClassList("opening-title");busyCard.Add(busyTitle);busyFile=new Label();busyFile.enableRichText=false;busyFile.AddToClassList("opening-file");busyCard.Add(busyFile);busyOverlay.style.display=DisplayStyle.None;page.Add(busyOverlay);
             activity=new VisualElement();activity.AddToClassList("activity");root.Add(activity);var activityHeader=Line(activity,"activity-header");activityTitle=new Label("Uploads");activityTitle.AddToClassList("grow");activityHeader.Add(activityTitle);
@@ -104,14 +134,62 @@ namespace Subsurface.Explorer
         void Sort(){files.Sort((a,b)=>(descending?-1:1)*StringComparer.OrdinalIgnoreCase.Compare(a.name,b.name));anchor=-1;}
         void Render()
         {
-            rows.Clear();for(int i=0;i<files.Count;i++)
+            ClearLocationPreview();rows.Clear();for(int i=0;i<files.Count;i++)
             {
-                int index=i;var file=files[i];var row=new VisualElement();row.AddToClassList("file-row");row.EnableInClassList("selected",selected.Contains(file.id));
-                var name=new Label(file.name);name.enableRichText=false;name.tooltip=file.name;name.AddToClassList("name");row.Add(name);rows.Add(row);
+                int index=i;var file=files[i];var row=new VisualElement{focusable=true};row.AddToClassList("file-row");row.EnableInClassList("selected",selected.Contains(file.id));
+                var name=new Label(file.name);name.enableRichText=false;name.tooltip=file.name;name.AddToClassList("name");row.Add(name);
+                if(TryGetLocation(file,out _,out _,out _)){var marker=new VisualElement();marker.AddToClassList("row-location-marker");marker.tooltip="Location available";row.Add(marker);}rows.Add(row);
+                row.RegisterCallback<PointerEnterEvent>(_=>PreviewLocation(file));row.RegisterCallback<PointerLeaveEvent>(_=>ClearLocationPreview(file));
+                row.RegisterCallback<FocusInEvent>(_=>PreviewLocation(file));row.RegisterCallback<FocusOutEvent>(_=>ClearLocationPreview(file));
+                row.RegisterCallback<KeyDownEvent>(e=>{if(e.keyCode==KeyCode.Return||e.keyCode==KeyCode.KeypadEnter){Open(file);e.StopPropagation();}});
                 row.RegisterCallback<PointerDownEvent>(e=>{if(e.button==1){if(!selected.Contains(file.id))Select(index,false,false);ShowContextMenu(e.position);e.StopPropagation();return;}if(e.button!=0)return;CloseContextMenu();Select(index,e.shiftKey,e.ctrlKey||e.commandKey);if(e.clickCount==2&&!e.shiftKey&&!e.ctrlKey&&!e.commandKey)Open(file);});
             }
             selection.text=selected.Count==0?files.Count+" documents":selected.Count+" selected";
         }
+        void PreviewLocation(Entry file)
+        {
+            hoveredLocationId=file.id;
+            if(!TryGetLocation(file,out double latitude,out double longitude,out string label))
+            {
+                locationMap.ClearLocation();locationCard.RemoveFromClassList("has-location");locationTitle.text=file.name;locationCoordinates.text="Location unavailable";locationDescription.text="This document does not include valid coordinates.";return;
+            }
+            locationMap.SetLocation(latitude,longitude);locationCard.AddToClassList("has-location");locationTitle.text=string.IsNullOrWhiteSpace(label)?file.name:label;
+            locationCoordinates.text=Coordinate(latitude,true)+"  ·  "+Coordinate(longitude,false);locationDescription.text=string.IsNullOrWhiteSpace(label)?file.name:"Source: "+file.name;
+        }
+        void ClearLocationPreview(Entry file){if(hoveredLocationId==file.id)ClearLocationPreview();}
+        void ClearLocationPreview()
+        {
+            hoveredLocationId=null;if(locationMap==null)return;locationMap.ClearLocation();locationCard.RemoveFromClassList("has-location");locationTitle.text="Hover a document";locationCoordinates.text="No location selected";locationDescription.text="Coordinates extracted from the TIFF will be highlighted here.";
+        }
+        static string Coordinate(double value,bool latitude)
+        {
+            string direction=latitude?(value<0?"S":"N"):(value<0?"W":"E");return Math.Abs(value).ToString("0.####",CultureInfo.InvariantCulture)+"° "+direction;
+        }
+        public static bool TryGetLocation(Entry entry,out double latitude,out double longitude,out string label)
+        {
+            latitude=longitude=0;label=null;if(entry==null)return false;
+            if(TryGetLocation(entry.location,out latitude,out longitude,out label)||TryGetLocation(entry.geo_location,out latitude,out longitude,out label))return true;
+            if(entry.stats!=null)
+            {
+                if(TryGetLocation(entry.stats.location,out latitude,out longitude,out label)||TryGetLocation(entry.stats.geo_location,out latitude,out longitude,out label))return true;
+                label=First(entry.stats.location_name,entry.stats.location_label,entry.stats.place);
+                if(TryCoordinates(entry.stats.latitude,entry.stats.longitude,entry.stats.lat,entry.stats.lon,entry.stats.lng,entry.stats.coordinates,entry.stats.has_location||!string.IsNullOrEmpty(label),out latitude,out longitude))return true;
+            }
+            label=First(entry.location_name,entry.location_label,entry.place);
+            return TryCoordinates(entry.latitude,entry.longitude,entry.lat,entry.lon,entry.lng,entry.coordinates,entry.has_location||!string.IsNullOrEmpty(label),out latitude,out longitude);
+        }
+        static bool TryGetLocation(GeoLocation location,out double latitude,out double longitude,out string label)
+        {
+            latitude=longitude=0;label=null;if(location==null)return false;label=First(location.name,location.label,location.place,location.location_name);
+            return TryCoordinates(location.latitude,location.longitude,location.lat,location.lon,location.lng,location.coordinates,location.has_coordinates||!string.IsNullOrEmpty(label),out latitude,out longitude);
+        }
+        static bool TryCoordinates(double latitude,double longitude,double lat,double lon,double lng,double[] coordinates,bool explicitlyPresent,out double resultLatitude,out double resultLongitude)
+        {
+            resultLatitude=latitude!=0?latitude:lat;resultLongitude=longitude!=0?longitude:(lon!=0?lon:lng);
+            if(resultLatitude==0&&resultLongitude==0&&coordinates!=null&&coordinates.Length>=2){resultLongitude=coordinates[0];resultLatitude=coordinates[1];explicitlyPresent=true;}
+            return (explicitlyPresent||resultLatitude!=0||resultLongitude!=0)&&WorldLocationMap.Valid(resultLatitude,resultLongitude);
+        }
+        static string First(params string[] values){foreach(string value in values)if(!string.IsNullOrWhiteSpace(value))return value.Trim();return null;}
         public void Select(int index,bool shift,bool control)
         {
             if(index<0||index>=files.Count)return;
