@@ -22,7 +22,7 @@ For the web UI (asynchronous, with progress)
     GET  /api/batch/{id}/picture/{i}
 
 For frontends (files and results stored in Postgres; see files_api.py)
-    /api/v1/...                       uploads, batches, files, downloads, previews, health
+    /api/v1/...                       uploads, files, downloads, previews, health
 
 Desktop helpers (only with --desktop, when the server runs on the user's machine)
     POST /api/desktop/pick-folder     native folder dialog (zenity)
@@ -85,6 +85,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from . import files_api
 
     hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store)
+    from . import legend_review
+
+    app.include_router(legend_review.make_router(s, store, images, jobs.lock))
     app.state.settings, app.state.jobs = s, jobs
 
     # ------------------------------------------------------------------ helpers
@@ -181,7 +184,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         return {"ok": True, "annotations": len(store.all())}
 
-    @app.post("/api/process", summary="Process one log image: returns the annotated TIF and the CSV")
+    @app.post("/api/process", summary="Process one log image: returns the annotated TIF and the CSV",
+              description="`output=zip`: the ZIP, with the annotated TIF's layout in the `X-Legend-Height` / "
+                          "`X-Scale` / `X-Y-Start` headers. `output=json`: `{id, image, annotation, notes, "
+                          "intervals, layout, csv, annotated_tif_url, csv_url}`, where `layout` is the annotated "
+                          "TIF's `{legend_height_px, scale, y_start, original_width, original_height, image_width, "
+                          "image_height}`.\n\n" + drawing.LAYOUT_DOC,
+              responses={200: {"content": {"application/zip": {}, "application/json": {}},
+                               "headers": drawing.LAYOUT_OPENAPI_HEADERS,
+                               "description": "ZIP (layout in the headers) or JSON (with `layout`)"}})
     def process(file: UploadFile = File(..., description="log image: .tif/.tiff/.pdf/.png"),
                 annotation: UploadFile | None = File(None, description="optional bounding-box JSON; "
                                                      "if omitted, the matching JSON from the store is used"),
@@ -241,7 +252,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job = jobs.submit(img, ann_path, force == "1", notes)
         return {"id": job.id, "image": img.name, "annotation": ann_path.name}
 
-    @app.get("/api/jobs/{jid}")
+    @app.get("/api/jobs/{jid}", description="Status, progress log, summary and intervals. When done, `layout` "
+                                            "is the layout of `overview.png`.\n\n" + drawing.LAYOUT_DOC)
     def job_status(jid: str):
         job = job_or_404(jid)
         return job if isinstance(job, JSONResponse) else job_json(job)
@@ -260,14 +272,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return job
         return job if job.status == "done" else err("Not ready", 409)
 
-    @app.get("/api/jobs/{jid}/overview.png")
+    @app.get("/api/jobs/{jid}/overview.png", responses=drawing.image_response_doc("image/png"))
     def overview(jid: str):
         job = _done(jid)
         if isinstance(job, JSONResponse):
             return job
         return FileResponse(job.overview, media_type="image/png", headers=drawing.layout_headers(job.overview_layout))
 
-    @app.get("/api/jobs/{jid}/zoom.png")
+    @app.get("/api/jobs/{jid}/zoom.png",
+             responses=drawing.image_response_doc("image/png", "a strip of the page: X-Y-Start is its first row"))
     def zoom(jid: str, top: float, bottom: float, scale: float = Query(0.5, gt=0, le=1)):
         job = _done(jid)
         if isinstance(job, JSONResponse):
@@ -276,7 +289,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(png, media_type="image/png", headers={"X-File-Path": str(png.with_suffix(".tif").resolve()),
                                                                   **drawing.layout_headers(drawing.read_layout(png))})
 
-    @app.get("/api/jobs/{jid}/annotated.tif")
+    @app.get("/api/jobs/{jid}/annotated.tif", responses=drawing.image_response_doc("image/tiff"))
     def annotated_tif(jid: str):
         job = _done(jid)
         if isinstance(job, JSONResponse):
