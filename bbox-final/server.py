@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Bounding-box service: the bbox-final workflow (int8 OpenVINO models) behind HTTP, so a lighter machine
-can send it images instead of running the models itself.
+Bounding-box service: the bbox-final workflow behind HTTP, so a lighter machine can send it images instead
+of running the models itself. Device (BBOX_DEVICE=auto): an NVIDIA GPU with the .pt weights in models-pt/,
+else the int8 OpenVINO models on an Intel GPU, else on the CPU. /health reports the one in use.
 
     POST /detect   multipart `file` (.tif/.tiff/.png/.jpg) -> {image_name, width, height, bounding_boxes{
                    depth_column, interpreted_lithology_column, lithology_legend}}, [xmin, ymin, xmax, ymax]
@@ -39,13 +40,55 @@ _state: dict = {"predictor": None, "error": None}
 _lock = threading.Lock()  # one prediction at a time: the models are shared and the CPU is busy anyway
 
 
+HERE = Path(__file__).resolve().parent
+PT_MODELS = HERE / "models-pt"  # manifest.json + general.pt + legend.pt, used on an NVIDIA GPU
+
+
+def _pt_models_ready() -> bool:
+    import json
+    try:
+        manifest = json.loads((PT_MODELS / "manifest.json").read_text(encoding="utf-8"))
+        return all((PT_MODELS / m["file"]).is_file() for m in manifest["models"].values())
+    except (OSError, ValueError, KeyError):
+        return False
+
+
+def _choose() -> tuple[Path | None, str]:
+    """(models_dir, device). BBOX_DEVICE=auto (default): NVIDIA GPU with the .pt weights in models-pt/,
+    else the int8 OpenVINO models on an Intel GPU, else on the CPU. BBOX_DEVICE=cpu / 0 / intel:gpu forces it."""
+    forced = os.environ.get("BBOX_DEVICE", "auto").strip().lower()
+    if forced not in ("", "auto"):
+        on_cuda = not forced.startswith(("cpu", "intel"))
+        return (PT_MODELS if on_cuda else None), forced
+    try:
+        import torch
+        cuda = torch.cuda.is_available()
+    except Exception:
+        cuda = False
+    if cuda and _pt_models_ready():
+        return PT_MODELS, "0"
+    if cuda:
+        print(f"NVIDIA GPU found, but no .pt weights in {PT_MODELS} (see its README): the OpenVINO models "
+              "can't run on it", file=sys.stderr)
+    try:
+        import openvino as ov
+        if any(d.startswith("GPU") for d in ov.Core().available_devices):
+            return None, "intel:gpu"
+    except Exception:
+        pass
+    return None, "cpu"
+
+
 def _load():
     with _lock:
         if _state["predictor"] is None:
             try:
+                models_dir, device = _choose()
+                print(f"running the models on: {device}" + (f" ({models_dir.name})" if models_dir else ""),
+                      file=sys.stderr)
                 with redirect_stdout(sys.stderr):
-                    _state["predictor"] = BoundingBoxPredictor(device=os.environ.get("BBOX_DEVICE", "auto"),
-                                                               cpu_threads=None)
+                    _state["predictor"] = BoundingBoxPredictor(device=device, cpu_threads=None,
+                                                               models_dir=models_dir)
                 _state["error"] = None
             except Exception as e:
                 _state["error"] = f"{type(e).__name__}: {e}"
