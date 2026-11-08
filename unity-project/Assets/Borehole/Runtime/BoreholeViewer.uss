@@ -105,3 +105,6 @@ Button:hover { background-color: #e9ddff; }
 .header .filename { overflow: hidden; text-overflow: ellipsis; }
 
 .document-legends.legends-expanded { width: 720px; }
+
+.document-focus .column-pane { display: none; }
+.document-focus .document-pane { border-right-width: 0; }

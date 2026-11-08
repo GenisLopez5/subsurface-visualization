@@ -22,6 +22,8 @@ namespace Subsurface.Borehole
         public double FocusDepthFeet {get;private set;}
         public double WindowFeet {get;private set;}
         public bool DocumentMode => false;
+        public bool DocumentFocus {get;private set;}
+        double savedFocusDepth,savedWindowFeet;
         public bool ShowingSurface => column.Document!=null&&((documentPane!=null&&documentPane.AtHeader)||FocusDepthFeet<=column.Document.TopFeet);
         public bool DocumentSynchronized => documentPane!=null&&documentPane.IsSynchronized;
         public double VisibleTopFeet => FocusDepthFeet-WindowFeet/(2*Math.Cos(pitch*Math.PI/180));
@@ -92,6 +94,8 @@ namespace Subsurface.Borehole
             zoomSlider=root.Q<Slider>("zoomSlider");zoomPercent=root.Q<Label>("zoomPercent");
             zoomSlider.RegisterValueChangedCallback(e=>{if(column.Document==null)return;double target=column.Document.SpanFeet*1.4*Math.Pow(1d/1400,e.newValue);Zoom(target/WindowFeet);});
             root.Q<Button>("fit").clicked+=FitColumn;
+            root.Q<Button>("focusDocument").clicked+=()=>SetDocumentFocus(!DocumentFocus);
+            root.RegisterCallback<KeyDownEvent>(e=>{if(e.keyCode==KeyCode.Escape&&DocumentFocus){SetDocumentFocus(false);e.StopPropagation();}});
             var appearance=root.Q<DropdownField>("appearance");appearance.choices=new List<string>{"Textured lithology","Legend / patterns"};appearance.index=0;
             appearance.RegisterValueChangedCallback(e=>{displayMode=e.newValue=="Legend / patterns"?DisplayMode.Legend:DisplayMode.Texture;column.SetMode(displayMode);});
             ruler.Clear();labelLayer.Clear();ticks.Clear();intervalLabels.Clear();intervalConnectors.Clear();
@@ -178,6 +182,15 @@ namespace Subsurface.Borehole
         void UpdateDocumentImage()
         {
             documentPane?.Bind(column.Document,SegmentedImage,DocumentPixelWidth,DocumentPixelHeight);poseDirty=true;
+        }
+        public void SetDocumentFocus(bool focused)
+        {
+            if(focused==DocumentFocus)return;
+            if(focused){savedFocusDepth=FocusDepthFeet;savedWindowFeet=WindowFeet;}
+            DocumentFocus=focused;root.EnableInClassList("document-focus",focused);
+            root.Q<Button>("focusDocument").text=focused?"Restore split view":"Focus document";
+            if(!focused){WindowFeet=savedWindowFeet;SetDepth(savedFocusDepth);}
+            documentPane?.SetFocus(focused);poseDirty=true;
         }
         public void SetDocumentMode(bool document)
         {

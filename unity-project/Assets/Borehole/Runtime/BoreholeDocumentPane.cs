@@ -17,15 +17,17 @@ namespace Subsurface.Borehole
             tiles.Tick();
             if(!string.IsNullOrEmpty(tiles.Error)){notice.text="Full-resolution detail unavailable: "+tiles.Error;notice.RemoveFromClassList("hidden");}
         }
+        bool focusMode;float focusZoom=1,focusPanX,previousX;double splitCenter;
+        public void SetFocus(bool value){if(value){splitCenter=center;focusZoom=1;focusPanX=0;}else center=splitCenter;focusMode=value;Refresh();}
         public bool AtHeader=>IsSynchronized&&center<map.FirstPixel;
         public BoreholeDocumentPane(BoreholeViewer viewer,VisualElement root)
         {
             this.viewer=viewer;viewport=root.Q("documentViewport");window=root.Q("documentWindow");selection=root.Q("documentSelection");placeholder=root.Q("documentPlaceholder");image=root.Q<Image>("documentImage");state=root.Q<Label>("syncState");notice=root.Q<Label>("documentNotice");readout=root.Q<Label>("pixelReadout");image.scaleMode=ScaleMode.StretchToFill;
             tiles=new BoreholeDocumentTiles(root.Q("documentTiles"));
             viewport.RegisterCallback<GeometryChangedEvent>(_=>Refresh());
-            viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey)viewer.Zoom(Math.Pow(1.12,e.delta.y));else Pan(e.delta.y*20);e.StopPropagation();});
-            viewport.RegisterCallback<PointerDownEvent>(e=>{if(e.button!=0)return;dragging=true;pointer=e.pointerId;previousY=e.localPosition.y;viewport.CapturePointer(pointer);});
-            viewport.RegisterCallback<PointerMoveEvent>(e=>{if(!dragging||pointer!=e.pointerId)return;float y=e.localPosition.y;Pan(previousY-y);previousY=y;});
+            viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey){if(focusMode){focusZoom=Mathf.Clamp(focusZoom/(float)Math.Pow(1.12,e.delta.y),.1f,20);Refresh();}else viewer.Zoom(Math.Pow(1.12,e.delta.y));}else Pan(e.delta.y*20);e.StopPropagation();});
+            viewport.RegisterCallback<PointerDownEvent>(e=>{if(e.button!=0)return;dragging=true;pointer=e.pointerId;previousY=e.localPosition.y;previousX=e.localPosition.x;viewport.CapturePointer(pointer);});
+            viewport.RegisterCallback<PointerMoveEvent>(e=>{if(!dragging||pointer!=e.pointerId)return;float y=e.localPosition.y;if(focusMode){focusPanX+=e.localPosition.x-previousX;previousX=e.localPosition.x;}Pan(previousY-y);previousY=y;});
             viewport.RegisterCallback<PointerUpEvent>(e=>{if(e.pointerId!=pointer)return;dragging=false;viewport.ReleasePointer(pointer);});viewport.RegisterCallback<PointerCaptureOutEvent>(_=>dragging=false);
         }
         public void Bind(BoreholeDocument data,Texture2D page,int width,int height)
@@ -45,16 +47,17 @@ namespace Subsurface.Borehole
         void Pan(float amount)
         {
             if(texture==null||scale<=0)return;center=Math.Max(0,Math.Min(originalHeight,center+amount/scale));
-            if(IsSynchronized)viewer.SetDepth(map.ToDepth(center),true);Refresh();
+            if(IsSynchronized&&!focusMode)viewer.SetDepth(map.ToDepth(center),true);Refresh();
         }
         public void Refresh()
         {
             if(!initialized)return;notice.text=problem??"";notice.EnableInClassList("hidden",string.IsNullOrEmpty(problem));window.style.display=DisplayStyle.None;selection.style.display=DisplayStyle.None;if(texture==null)return;
             float width=viewport.contentRect.width,height=viewport.contentRect.height;if(width<1||height<1)return;
             float fit=Mathf.Min(width/originalWidth,height/originalHeight),zoom=viewer.column.Document==null?1:(float)(viewer.column.Document.SpanFeet*1.15/Math.Max(.0001,viewer.WindowFeet));
-            scale=Mathf.Min(width/originalWidth,fit*zoom);
-            if(IsSynchronized&&!AtHeader){double span=map.ToPixel(viewer.VisibleBottomFeet)-map.ToPixel(viewer.VisibleTopFeet);if(span>0)scale=Mathf.Min(scale,(float)(height/span));}
+            scale=focusMode?width/originalWidth*focusZoom:Mathf.Min(width/originalWidth,fit*zoom);
+            if(!focusMode&&IsSynchronized&&!AtHeader){double span=map.ToPixel(viewer.VisibleBottomFeet)-map.ToPixel(viewer.VisibleTopFeet);if(span>0)scale=Mathf.Min(scale,(float)(height/span));}
             float drawnWidth=originalWidth*scale,drawnHeight=originalHeight*scale,left=(width-drawnWidth)*.5f;
+            if(focusMode&&drawnWidth>width)left=Mathf.Clamp(left+focusPanX,width-drawnWidth,0);
             float offset=drawnHeight<=height?(height-drawnHeight)*.5f:Mathf.Clamp(height*.5f-(float)center*scale,height-drawnHeight,0);
             image.style.left=left;image.style.top=offset;image.style.width=drawnWidth;image.style.height=drawnHeight;
             tiles.SetView(viewer.FullResolutionDocumentPath,originalWidth,originalHeight,left,offset,scale,width,height);
