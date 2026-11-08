@@ -10,6 +10,8 @@ Open **Tools → Lithology → Open Demo Scene**, then Play. Families, Recipes, 
 
 Generated output: `Assets/Lithology/Generated`. Catalogue: `LithologyCatalog.asset`. Demo: `Demo/LithologyDemo.unity`. Runtime scripts and shader are separate from Editor tooling and tests. Generated maps/materials are replaceable assets, not photoreal scans or measured geology.
 
+Rock presentation uses family-specific grain detail, contrast and relief. Loose sand has smaller, softer grains with a capped screen footprint; silt, clay and shale use fine matte detail rather than pebble-like bumps. Other rock families retain stronger texture emphasis. The shader exposes contrast, grain size, minimum/maximum grain-tile pixels, relief and fine-surface strength for visual tuning; a zero maximum keeps authored scale uncapped. These are display exaggerations, not measured grain sizes. Schematic/unknown materials use irregular fine mottling instead of diagonal hatching; their original labels and uncertainty remain unchanged. Legend mode keeps flat, non-diagonal identification patterns.
+
 Other menu commands initialize/update only, generate previews/materials, validate, open the searchable catalogue/texture authoring window, and pack a selected conventional roughness map into a linear surface map. Preview resolution defaults to 128; call `LithologyPreviewGenerator.Generate(256)` from an Editor script for another size (32–512).
 
 ## Apply to any mesh or material slot

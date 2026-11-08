@@ -39,6 +39,12 @@ Shader "Lithology/URP Lithology Lit"
   _DetailStrength("Detail color strength",Range(0,1))=.4
   _DetailEnabled("Independent detail supported",Float)=1
   _NormalStrength("Relief strength",Range(0,2))=.5
+  _RockContrast("Rock detail contrast",Range(1,2.5))=1.65
+  _RockGrainSize("Visible rock grain size",Range(1,6))=3
+  _MinimumGrainPixels("Minimum readable grain tile (pixels)",Range(0,32))=24
+  _MaximumGrainPixels("Maximum grain tile pixels (0 = authored)",Range(0,128))=0
+  _FineSurfaceStrength("Fine matte surface detail",Range(0,1))=0
+  _ReliefGain("Rock relief emphasis",Range(1,3))=1.8
   _HasNormal("Has macro normal",Float)=0
   _HasDetailNormal("Has grain normal",Float)=0
   _HasSurface("Has packed surface",Float)=0
@@ -83,7 +89,7 @@ Shader "Lithology/URP Lithology Lit"
    float4 _GeoOrigin,_BeddingNormal,_CleavageNormal,_DisplayOrigin;
    float _MacroScale,_GrainScale,_DetailStrength,_DetailEnabled,_NormalStrength,_HasNormal,_HasDetailNormal,_HasSurface,_InvertGreen,_Smoothness;
    float _WorldSpace,_Triplanar,_UnitMetres,_VeinWidth,_Irregularity,_Seed,_Legend,_Schematic,_StatusPattern,_LayerCount,_ProceduralDark;
-   float _HasCoverageMask,_MineralBalance,_HasMineralRegions,_DisplayScale;
+   float _HasCoverageMask,_MineralBalance,_HasMineralRegions,_DisplayScale,_RockContrast,_RockGrainSize,_MinimumGrainPixels,_MaximumGrainPixels,_FineSurfaceStrength,_ReliefGain;
   CBUFFER_END
   struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; float4 tangentOS:TANGENT; float2 uv:TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
   struct Varyings { float4 positionCS:SV_POSITION; float3 positionWS:TEXCOORD0; float3 positionOS:TEXCOORD1; float3 normalWS:TEXCOORD2; float4 tangentWS:TEXCOORD3; float2 uv:TEXCOORD4; float fog:TEXCOORD5; UNITY_VERTEX_INPUT_INSTANCE_ID UNITY_VERTEX_OUTPUT_STEREO };
@@ -170,32 +176,38 @@ Shader "Lithology/URP Lithology Lit"
    float3 density=_WorldSpace>.5?float3(_DisplayScale,_DisplayScale,_DisplayScale):float3(1,_DisplayScale,1);
    float3 p=(anchor+(original-anchor)*density)*_UnitMetres;
    float3 texturePosition=p;
-   float3 macro=texturePosition/max(_MacroScale,.00001),grain=texturePosition/max(_GrainScale,.00001);
+   float footprint=max(length(ddx(texturePosition)),length(ddy(texturePosition)));
+   float grainScale=max(max(_GrainScale*_RockGrainSize,.00001),footprint*_MinimumGrainPixels);
+   if(_MaximumGrainPixels>0)grainScale=min(grainScale,max(footprint*_MaximumGrainPixels,.00001));
+   float3 macro=texturePosition/max(_MacroScale,.00001),grain=texturePosition/grainScale;
    grain*=lerp(float3(1,1,1),float3(.55,4,1),_Fabric.x);
    float fade=DetailFade(grain)*_DetailEnabled;
    s.color=Map(TEXTURE2D_ARGS(_BaseMap,sampler_BaseMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001)).rgb*_Tint.rgb;
-   s.color*=lerp(.94,1.06,Noise(p/max(_Spacing.w,.00001)));
-   float4 detail=Map(TEXTURE2D_ARGS(_DetailMap,sampler_DetailMap),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001));
-   float4 regions=Map(TEXTURE2D_ARGS(_MineralMask,sampler_MineralMask),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001));
-   s.color*=lerp(1,detail.rgb*1.65,fade*_DetailStrength);
+   s.color*=lerp(.76,1.30,Noise(p/max(_Spacing.w,.00001)));
+   float4 detail=Map(TEXTURE2D_ARGS(_DetailMap,sampler_DetailMap),grain,n,(i.uv*float2(1,_DisplayScale))/grainScale);
+   float4 regions=Map(TEXTURE2D_ARGS(_MineralMask,sampler_MineralMask),grain,n,(i.uv*float2(1,_DisplayScale))/grainScale);
+   float detailAmount=saturate(fade*_DetailStrength*_RockContrast);
+   float3 grainColor=clamp(1+(detail.rgb*2.85-1)*_RockContrast,.50,1.50);
+   s.color*=lerp(1,grainColor,detailAmount);
    s.color=lerp(s.color,s.color*_MineralLight.rgb*1.3,regions.r*fade*.55);
    float darkRegion=lerp(regions.g,1-smoothstep(_MineralBalance-.03,_MineralBalance+.03,regions.b),_HasMineralRegions);
    s.color=lerp(s.color,s.color*_MineralDark.rgb*2,darkRegion*fade*.8);
    float4 packed=Map(TEXTURE2D_ARGS(_SurfaceMap,sampler_SurfaceMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001));
    s.metal=0; // Bulk host is dielectric. Only explicit component masks can be metallic.
-   s.ao=lerp(1,packed.g,_HasSurface);s.smooth=saturate(_Smoothness*lerp(1,packed.a*2,_HasSurface));
+   s.ao=lerp(1,packed.g,_HasSurface)*lerp(1,lerp(.65,1,saturate(dot(detail.rgb,float3(.2126,.7152,.0722))*1.65)),detailAmount);s.smooth=saturate(_Smoothness*lerp(1,packed.a*2,_HasSurface));
    s.smooth=lerp(s.smooth,saturate(s.smooth+.06),(1-_Fabric.w)*_Fabric.z); // Cement between supported grains, never assumed open voids.
    float3 normal=n;
    if(_HasNormal>.5)normal=ProjectedNormal(TEXTURE2D_ARGS(_NormalMap,sampler_NormalMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001),i.tangentWS);
    if(_HasDetailNormal>.5)
    {
-    float3 dn=ProjectedNormal(TEXTURE2D_ARGS(_DetailNormal,sampler_DetailNormal),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001),i.tangentWS);
+    float3 dn=ProjectedNormal(TEXTURE2D_ARGS(_DetailNormal,sampler_DetailNormal),grain,n,(i.uv*float2(1,_DisplayScale))/grainScale,i.tangentWS);
     // RNM in an orthonormal local surface frame, then return to projection space.
     float3 t=normalize(cross(abs(n.y)<.95?float3(0,1,0):float3(1,0,0),n)),b=cross(n,t);
     float3 a=float3(dot(normal,t),dot(normal,b),dot(normal,n)),d=float3(dot(dn,t),dot(dn,b),dot(dn,n));
     float3 rn=RNM(a,d);normal=normalize(lerp(normal,t*rn.x+b*rn.y+n*rn.z,fade));
    }
-   normal=normalize(lerp(n,normal,_NormalStrength));
+   float reliefStrength=min(2,_NormalStrength*_ReliefGain);
+   normal=normalize(lerp(n,normal,reliefStrength));
    s.normal=_WorldSpace>.5||_Triplanar<.5?normal:TransformObjectToWorldNormal(normal);
    float warp=Noise(p/max(_Spacing.w,.00001))*_Irregularity;
    float bed=.5+.5*sin((dot(p,normalize(_BeddingNormal.xyz))/max(_Spacing.x,.00001)+warp)*6.28318);
@@ -219,19 +231,35 @@ Shader "Lithology/URP Lithology Lit"
      smooth*=data.a*2;ao=data.g;metal=max(metal,data.r);
     }
     s.color=lerp(s.color,color,mask);s.smooth=lerp(s.smooth,smooth,mask);s.metal=lerp(s.metal,metal,mask);s.ao=lerp(s.ao,ao,mask);
-    cn=normalize(lerp(nWS,cn,_NormalStrength));s.normal=normalize(lerp(s.normal,cn,mask));h+=mask*layer.w*.0015;
+    cn=normalize(lerp(nWS,cn,reliefStrength));s.normal=normalize(lerp(s.normal,cn,mask));h+=mask*layer.w*.0015;
    }
-   s.normal=Bump(s.normal,i.positionWS,h/max(_DisplayScale,.000001),_NormalStrength);
+   s.normal=Bump(s.normal,i.positionWS,h/max(_DisplayScale,.000001),reliefStrength);
    if(_ProceduralDark>.5)s.color=lerp(s.color,float3(.025,.018,.012),.95)*lerp(.85,1.1,Noise(p/max(_Spacing.w,.00001))); // Explicit tar/bitumen role.
-   if(_Legend>.5||_Schematic>.5)
+   if(_Legend>.5)
    {
-    float3 q=p/max(.12,_Spacing.x);float pat=step(.65,frac(q.x+q.y*(1+fmod(_StatusPattern,3))));
-    if(_StatusPattern==2)pat=max(step(.8,frac(q.x)),step(.8,frac(q.y)));
-    if(_StatusPattern==3)pat=step(.72,frac(q.x-q.y));
+    float3 q=p/max(.12,_Spacing.x);float pat=step(.60,Noise(q*3));
+    if(_StatusPattern==2)pat=max(step(.85,frac(q.x)),step(.85,frac(q.y)));
+    if(_StatusPattern==3)pat=1-smoothstep(.12,.25,length(frac(q.xy)-.5));
     if(_StatusPattern==4)pat=step(.7,Noise(q*2));
     s.color=_LegendColor.rgb*lerp(.6,1.15,pat);s.normal=nWS;s.smooth=.12;s.metal=0;s.ao=1;
    }
-   if(_StatusPattern==5)s.color=lerp(s.color,float3(.95,.4,.1),step(.8,frac((p.x+p.y)*10))*.35);
+   else if(_Schematic>.5)
+   {
+    float3 q=p/max(.08,_Spacing.x*1.6);float coarse=Noise(q*.85),fine=Noise(q*4.7);
+    float chips=smoothstep(.48,.75,Noise(q*2.8));
+    s.color=_LegendColor.rgb*lerp(.48,1.32,saturate(coarse*.65+fine*.35));s.color=lerp(s.color,s.color*.60,chips*.35);
+    s.normal=Bump(nWS,i.positionWS,(coarse*.006+fine*.0015)/max(_DisplayScale,.000001),reliefStrength);
+    s.smooth=.12;s.metal=0;s.ao=lerp(.72,1,fine);
+   }
+   if(_StatusPattern==5)s.color=lerp(s.color,float3(.95,.4,.1),step(.8,Noise(p/max(.08,_Spacing.w)*7))*.35);
+   if(_Legend<.5&&_FineSurfaceStrength>0)
+   {
+    float micro=Noise(texturePosition/max(footprint*2.8,.00001));
+    float flecks=Noise(texturePosition/max(footprint*14,.00001));
+    s.color*=lerp(1,lerp(.80,1.20,micro)*lerp(.90,1.10,flecks),_FineSurfaceStrength);
+    s.normal=Bump(s.normal,i.positionWS,(micro-.5)*footprint/max(_DisplayScale,.000001),_FineSurfaceStrength*.18);
+    s.smooth=lerp(s.smooth,min(s.smooth,.16),_FineSurfaceStrength);
+   }
    return s;
   }
   half4 Frag(Varyings i):SV_Target

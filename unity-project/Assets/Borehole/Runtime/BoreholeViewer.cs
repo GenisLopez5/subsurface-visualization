@@ -268,9 +268,9 @@ namespace Subsurface.Borehole
             float radialScale=columnCamera.orthographicSize*columnCamera.aspect*widthFraction/column.radius;
             column.transform.localScale=new Vector3(radialScale,1,radialScale);
             cutaway?.SetWidth(radialScale);
-            // Reference appearance: the 60 ft close-up shown in the material acceptance image.
+            // Keep coarse rock features legible at the 60 ft reference close-up.
             float referenceSize=(float)(60/column.Document.SpanFeet)*column.displayHeight*.5f;
-            column.SetTextureDisplayScale(referenceSize/(1.4f*Mathf.Max(.00001f,columnCamera.orthographicSize)));
+            column.SetTextureDisplayScale(referenceSize/(2.8f*Mathf.Max(.00001f,columnCamera.orthographicSize)));
             column.SetHighlightWidth(columnCamera.orthographicSize*4/Mathf.Max(1,viewport.contentRect.height));
             var rotation=Quaternion.Euler(pitch,yaw,0);var focus=column.transform.TransformPoint(new Vector3(0,map.ToY(FocusDepthFeet)+(atSurface?(cutaway!=null?cutaway.SurfaceOffset:0)+columnCamera.orthographicSize*.1f:0),0));
             columnCamera.transform.SetPositionAndRotation(focus+rotation*Vector3.back*45,rotation);
