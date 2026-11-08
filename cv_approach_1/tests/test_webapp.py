@@ -152,8 +152,11 @@ def test_unlabelled_log_has_no_accuracy(client, tmp_path):
     tif, js, _ = SAMPLE
     folder = tmp_path / "logs"
     folder.mkdir()
-    (folder / tif.name).symlink_to(tif)
-    (folder / js.name).symlink_to(js)
+    # another name, so the example's ground truth (picked up automatically from labels/) does not apply
+    (folder / "unlabelled_copy.tif").symlink_to(tif)
+    ann = json.loads(js.read_text())
+    ann["image_name"] = "unlabelled_copy.tif"
+    (folder / "unlabelled_copy.json").write_text(json.dumps(ann))
     rid = client.post("/api/runs", json={}).json()["id"]
     r = client.post(f"/api/runs/{rid}/link", json={"path": str(folder)})
     assert r.status_code == 200 and r.json()["linked"] == 1
@@ -170,7 +173,7 @@ def test_unlabelled_log_has_no_accuracy(client, tmp_path):
     assert clone["status"] == "draft" and clone["config_overrides"] == {"column_scale": 0.3}
     assert client.get(f"/api/runs/{clone['id']}/preflight").json()["n_ok"] == 1
     assert client.delete(f"/api/runs/{clone['id']}").status_code == 200
-    assert tif.is_file() and (folder / tif.name).exists()
+    assert tif.is_file() and (folder / "unlabelled_copy.tif").exists()
 
 
 @needs_sample
