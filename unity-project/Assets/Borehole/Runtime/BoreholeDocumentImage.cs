@@ -27,6 +27,17 @@ namespace Subsurface.Borehole
             throw new PlatformNotSupportedException("Full-resolution TIFF regions currently require Windows.");
 #endif
         }
+        public static Pixels ReadPreview(string path,int maximumEdge=2048)
+        {
+            if(string.IsNullOrWhiteSpace(path)||!File.Exists(path))throw new IOException("Choose an existing document image.");
+            if(new FileInfo(path).Length>512L*1024*1024)throw new IOException("Document exceeds the 512 MB limit.");
+            if(maximumEdge<1||maximumEdge>16384)throw new ArgumentOutOfRangeException(nameof(maximumEdge));
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            return ReadWindows(Path.GetFullPath(path),null,maximumEdge);
+#else
+            throw new PlatformNotSupportedException("Background document decoding currently requires Windows.");
+#endif
+        }
         public static BoreholeDocumentImage Load(string path)
         {
             if(string.IsNullOrWhiteSpace(path)||!File.Exists(path))throw new IOException("Choose an existing document image.");

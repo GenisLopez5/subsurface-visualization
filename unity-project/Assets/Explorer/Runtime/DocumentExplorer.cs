@@ -78,7 +78,7 @@ namespace Subsurface.Explorer
         void UpdateFeedback()
         {
             if(feedbackSpinner==null)return;feedbackSpinner.style.display=listing||opening||downloading||deleting?DisplayStyle.Flex:DisplayStyle.None;
-            busyOverlay.style.display=opening&&!visualizing?DisplayStyle.Flex:DisplayStyle.None;busyFile.text=openingName??"";
+            busyOverlay.style.display=opening&&!visualizing?DisplayStyle.Flex:DisplayStyle.None;busyFile.text=(openingName??"")+"\n"+(opening?message.text:"");
         }
         public void Refresh(){CloseContextMenu();StartCoroutine(ListFiles(++revision));}
         IEnumerator ListFiles(int version)
@@ -125,27 +125,38 @@ namespace Subsurface.Explorer
         public void Open(Entry file){CloseContextMenu();if(opening||deleting||connecting)return;StartCoroutine(OpenFile(file,++openRevision));}
         IEnumerator OpenFile(Entry file,int version)
         {
+            var timer=System.Diagnostics.Stopwatch.StartNew();double downloadMs=0,prepareMs=0;System.Threading.Tasks.Task pendingWork=null;
             opening=true;openingName=file.name;Say("Opening "+file.name+"…");byte[] originalLegend=null,generatedLegend=null;string csv=null;double displacement=0;string temp=Path.Combine(Application.temporaryCachePath,Guid.NewGuid()+".tif"),archive=temp+".zip";
             try
             {
                 using(var request=UnityWebRequest.Get(Url("/api/v1/files/"+file.id+"/result?format=zip")))
                 {
-                    request.downloadHandler=new DownloadHandlerFile(archive){removeFileOnAbort=true};request.timeout=180;yield return request.SendWebRequest();if(request.result!=UnityWebRequest.Result.Success){Say(request.responseCode==404?"This document's result is not available yet. Refresh and try again.":"Result download failed: "+request.error);yield break;}
+                    request.downloadHandler=new DownloadHandlerFile(archive){removeFileOnAbort=true};request.timeout=180;var operation=request.SendWebRequest();while(!operation.isDone){Say("Downloading result · "+(request.downloadedBytes/1048576d).ToString("0.0",CultureInfo.InvariantCulture)+" MB");yield return null;}downloadMs=timer.Elapsed.TotalMilliseconds;if(request.result!=UnityWebRequest.Result.Success){Say(request.responseCode==404?"This document's result is not available yet. Refresh and try again.":"Result download failed: "+request.error);yield break;}
                 }
                 if(version!=openRevision)yield break;
-                Say("Preparing document…");yield return null;BoreholeDocumentImage image=null;
+                Say("Preparing document preview…");yield return null;BoreholeDocumentImage image=null;
+                var work=System.Threading.Tasks.Task.Run(()=>
+                {
+                    var preparation=System.Diagnostics.Stopwatch.StartNew();
+                    var original=DocumentResultArchive.ReadLegend(archive,true);var generated=DocumentResultArchive.ReadLegend(archive,false);
+                    string content=DocumentResultArchive.Read(archive,temp,out var offset);var pixels=BoreholeDocumentImage.ReadPreview(temp);
+                    if((offset.result_width>0&&offset.result_width!=pixels.OriginalWidth)||(offset.result_height>0&&offset.result_height!=pixels.OriginalHeight))throw new IOException("The result image dimensions disagree with its offset metadata.");
+                    return (original,generated,content,offset,pixels,preparation.Elapsed.TotalMilliseconds);
+                });
+                pendingWork=work;while(!work.IsCompleted)yield return null;
+                if(version!=openRevision){if(work.IsFaulted)Debug.LogWarning(work.Exception.GetBaseException().Message);yield break;}
                 try
                 {
-                    originalLegend=DocumentResultArchive.ReadLegend(archive,true);generatedLegend=DocumentResultArchive.ReadLegend(archive,false);csv=DocumentResultArchive.Read(archive,temp,out var offset);displacement=offset.offset_y_px;image=BoreholeDocumentImage.Load(temp);
+                    var prepared=work.GetAwaiter().GetResult();originalLegend=prepared.original;generatedLegend=prepared.generated;csv=prepared.content;displacement=prepared.offset.offset_y_px;prepareMs=prepared.Item6;var offset=prepared.offset;image=new BoreholeDocumentImage{Texture=prepared.pixels.CreateTexture(),OriginalWidth=prepared.pixels.OriginalWidth,OriginalHeight=prepared.pixels.OriginalHeight};
                     if((offset.result_width>0&&offset.result_width!=image.OriginalWidth)||(offset.result_height>0&&offset.result_height!=image.OriginalHeight))throw new IOException("The result image dimensions disagree with its offset metadata.");
                 }
                 catch(Exception e){if(image!=null)Destroy(image.Texture);Say("Cannot open document result: "+e.Message);yield break;}
                 if(!viewer.SetAnalysisResult(csv,image.Texture,file.name,image.OriginalWidth,image.OriginalHeight,displacement,temp)){Destroy(image.Texture);Say(viewer.LastError);yield break;}
                 viewer.SetLegends(originalLegend,generatedLegend);if(activeImage!=null)Destroy(activeImage);activeImage=image.Texture;viewer.Root.style.display=DisplayStyle.Flex;page.style.display=DisplayStyle.None;visualizing=true;ClearFinishedUploads();RenderActivity();
                 var header=viewer.Root.Q(className:"header");var back=viewer.Root.Q<Button>("backToDocuments");if(back==null){back=new Button(ShowLibrary){name="backToDocuments",text="← Documents"};back.AddToClassList("header-button");header.Insert(0,back);}
-                Say("");
+                yield return null;Debug.Log("DOCUMENT_LOAD "+file.id+" download_ms="+downloadMs.ToString("0.0",CultureInfo.InvariantCulture)+" prepare_ms="+prepareMs.ToString("0.0",CultureInfo.InvariantCulture)+" first_usable_ms="+timer.Elapsed.TotalMilliseconds.ToString("0.0",CultureInfo.InvariantCulture));Say("");
             }
-            finally{if(File.Exists(temp))File.Delete(temp);if(File.Exists(archive))File.Delete(archive);opening=false;UpdateFeedback();}
+            finally{Action cleanup=()=>{try{if(File.Exists(temp))File.Delete(temp);if(File.Exists(archive))File.Delete(archive);}catch(IOException){}catch(UnauthorizedAccessException){}};if(pendingWork!=null&&!pendingWork.IsCompleted)pendingWork.ContinueWith(t=>{if(t.IsFaulted){var observed=t.Exception;}cleanup();});else cleanup();opening=false;UpdateFeedback();}
         }
         void ChooseUpload()
         {

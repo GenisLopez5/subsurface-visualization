@@ -12,6 +12,19 @@ namespace Subsurface.Borehole.Tests
             var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,cluster_id\n20,30,Sandstone,alpha\n0,10,Shale,beta");
             Assert.That(data.Headers[3],Is.EqualTo("cluster_id"));Assert.That(data.SourceRows[0].TopFeet,Is.EqualTo(20));Assert.That(data.SourceRows[0].SourceValues[3],Is.EqualTo("alpha"));Assert.That(data.Intervals[0].TopFeet,Is.EqualTo(0));
         }
+        [TestCase("aa715df0-ee67-47ee-b700-184bac706b7c")][TestCase("e0971608-6986-4e46-85da-8b2320516f2e")]
+        public void RepresentativePreviewKeepsNativeCoordinatesAndReportsDecodeCost(string id)
+        {
+            string fixtures=Environment.GetEnvironmentVariable("SUBSURFACE_PERF_FIXTURES");if(string.IsNullOrEmpty(fixtures))Assert.Ignore("Set SUBSURFACE_PERF_FIXTURES to the directory containing the documented TIFF fixtures.");
+            string path=Path.Combine(fixtures,id+".tif");if(!File.Exists(path))Assert.Ignore("Representative fixture not available.");
+            for(int run=0;run<3;run++)
+            {
+                var timer=System.Diagnostics.Stopwatch.StartNew();var baseline=BoreholeDocumentImage.Load(path);double before=timer.Elapsed.TotalMilliseconds;
+                timer.Restart();var pixels=System.Threading.Tasks.Task.Run(()=>BoreholeDocumentImage.ReadPreview(path)).GetAwaiter().GetResult();var preview=pixels.CreateTexture();double after=timer.Elapsed.TotalMilliseconds;
+                try{Assert.That(pixels.OriginalWidth,Is.EqualTo(baseline.OriginalWidth));Assert.That(pixels.OriginalHeight,Is.EqualTo(baseline.OriginalHeight));Assert.That(Math.Max(preview.width,preview.height),Is.LessThanOrEqualTo(2048));UnityEngine.Debug.Log("DOCUMENT_PREVIEW "+id+" run="+run+" baseline_ms="+before.ToString("0.0",System.Globalization.CultureInfo.InvariantCulture)+" preview_ms="+after.ToString("0.0",System.Globalization.CultureInfo.InvariantCulture)+" baseline_pixels="+(baseline.Texture.width*baseline.Texture.height)+" preview_pixels="+(preview.width*preview.height));}
+                finally{UnityEngine.Object.DestroyImmediate(baseline.Texture);UnityEngine.Object.DestroyImmediate(preview);}
+            }
+        }
         const string Header="top_depth,bottom_depth,lithology,top_y,bottom_y\n";
         [Test]public void LegendDisplacementShiftsBothDirectionsWithoutChangingCsvOrScale()
         {
