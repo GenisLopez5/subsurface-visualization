@@ -166,9 +166,9 @@ async function viewNew() {
     <input type="text" id="runName" placeholder="e.g. Callaway, hybrid method" maxlength="120"></div></div>
 
   <div data-panel="single">
-    <div class="card"><h2>One image + its annotation</h2>
-      <div class="dropzone" id="drop" tabindex="0" role="button" style="padding:40px 16px"><strong>Drop the .tif and its .json here</strong> or click to choose both<br>
-        <span class="small">.tif / .tiff / .png / .jpg / .pdf + the bounding-box .json</span></div>
+    <div class="card"><h2>One image</h2>
+      <div class="dropzone" id="drop" tabindex="0" role="button" style="padding:40px 16px"><strong>Drop the image here</strong> (+ its .json if you have one) or click to choose<br>
+        <span class="small">.tif / .tiff / .png / .jpg / .pdf. The boxes are found automatically; a bounding-box .json with the same name is the fallback.</span></div>
       <input type="file" id="fileInput" multiple class="hidden" accept=".tif,.tiff,.png,.jpg,.jpeg,.pdf,.json">
       <p class="small muted">Next: a quick check of both files, the settings, then Start.</p>
       <details style="margin-top:6px"><summary class="muted" style="cursor:pointer">…or pick an image already on this computer (no upload)</summary>
@@ -196,7 +196,8 @@ async function viewNew() {
         <p class="small muted">Ground truth = a <code>&lt;image name&gt;.csv</code> in <code id="defLabels">cv_approach_1/labels</code> (columns top_depth, bottom_depth, lithology, top_y, bottom_y). Add more CSVs there to evaluate more images.</p>
       </div>
       <div class="card"><h2>2 · Methods to compare</h2>
-        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology_cv" checked> <b>lithology_cv</b>&nbsp;<span class="muted small">hybrid_v3 + Pau's grid legend parser (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="automatic_lithology_cv" checked> <b>automatic_lithology_cv</b>&nbsp;<span class="muted small">lithology_cv + automatic bounding boxes (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology_cv" checked> <b>lithology_cv</b>&nbsp;<span class="muted small">hybrid_v3 + Pau's grid legend reader, boxes from the .json</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v3" checked> <b>hybrid_v3</b>&nbsp;<span class="muted small">hybrid_v2 + Pau's robust depth fit</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v2" checked> <b>hybrid_v2</b>&nbsp;<span class="muted small">colour mode, blank fix, legend quality</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks</span></label>
@@ -230,7 +231,7 @@ async function viewNew() {
   wireDrop($("#drop"), $("#fileInput"), async (files) => {
     if (!files.length) return;
     const imgs = files.filter((f) => !/\.(json|csv)$/i.test(f.name));
-    if (imgs.length > 1) toast("Single image: drop one image (+ its .json). Use Batch for a folder.", true);
+    if (imgs.length > 1) toast("Single image: drop one image (+ its .json if you have one). Use Batch for a folder.", true);
     try { const r = await newRun(imgs[0] ? imgs[0].name.replace(/\.[^.]+$/, "") : ""); S.pendingUpload = [...files]; location.hash = `#/run/${r.id}/setup`; } catch (e) { fail(e); }
   });
   let logs = [];
@@ -453,7 +454,7 @@ function viewHow() {
   const step = (n, title, task, text, eg) => `<li><div class="n">${n}</div><div><div class="t">${title}${task ? ` <span class="badge">${task}</span>` : ""}</div>
     <div class="d">${text}</div>${eg ? `<div class="eg">${eg}</div>` : ""}</div></li>`;
   view(`<div class="page-head"><div class="title"><h1>How it works</h1>
-    <div class="muted">The default method, <b>lithology_cv</b> (<code>methods/lithology_cv_pipeline.py</code>), explained step by step.</div></div></div>
+    <div class="muted">The default method, <b>automatic_lithology_cv</b> (<code>methods/lithology_cv_pipeline.py</code>), explained step by step.</div></div></div>
 
   <details class="group how-more"><summary>📋 Project description: the challenge we are solving</summary><div class="how-body">
     <h3>Viridien challenge: lithology segmentation and clustering</h3>
@@ -489,7 +490,7 @@ function viewHow() {
 
   <div class="card"><h2>The idea in one picture</h2>
     <div class="flow">
-      <div class="fbox"><b>Input</b><span>scanned log + JSON with 3 boxes</span></div><div class="farrow">→</div>
+      <div class="fbox"><b>Input</b><span>scanned log → 3 boxes found by YOLO</span></div><div class="farrow">→</div>
       <div class="fcol">
         <div class="fbox"><b>Legend</b><span>which pattern = which rock</span></div>
         <div class="fbox"><b>Lithology column</b><span>where the patterns change</span></div>
@@ -503,9 +504,9 @@ function viewHow() {
   </div>
 
   <ol class="how">
-    ${step(1, "Open the log", "", "Load the scanned image and the JSON that says where the three boxes are: the <b>depth column</b>, the <b>lithology column</b> and the <b>legend</b>.")}
+    ${step(1, "Find the three boxes", "Bonus", "A detector trained on the development scans (two <b>YOLO11</b> models, run on the CPU) finds the <b>depth column</b>, the <b>lithology column</b> and the <b>legend</b> on the image. If it fails, the organisers' <code>.json</code> is used instead. Switch: <i>Automatic bounding boxes</i> on the run's setup page.")}
     ${step(2, "Clean the column", "", "Cut out the lithology column. Remove its frame and the thin grid lines printed across it, so only the rock patterns remain. Measure how big the pattern repeats (e.g. dots every 12 px): every later step adapts to that size, so small and large scans work the same way.")}
-    ${step(3, "Read the legend", "", "Find every little sample box in the legend (a <i>swatch</i>) and read the word next to it with OCR. Several readers try in turn, from fast to slow, and the one whose names look most like real rock names wins. Pau's new <b>grid reader</b> is one of them: it is slow but the most careful, so it only runs when the fast ones struggle.",
+    ${step(3, "Read the legend", "", "Find every little sample box in the legend (a <i>swatch</i>) and read the word next to it with OCR. Several readers try in turn, from fast to slow, and the one whose names look most like real rock names wins. Pau's <b>grid reader</b> is one of them: the slowest but the most careful, it always runs, and wins when its names are better.",
       "Swatch <span class='sw-dots'></span> + text “Sandstone” → the rock <b>Sandstone</b> looks like dots.")}
     ${step(4, "Cut the column into intervals", "Segment", "Go down the column row by row and notice where the pattern changes. A change = a boundary between two rock layers. <b>Coloured logs</b>: compare each row's colour with the legend colours. <b>Black-and-white logs</b>: describe the texture (dots? lines? how dense?) and look for where it changes. Every boundary is then snapped to the exact pixel row.")}
     ${step(5, "Group similar intervals", "Cluster", "Intervals that look the same get the same cluster number, even if they are far apart in the column (e.g. three separate sandstone layers = one cluster).")}
@@ -525,9 +526,15 @@ function viewHow() {
     </ul>
     <h3>Legend</h3>
     <ul>
-      <li>Readers: <b>size-groups</b> (Tesseract, boxes of equal size) → <b>text-anchored</b> (Tesseract, words first) → <b>grid</b> (Pau's <code>lithology/legend_grid.py</code>, RapidOCR, one OCR per swatch column, non-overlapping cells) → Pau's older parser only if grid finds nothing.</li>
-      <li>Each result gets a <b>name-quality score</b> (real rock words, no glued or junk names). Stop early when ≥ 3 swatches and quality ≥ 80 %; otherwise the best score wins.</li>
+      <li>Readers, all run: <b>size-groups</b> (Tesseract, boxes of equal size), <b>text-anchored</b> (Tesseract, words first), <b>grid</b> (Pau's <code>lithology/legend_grid.py</code>, RapidOCR, one OCR per swatch column, non-overlapping cells); Pau's older parser only if grid finds nothing.</li>
+      <li>Each result gets a <b>name-quality score</b> (+1 per clean rock name, −0.5 glued, −1 junk); the best score wins, on a tie the Tesseract readers (validated on the labelled log).</li>
       <li>Strip-shaped legends are normalised (swatch boxes re-aligned to a common column/row grid). Look-alike swatches are grouped; ties are broken by how common the rock is, and flagged.</li>
+    </ul>
+    <h3>Automatic bounding boxes</h3>
+    <ul>
+      <li><code>bbox-final/</code>: a <b>general YOLO11s</b> (3 classes, page tiles at 1536 px) and a <b>legend specialist</b> (2048 px; fragments + frame reconstruction, multi-view retry), exported to <b>OpenVINO int8</b> for the CPU.</li>
+      <li>Runs as a separate process in its own environment (<code>bbox-final/.venv</code>, created by <code>setup_auto_boxes.sh</code>). PDFs are rendered first, at the <code>.json</code>'s size when there is one.</li>
+      <li>Order: detector → uploaded <code>.json</code> → error. A missed depth column is taken from the <code>.json</code>. The overlap (IoU) with the <code>.json</code> boxes is reported; the boxes used are saved as <code>&lt;stem&gt;.boxes.json</code>.</li>
     </ul>
     <h3>Depth</h3>
     <ul>
@@ -539,10 +546,11 @@ function viewHow() {
     <ul>
       <li>Depth OCR runs in a background thread while the column is analysed. Tesseract uses one OpenMP thread per call (2–3× faster on small crops).</li>
       <li>Legend picture drawn with PIL instead of matplotlib; the full-resolution annotated TIF is only drawn when you download the Output zip.</li>
-      <li>Typical: ~10 s for a normal log, ~25 s for a long mud log (Callaway) on 2 CPU cores, no GPU.</li>
+      <li>On 2 CPU cores, no GPU: the boxes take ~1–2 min per page, Pau's grid legend reader up to a few minutes, the rest ~10–25 s.</li>
     </ul>
     <h3>Other methods (for comparison on the Evaluation page)</h3>
     <dl class="kv">
+      <dt><code>lithology_cv</code></dt><dd>The same, with the boxes from the uploaded <code>.json</code>.</dd>
       <dt><code>hybrid_v3</code></dt><dd>Same as lithology_cv without Pau's grid legend reader.</dd>
       <dt><code>hybrid_v2</code></dt><dd>Colour mode, blank fix and legend quality score; simpler depth fit. The shared engine the newer methods plug into.</dd>
       <dt><code>hybrid</code></dt><dd>First hybrid: classic CV segmentation with OCR fallbacks.</dd>
@@ -552,7 +560,8 @@ function viewHow() {
     <h3>Code map</h3>
     <dl class="kv">
       <dt><code>lithology_pipeline.py</code></dt><dd>Entry point: settings (<code>Config</code>), picks the method, runs a folder, command line.</dd>
-      <dt><code>methods/lithology_cv_pipeline.py</code></dt><dd>Legend readers competition + wiring of the steps above.</dd>
+      <dt><code>methods/lithology_cv_pipeline.py</code></dt><dd>Automatic boxes with fallback, legend readers competition, wiring of the steps above.</dd>
+      <dt><code>methods/auto_boxes.py</code></dt><dd>Runs the YOLO detector (<code>bbox-final/</code>) on one scan.</dd>
       <dt><code>methods/hybrid_v3.py</code></dt><dd>Depth reading (Tesseract strips, robust fit, RapidOCR fallback), fast legend picture.</dd>
       <dt><code>methods/hybrid_v2.py</code></dt><dd>The engine: column, colour mode, segmentation, naming, outputs.</dd>
       <dt><code>methods/cv_pipeline.py</code></dt><dd>Building blocks: ink masks, texture features, clustering, rendering, metrics.</dd>
@@ -641,6 +650,8 @@ async function tabSetup(id, st) {
       <div class="progress" style="margin:6px 0"><div id="upBar" style="width:0%"></div></div><div class="upload-list" id="upList"></div></div>
     <div id="fileList"></div>
   </div>
+  <label class="auto-toggle card" id="autoBox"><input type="checkbox" id="autoBoxes">
+    <div><b>Automatic bounding boxes</b><div class="small muted" id="autoNote"></div></div></label>
   <div class="card"><div class="card-head"><h2>Pre-flight check</h2><span id="pfSummary" class="small muted"></span>
     <span class="small muted" style="flex-basis:100%;margin-top:-6px">One row per image found: are its image, annotation (.json) and optional ground truth there and valid? Ticked images are processed (all valid ones by default).</span><div class="spacer"></div>
     <button id="selAll">Select all</button><button id="selNone">Select none</button></div><div id="pf"></div></div>
@@ -668,10 +679,30 @@ async function tabSetup(id, st) {
   };
   $("#selAll").onclick = () => { S.sel = new Set(S.pf.rows.filter((r) => r.ok).map((r) => r.stem)); renderPreflight(id, S.pf); };
   $("#selNone").onclick = () => { S.sel = new Set(); S.pf.rows.forEach((r) => S.seen.add(r.stem)); renderPreflight(id, S.pf); };
+  S.setupId = id; S.cfg = cfg;
+  $("#autoBoxes").onchange = (e) => { S.cfgValues.automatic_bounding_boxes = e.target.checked; renderConfigForm(cfg); };
   renderConfigForm(cfg);
   $("#startBtn").onclick = () => startRun(id, cfg);
-  renderPreflight(id, await api(`/api/runs/${id}/preflight`));
+  await refreshPreflight(id);
   if (S.pendingUpload) { const f = S.pendingUpload; S.pendingUpload = null; uploadFiles(id, f); }
+}
+
+// automatic bounding boxes: method automatic_lithology_cv + its switch. Then an image needs no .json.
+const autoOn = () => S.cfgValues && S.cfgValues.method === "automatic_lithology_cv" && !!S.cfgValues.automatic_bounding_boxes;
+async function refreshPreflight(id) {
+  try { renderPreflight(id, await api(`/api/runs/${id}/preflight?auto=${autoOn()}`)); } catch (e) { fail(e); }
+}
+function onCfgChange() {
+  const box = $("#autoBoxes");
+  if (!box) return;
+  const isAutoMethod = S.cfgValues.method === "automatic_lithology_cv";
+  box.checked = autoOn();
+  box.disabled = !isAutoMethod;
+  $("#autoBox").classList.toggle("on", autoOn());
+  $("#autoNote").innerHTML = !isAutoMethod ? `Only with the method <code>automatic_lithology_cv</code> (now <code>${esc(S.cfgValues.method)}</code>): boxes come from the .json.`
+    : autoOn() ? "On: the depth column, lithology column and legend are found on the image, even when a .json is uploaded. If that fails, the uploaded .json is used. Images without a .json are accepted."
+    : "Off: the boxes come from the uploaded .json (each image needs one).";
+  if (S.pf && S.setupId && !!S.pf.auto !== autoOn()) refreshPreflight(S.setupId);
 }
 
 async function removeFile(id, name, el) {
@@ -689,14 +720,14 @@ function renderFileList(id, pf) {
   const mism = new Set((pf.mismatches || []).flatMap((m) => [m.json, ...m.images]));
   const files = [];
   for (const r of pf.rows) {
-    files.push({ name: r.json, kind: "annotation", ok: r.ok && !mism.has(r.json) });
+    if (r.json) files.push({ name: r.json, kind: "annotation", ok: r.ok && !mism.has(r.json) });
     if (r.image) files.push({ name: r.image.name, kind: "image", ok: r.ok && !mism.has(r.image.name) });
     if (r.labels) files.push({ name: r.labels.name, kind: "ground truth", ok: r.labels.ok });
   }
   for (const u of pf.unmatched) if (!files.some((f) => f.name === u.name)) files.push({ name: u.name, kind: /\.json$/i.test(u.name) ? "annotation" : /\.csv$/i.test(u.name) ? "ground truth" : "image", ok: false, why: u.problem });
   // only images, or only annotations, so far: nothing can match yet. Wait for the other file instead of warning.
   const hasImg = files.some((f) => f.kind === "image"), hasJson = files.some((f) => f.kind === "annotation");
-  const waiting = !(hasImg && hasJson);
+  const waiting = !(hasImg && hasJson) && !(pf.auto && hasImg);
   if (waiting) files.forEach((f) => { if (!f.ok && (f.kind === "image" || f.kind === "annotation")) { f.pending = true; f.why = f.kind === "image" ? "waiting for its .json annotation" : "waiting for its image"; } });
   box.innerHTML = files.length ? `<div class="row" style="margin-top:14px"><strong class="small">Files in this run (${files.length})</strong><span class="small muted">✕ removes a file (e.g. the one whose name does not match)</span></div>
     <div class="file-list">${files.map((f) => `<div class="file-item ${f.ok || f.pending ? "" : "bad"}">
@@ -707,6 +738,7 @@ function renderFileList(id, pf) {
 }
 
 function renderPreflight(id, pf) {
+  if (S.setupId === id && !!pf.auto !== autoOn()) { S.pf = pf; refreshPreflight(id); return; }   // answer of another action: re-check
   S.pf = pf;
   renderFileList(id, pf);
   const ok = pf.rows.filter((r) => r.ok);
@@ -717,21 +749,21 @@ function renderPreflight(id, pf) {
   const ck = (b) => (b ? `<span class="yes">✓</span>` : `<span class="no">✗</span>`);
   const nImg = pf.rows.filter((r) => r.image).length + pf.unmatched.filter((u) => u.problem.startsWith("image without")).length;
   const nJson = pf.rows.length;
-  if ((nImg === 0) !== (nJson === 0)) {                      // one side only: wait for the other file
+  if (!(pf.auto && nImg) && (nImg === 0) !== (nJson === 0)) {   // one side only: wait for the other file (unless automatic boxes)
     $("#pf").innerHTML = `<div class="notice">${nImg ? "Image added. Now add its <code>.json</code> annotation (same name, e.g. <code>log.tif</code> + <code>log.json</code>)."
       : "Annotation added. Now add its image (same name, e.g. <code>log.json</code> + <code>log.tif</code>)."}</div>`;
     updateStartInfo();
     return;
   }
-  $("#pf").innerHTML = !pf.rows.length && !pf.unmatched.length ? `<div class="empty">No files yet. Drop a log's image + .json above, or link a folder.</div>` : `
-    <div class="table-wrap scroll-y"><table class="data"><thead><tr><th></th><th>Log</th><th>Image</th><th class="num">Size</th><th class="num">Pixels</th><th>JSON</th><th>Labels</th><th>Problems</th><th></th></tr></thead><tbody>
+  $("#pf").innerHTML = !pf.rows.length && !pf.unmatched.length ? `<div class="empty">No files yet. Drop a log's image (+ its .json) above, or link a folder.</div>` : `
+    <div class="table-wrap scroll-y"><table class="data"><thead><tr><th></th><th>Log</th><th>Image</th><th class="num">Size</th><th class="num">Pixels</th><th>Boxes</th><th>Labels</th><th>Problems</th><th></th></tr></thead><tbody>
     ${pf.rows.map((r) => `<tr class="${r.ok ? "" : "bad"}">
       <td><input type="checkbox" data-sel="${esc(r.stem)}" ${S.sel.has(r.stem) ? "checked" : ""} ${r.ok ? "" : "disabled"} aria-label="select"></td>
       <td class="ellipsis" style="max-width:340px" title="${esc(r.stem)}">${esc(r.stem)}</td>
       <td>${r.image ? ck(true) + ` <span class="small muted">${esc((r.image.name.split(".").pop() || "").toUpperCase())} · ${esc({ "1": "1-bit", L: "grey", P: "palette", RGB: "colour", RGBA: "colour", CMYK: "colour" }[r.image.mode] || r.image.mode || "")}</span>` : ck(false)}</td>
       <td class="num">${r.image ? fmtNum(r.image.size_mb, 1) + " MB" : "–"}</td>
       <td class="num nowrap">${r.image && r.image.width ? `${fmtInt(r.image.width)} × ${fmtInt(r.image.height)}` : "–"}</td>
-      <td>${ck(r.json_ok)}</td>
+      <td class="nowrap">${r.boxes_source === "automatic" ? `<span class="badge ok" title="found on the image by the detector">automatic</span>${r.json ? ` <span class="small muted" title="used if the automatic boxes fail">.json fallback ${r.json_ok ? "✓" : "✗"}</span>` : ""}` : ck(r.json_ok)}</td>
       <td>${r.labels ? (r.labels.ok ? `<span class="yes">✓</span> <span class="small muted">${esc(r.labels.name)}</span>` : `<span class="no">✗</span>`) : `<span class="muted">–</span>`}</td>
       <td class="small">${r.errors.map((e) => `<div class="no">${esc(e)}</div>`).join("")}${r.warnings.map((w) => `<div style="color:var(--warn)">${esc(w)}</div>`).join("")}</td>
       <td><button class="icon-btn" data-rm="${esc(r.stem)}" title="Remove this log from the run">×</button></td></tr>`).join("")}
@@ -819,6 +851,7 @@ function renderConfigForm(cfg) {
       S.cfgValues[f.name] = parse(f, el);
       if (f.type === "bool") el.parentElement.lastChild.textContent = el.checked ? " on" : " off";
       markChanged(cfg);
+      onCfgChange();
     };
   });
   $$("[data-reset]").forEach((b) => (b.onclick = () => { const f = cfg.fields.find((x) => x.name === b.dataset.reset); S.cfgValues[f.name] = f.default; renderConfigForm(cfg); }));
@@ -838,6 +871,7 @@ function renderConfigForm(cfg) {
     try { const r = await api("/api/presets", { method: "POST", json: { name: n, config: overrides(cfg) } }); cfg.presets = r; renderConfigForm(cfg); toast("Preset saved"); } catch (e) { fail(e); }
   };
   markChanged(cfg);
+  onCfgChange();
 }
 function overrides(cfg) {
   const o = {};

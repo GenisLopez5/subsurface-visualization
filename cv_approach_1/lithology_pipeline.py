@@ -11,12 +11,14 @@ app (webapp/) and the command line: same inputs (image + bounding-box JSON), sam
     * <stem>_depth.png        the depth labels OCR read and the fitted pixel -> depth line
     * <stem>_annotated.tif    high-resolution result in the challenge notebook's style (lithology/drawing.py)
 and one summary.json for the whole folder (plus metrics when ground-truth labels are available).
-Methods (Config.method, code in methods/): "lithology_cv" (default; hybrid_v3 + Pau's grid legend parser),
+Methods (Config.method, code in methods/): "automatic_lithology_cv" (default; lithology_cv + automatic bounding
+boxes, falling back to the .json), "lithology_cv" (hybrid_v3 + Pau's grid legend reader),
 "hybrid_v3", "hybrid_v2", "hybrid", "lithology" (lithology/ package only), "cv" (classic computer vision only).
 
 How it works (method "lithology_cv"; the web app's "How it works" page explains it step by step)
 ----------------------------------------------------------------------------------------
- 1. Open          image + JSON with the depth column, lithology column and legend boxes.
+ 1. Boxes         the depth column, lithology column and legend: found automatically (bbox-final detector), else
+                  from the uploaded JSON.
  2. Column        crop, remove frame and grid lines, measure the pattern period (all sizes scale with it).
  3. Legend        swatches + names; readers compete on name quality (Tesseract size-groups, text-anchored, Pau's grid).
  4. Segment       colour logs: per-row fill colour vs legend colours; black-and-white: texture windows + k-means;
@@ -79,8 +81,9 @@ STAGES = {"lithology": ["column", "legend+naming", "segmentation", "depth", "ren
           "hybrid": ["column", "segmentation", "legend+naming", "depth", "render"],
           "hybrid_v2": ["column", "legend+naming", "segmentation", "depth", "render"],
           "hybrid_v3": ["column", "legend+naming", "segmentation", "depth", "render"],
-          "lithology_cv": ["column", "legend+naming", "segmentation", "depth", "render"]}
-CHOICES = {"method": ["lithology_cv", "hybrid_v3", "hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
+          "lithology_cv": ["column", "legend+naming", "segmentation", "depth", "render"],
+          "automatic_lithology_cv": ["boxes", "column", "legend+naming", "segmentation", "depth", "render"]}
+CHOICES = {"method": ["automatic_lithology_cv", "lithology_cv", "hybrid_v3", "hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
 
 
 # ======================================================================================================================
@@ -90,7 +93,8 @@ CHOICES = {"method": ["lithology_cv", "hybrid_v3", "hybrid_v2", "hybrid", "litho
 class Config:
     """All settings. The web app builds its settings form from this class (the comments become the help text)."""
     # --- method -------------------------------------------------------------------------------------------------------
-    method: str = "lithology_cv"        # "lithology_cv" = hybrid_v3 + Pau's grid legend parser (lithology_cv_pipeline.py); "hybrid_v3" = hybrid_v2 + Pau's robust depth fit and full-resolution drawing (hybrid_v3.py); "hybrid_v2" = colour mode, blank fix, legend quality (hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
+    method: str = "automatic_lithology_cv"  # "automatic_lithology_cv" = lithology_cv + automatic bounding boxes (methods/lithology_cv_pipeline.py); "lithology_cv" = hybrid_v3 + Pau's grid legend reader, boxes from the .json; "hybrid_v3" = hybrid_v2 + Pau's robust depth fit and full-resolution drawing (hybrid_v3.py); "hybrid_v2" = colour mode, blank fix, legend quality (hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
+    automatic_bounding_boxes: bool = True  # Automatic bounding boxes (automatic_lithology_cv): find the depth column, lithology column and legend with the detector, even when a .json is uploaded; if it fails, use the .json
     # --- hybrid method ------------------------------------------------------------------------------------------------
     hybrid_prefer_rapidocr: bool = False  # read the legend with RapidOCR first (slower; default: Tesseract first, RapidOCR if it looks wrong)
     hybrid_depth_min_labels: int = 4    # fewer Tesseract depth labels than this -> also try RapidOCR
@@ -138,7 +142,7 @@ def cv_config(cfg: Config) -> cv.Config:
 # ======================================================================================================================
 def ocr_info(method: str = "lithology") -> dict:
     """{'ok', 'version', 'path' or 'message'} for the OCR engine the method needs."""
-    if method in ("cv", "hybrid", "hybrid_v2", "hybrid_v3", "lithology_cv"):                                  # hybrid: Tesseract first, RapidOCR optional
+    if method in ("cv", "hybrid", "hybrid_v2", "hybrid_v3", "lithology_cv", "automatic_lithology_cv"):                                  # hybrid: Tesseract first, RapidOCR optional
         try:
             cv.check_tesseract()
             return dict(ok=True, version="Tesseract", path=str(cv.pytesseract.pytesseract.tesseract_cmd))
@@ -312,7 +316,10 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     colours = colours or cv.Colours()
-    if cfg.method == "lithology_cv":
+    if cfg.method == "automatic_lithology_cv":
+        from methods import lithology_cv_pipeline
+        record = lithology_cv_pipeline.process_log_auto(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
+    elif cfg.method == "lithology_cv":
         from methods import lithology_cv_pipeline
         record = lithology_cv_pipeline.process_log_lcv(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "hybrid_v3":
@@ -337,7 +344,11 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
 # ======================================================================================================================
 # Folder
 # ======================================================================================================================
-def find_logs(data_dir: Path, labels_dir: Optional[Path] = None) -> list:
+def uses_auto_boxes(cfg: Config) -> bool:
+    return cfg.method == "automatic_lithology_cv" and cfg.automatic_bounding_boxes
+
+
+def find_logs(data_dir: Path, labels_dir: Optional[Path] = None, images_without_json: bool = False) -> list:
     """Every log under data_dir: flat (<stem>.json + image) or the organisers' layout (bbox_annotation/ + images/).
     The image comes from the JSON's image_name (or <stem>.tif/.png/.jpg/.pdf). Labels: labels_dir/<stem>.csv,
     data_dir/labels/<stem>.csv or data_dir/<stem>.csv."""
@@ -361,6 +372,13 @@ def find_logs(data_dir: Path, labels_dir: Optional[Path] = None) -> list:
             continue
         gt = next((p for p in (labels_dir / f"{jp.stem}.csv", data_dir / f"{jp.stem}.csv") if p.is_file()), None)
         logs.append(Log(jp.stem, img, jp, gt))
+    if images_without_json:                                         # automatic bounding boxes: no .json needed
+        have = {l.stem for l in logs} | {Path(l.image_path).name for l in logs}
+        for img in sorted(p for d in image_dirs for p in d.iterdir()
+                          if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES and p.stem not in have and p.name not in have):
+            have.add(img.stem)
+            gt = next((p for p in (labels_dir / f"{img.stem}.csv", data_dir / f"{img.stem}.csv") if p.is_file()), None)
+            logs.append(Log(img.stem, img, None, gt))
     return logs
 
 
@@ -370,12 +388,13 @@ def run_folder(data_dir, out_dir, labels_dir=None, cfg: Config = Config(), on_pr
     data_dir, out_dir = Path(data_dir), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     labels_dir = Path(labels_dir) if labels_dir else data_dir / "labels"
-    logs = find_logs(data_dir, labels_dir)
+    auto = uses_auto_boxes(cfg)
+    logs = find_logs(data_dir, labels_dir, images_without_json=auto)
     example_csv = next((p for p in (data_dir / "example.csv", data_dir / "example" / "example.csv") if p.is_file()), None)
     if example_csv and any(l.stem == EXAMPLE_STEM and l.labels_path is None for l in logs):
         labels_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(example_csv, labels_dir / f"{EXAMPLE_STEM}.csv")
-        logs = find_logs(data_dir, labels_dir)
+        logs = find_logs(data_dir, labels_dir, images_without_json=auto)
     if not logs:
         raise FileNotFoundError(f"no logs in {data_dir}: need <stem>.json (with bounding_boxes) + its image")
     on_progress(dict(event="start", n_logs=len(logs), method=cfg.method, stages=STAGES[cfg.method]))
@@ -408,7 +427,7 @@ def main(argv=None) -> int:
     ap.add_argument("data_dir", help="folder with <stem>.json + image, or a dataset folder with bbox_annotation/ + images/")
     ap.add_argument("--out", default="outputs", help="output folder (default: outputs)")
     ap.add_argument("--labels", default=None, help="ground-truth folder with <stem>.csv (default: <data_dir>/labels)")
-    ap.add_argument("--method", default="lithology_cv", choices=CHOICES["method"])
+    ap.add_argument("--method", default=Config.method, choices=CHOICES["method"])
     a = ap.parse_args(argv)
     s = run_folder(a.data_dir, a.out, a.labels, Config(method=a.method), on_progress=cv._print)
     print(f"outputs: {Path(a.out).resolve()}")

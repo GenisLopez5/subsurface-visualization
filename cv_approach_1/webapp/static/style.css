@@ -289,3 +289,9 @@ img.zoomable { cursor: zoom-in; }
 @media (max-width: 760px) { #lightbox .lb-panels { flex-direction: column; } }
 #lightbox .lb-body img:not(.fit) { cursor: zoom-out; }
 @media (max-width: 760px) { #lightbox .lb-hint { display: none; } }
+
+/* automatic bounding boxes switch */
+.auto-toggle { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; border-left: 4px solid var(--line); }
+.auto-toggle.on { border-left-color: var(--ok); }
+.auto-toggle input { width: 18px; height: 18px; margin-top: 2px; }
+.auto-toggle b { font-size: 15px; }

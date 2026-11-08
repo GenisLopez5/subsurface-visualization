@@ -1,7 +1,9 @@
 """
 The extraction methods. lithology_pipeline.py (one level up) is the entry point: it picks one by Config.method.
 
-    lithology_cv_pipeline.py  "lithology_cv" (default)  hybrid_v3 + Pau's grid legend parser
+    lithology_cv_pipeline.py  "automatic_lithology_cv"  (default) lithology_cv + automatic bounding boxes (auto_boxes.py)
+                              "lithology_cv"            hybrid_v3 + Pau's grid legend reader, boxes from the .json
+    auto_boxes.py                                       runs the YOLO box detector of bbox-final/ on one scan
     hybrid_v3.py              "hybrid_v3"               hybrid_v2 + Pau's robust depth fit, faster depth OCR
     hybrid_v2.py              "hybrid_v2"               colour mode, blank fix, legend quality score (the shared engine
                                                         that v3 and lithology_cv plug into)

@@ -26,7 +26,8 @@ organisers' `example.csv`.
 
 ```
 lithology_pipeline.py      entry point: Config (every setting), method dispatch, batch runner, CLI
-methods/                   the extraction methods (default "lithology_cv"; see methods/__init__.py)
+methods/                   the extraction methods (default "automatic_lithology_cv"; see methods/__init__.py)
+setup_auto_boxes.sh        one-time install of the YOLO box detector (bbox-final/.venv) for automatic bounding boxes
 webapp/                    the web app: app.py (FastAPI server), worker.py (runs a batch), static/ (page)
 labels/                    ground-truth CSVs used for accuracy and the Evaluation page
 tests/                     web app + regression tests
