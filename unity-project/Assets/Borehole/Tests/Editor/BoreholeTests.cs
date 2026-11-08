@@ -56,6 +56,9 @@ namespace Subsurface.Borehole.Tests
                 var column=go.AddComponent<BoreholeColumn>();column.catalog=LithologyBuilder.Catalog;
                 var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology\n100,110,Shale\n120,130,Sandstone");column.Build(data);
                 Assert.That(column.Surfaces.Count,Is.EqualTo(3));var one=column.Surfaces[0].GetComponent<MeshFilter>().sharedMesh;Assert.That(column.Surfaces.All(s=>s.GetComponent<MeshFilter>().sharedMesh==one),Is.True);
+                Assert.That(column.GetComponentsInChildren<LineRenderer>().Length,Is.EqualTo(6));
+                column.SetHighlightWidth(.1f);
+                foreach(var line in column.GetComponentsInChildren<LineRenderer>())if(line.name.StartsWith("Interval boundary"))Assert.That(line.widthMultiplier,Is.InRange(.00001f,.05f));
                 Assert.That(column.Surfaces[1].rawLabel,Is.EqualTo("Not Available"));Assert.That(column.Surfaces[0].target.sharedMaterial.shader,Is.EqualTo(column.catalog.shader));column.Select(1);Assert.That(column.SelectedIndex,Is.EqualTo(1));
                 column.Build(data);Assert.That(column.transform.childCount,Is.EqualTo(1));Assert.That(column.Surfaces.Count,Is.EqualTo(3));
                 column.ReleaseRuntimeResources(true);Assert.That(column.transform.childCount,Is.Zero);Assert.That(column.Surfaces,Is.Empty);Assert.That(column.Document,Is.Null);Assert.That(one==null,Is.True);

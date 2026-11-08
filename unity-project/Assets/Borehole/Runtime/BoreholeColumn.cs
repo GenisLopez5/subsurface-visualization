@@ -21,6 +21,7 @@ namespace Subsurface.Borehole
         Mesh cylinder;
         Material highlightMaterial;
         LineRenderer topHighlight,bottomHighlight;
+        readonly List<LineRenderer> boundaries=new List<LineRenderer>();Material boundaryMaterial;
         public void Build(BoreholeDocument document)
         {
             if(catalog==null||catalog.shader==null)throw new System.InvalidOperationException("The lithology catalogue must be assigned.");
@@ -40,6 +41,16 @@ namespace Subsurface.Borehole
             }
             Shader unlit=highlightShader!=null?highlightShader:BoreholeRenderAssets.Load().selectionShader;
             if(unlit!=null){highlightMaterial=new Material(unlit){name="Borehole selection",hideFlags=HideFlags.HideAndDontSave};highlightMaterial.SetColor("_BaseColor",new Color(.47f,1,0));topHighlight=Ring("Selection top");bottomHighlight=Ring("Selection bottom");}
+            if(unlit!=null)
+            {
+                boundaryMaterial=new Material(unlit){name="Interval boundaries",hideFlags=HideFlags.HideAndDontSave};boundaryMaterial.SetColor("_BaseColor",new Color(.12f,.10f,.14f));
+                for(int i=0;i<document.Intervals.Count;i++)
+                {
+                    var line=Ring("Interval boundary "+i);line.sharedMaterial=boundaryMaterial;SetRing(line,DepthMap.ToY(document.Intervals[i].TopFeet));boundaries.Add(line);
+                }
+                var end=Ring("Final interval boundary");end.sharedMaterial=boundaryMaterial;SetRing(end,DepthMap.ToY(document.BottomFeet));boundaries.Add(end);
+            }
+            if(topHighlight!=null)topHighlight.enabled=false;if(bottomHighlight!=null)bottomHighlight.enabled=false;
             SelectedIndex=-1;
         }
         LineRenderer Ring(string name)
@@ -49,7 +60,7 @@ namespace Subsurface.Borehole
         public void Select(int index)
         {
             if(Document==null||index<0||index>=Document.Intervals.Count)return;SelectedIndex=index;
-            var row=Document.Intervals[index];SetRing(topHighlight,DepthMap.ToY(row.TopFeet));SetRing(bottomHighlight,DepthMap.ToY(row.BottomFeet));
+            var row=Document.Intervals[index];if(topHighlight!=null)topHighlight.enabled=true;if(bottomHighlight!=null)bottomHighlight.enabled=true;SetRing(topHighlight,DepthMap.ToY(row.TopFeet));SetRing(bottomHighlight,DepthMap.ToY(row.BottomFeet));
         }
         void SetRing(LineRenderer line,float y){if(line==null)return;for(int i=0;i<64;i++){float a=i*Mathf.PI*2/64;line.SetPosition(i,new Vector3(Mathf.Cos(a)*radius*1.015f,y,Mathf.Sin(a)*radius*1.015f));}}
         readonly Dictionary<Material,Material> displayMaterials=new Dictionary<Material,Material>();
@@ -80,7 +91,13 @@ namespace Subsurface.Borehole
             foreach(var surface in Surfaces)if(surface!=null&&surface.target!=null&&surface.target.sharedMaterial!=null&&displaySources.TryGetValue(surface.target.sharedMaterial,out var source))surface.target.sharedMaterial=source;
             foreach(var material in displayMaterials.Values)DestroyOwned(material,immediate);displayMaterials.Clear();displaySources.Clear();
         }
-        public void SetHighlightWidth(float width){if(topHighlight!=null)topHighlight.widthMultiplier=width;if(bottomHighlight!=null)bottomHighlight.widthMultiplier=width;}
+        public void SetHighlightWidth(float width){
+            for(int i=0;i<boundaries.Count;i++)
+            {
+                double thickness=i==0?Document.Intervals[0].ThicknessFeet:i==Document.Intervals.Count?Document.Intervals[i-1].ThicknessFeet:System.Math.Min(Document.Intervals[i-1].ThicknessFeet,Document.Intervals[i].ThicknessFeet);
+                boundaries[i].widthMultiplier=Mathf.Min(width*.45f,(float)(thickness/Document.SpanFeet)*displayHeight*.18f);
+            }
+            if(topHighlight!=null)topHighlight.widthMultiplier=width;if(bottomHighlight!=null)bottomHighlight.widthMultiplier=width;}
         public int Pick(Ray ray)
         {
             if(Physics.Raycast(ray,out var hit,1000,1<<renderingLayer)){var section=hit.collider.GetComponent<BoreholeSection>();if(section!=null&&section.transform.IsChildOf(transform))return section.Index;}return -1;
@@ -88,6 +105,7 @@ namespace Subsurface.Borehole
         void Clear(bool immediate=false)
         {
             RestoreDisplayMaterials(immediate);
+            boundaries.Clear();if(boundaryMaterial!=null)DestroyOwned(boundaryMaterial,immediate);boundaryMaterial=null;
             foreach(var s in Surfaces)if(s!=null)s.enabled=false;Surfaces.Clear();IdentifierColors.Clear();
             if(generation!=null){generation.SetActive(false);DestroyOwned(generation,immediate);}generation=null;
             if(highlightMaterial!=null)DestroyOwned(highlightMaterial,immediate);highlightMaterial=null;topHighlight=null;bottomHighlight=null;
