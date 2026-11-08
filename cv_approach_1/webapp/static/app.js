@@ -36,6 +36,20 @@ async function api(path, opts = {}) {
   }
   return data;
 }
+// "📁 Browse…" next to a path input: opens the native folder chooser (server side, this computer) and fills it in
+function addBrowse(input, title, after = input) {
+  if (!input) return;
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = "📁 Browse…"; b.title = "Choose the folder in the file explorer";
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r = await api("/api/pick-folder", { method: "POST", json: { start: input.value.trim(), title } });
+      if (r.path) { input.value = r.path; input.dispatchEvent(new Event("input")); input.focus(); }
+    } catch (e) { toast(e.message, true); } finally { b.disabled = false; }
+  };
+  after.insertAdjacentElement("afterend", b);
+}
 function toast(msg, err = false) {
   const t = document.createElement("div");
   t.className = "toast" + (err ? " err" : "");
@@ -252,6 +266,7 @@ async function viewNew() {
   $("#logSel").ondblclick = () => singleRun(true);
 
   // --- batch
+  addBrowse($("#folderPath"), "Choose the dataset folder");
   $("#linkBtn").onclick = async () => {
     const path = $("#folderPath").value.trim();
     if (!path) return toast("Type the dataset folder path first", true);
@@ -536,6 +551,8 @@ async function tabSetup(id, st) {
     $("#labelsList").innerHTML = s.labels.map((p) => `<option value="${esc(p)}">`).join("");
   }).catch(() => {});
   wireDrop($("#drop"), $("#fileInput"), (files) => uploadFiles(id, files));
+  addBrowse($("#folderPath"), "Choose a folder with images + .json annotations");
+  addBrowse($("#labelsPath"), "Choose the ground-truth (.csv) folder");
   $("#linkBtn").onclick = async () => {
     const path = $("#folderPath").value.trim();
     if (!path) return toast("Type the folder path first", true);
@@ -572,10 +589,14 @@ function renderFileList(id, pf) {
     if (r.labels) files.push({ name: r.labels.name, kind: "ground truth", ok: r.labels.ok });
   }
   for (const u of pf.unmatched) if (!files.some((f) => f.name === u.name)) files.push({ name: u.name, kind: /\.json$/i.test(u.name) ? "annotation" : /\.csv$/i.test(u.name) ? "ground truth" : "image", ok: false, why: u.problem });
+  // only images, or only annotations, so far: nothing can match yet. Wait for the other file instead of warning.
+  const hasImg = files.some((f) => f.kind === "image"), hasJson = files.some((f) => f.kind === "annotation");
+  const waiting = !(hasImg && hasJson);
+  if (waiting) files.forEach((f) => { if (!f.ok && (f.kind === "image" || f.kind === "annotation")) { f.pending = true; f.why = f.kind === "image" ? "waiting for its .json annotation" : "waiting for its image"; } });
   box.innerHTML = files.length ? `<div class="row" style="margin-top:14px"><strong class="small">Files in this run (${files.length})</strong><span class="small muted">✕ removes a file (e.g. the one whose name does not match)</span></div>
-    <div class="file-list">${files.map((f) => `<div class="file-item ${f.ok ? "" : "bad"}">
-      <span class="${f.ok ? "yes" : "no"}" title="${f.ok ? "matched" : esc(f.why || "not matched / not usable")}">${f.ok ? "✓" : "⚠"}</span>
-      <span class="ellipsis mono small" title="${esc(f.name)}">${esc(f.name)}</span><span class="badge">${esc(f.kind)}</span>
+    <div class="file-list">${files.map((f) => `<div class="file-item ${f.ok || f.pending ? "" : "bad"}">
+      <span class="${f.ok ? "yes" : f.pending ? "muted" : "no"}" title="${f.ok ? "matched" : esc(f.why || "not matched / not usable")}">${f.ok ? "✓" : f.pending ? "…" : "⚠"}</span>
+      <span class="ellipsis mono small" title="${esc(f.name)}">${esc(f.name)}${f.pending ? ` <span class="muted">· ${esc(f.why)}</span>` : ""}</span><span class="badge">${esc(f.kind)}</span>
       <button class="icon-btn" data-rmfile="${esc(f.name)}" title="Remove ${esc(f.name)} from this run" aria-label="Remove ${esc(f.name)}">✕</button></div>`).join("")}</div>` : "";
   $$("[data-rmfile]", box).forEach((b) => (b.onclick = () => removeFile(id, b.dataset.rmfile)));
 }
@@ -589,6 +610,14 @@ function renderPreflight(id, pf) {
   const nLab = pf.rows.filter((r) => r.labels && r.labels.ok).length;
   $("#pfSummary").innerHTML = pf.rows.length ? `${ok.length} ready · ${pf.rows.length - ok.length} with errors · ${nLab} with labels` : "";
   const ck = (b) => (b ? `<span class="yes">✓</span>` : `<span class="no">✗</span>`);
+  const nImg = pf.rows.filter((r) => r.image).length + pf.unmatched.filter((u) => u.problem.startsWith("image without")).length;
+  const nJson = pf.rows.length;
+  if ((nImg === 0) !== (nJson === 0)) {                      // one side only: wait for the other file
+    $("#pf").innerHTML = `<div class="notice">${nImg ? "Image added. Now add its <code>.json</code> annotation (same name, e.g. <code>log.tif</code> + <code>log.json</code>)."
+      : "Annotation added. Now add its image (same name, e.g. <code>log.json</code> + <code>log.tif</code>)."}</div>`;
+    updateStartInfo();
+    return;
+  }
   $("#pf").innerHTML = !pf.rows.length && !pf.unmatched.length ? `<div class="empty">No files yet. Drop a log's image + .json above, or link a folder.</div>` : `
     <div class="table-wrap scroll-y"><table class="data"><thead><tr><th></th><th>Log</th><th>Image</th><th class="num">Size</th><th class="num">Pixels</th><th>JSON</th><th>Labels</th><th>Problems</th><th></th></tr></thead><tbody>
     ${pf.rows.map((r) => `<tr class="${r.ok ? "" : "bad"}">

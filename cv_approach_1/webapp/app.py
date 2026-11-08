@@ -669,6 +669,43 @@ def list_logs(path: Optional[str] = None):
     return dict(logs=out, folders=[str(Path(f)) for f in folders], labels_dir=str(default_labels_dir() or ""))
 
 
+def desktop_env() -> dict:
+    """Environment for desktop programs (folder chooser). Started from VS Code installed as a snap, the server inherits
+    the snap's library/GTK paths and zenity crashes on start (glibc symbol lookup error): drop them, restore originals."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("SNAP", "GTK_", "GDK_", "GIO_", "GSETTINGS_")) and k not in ("LOCPATH", "LD_LIBRARY_PATH", "LD_PRELOAD")}
+    for k in [k for k in env if k.endswith("_VSCODE_SNAP_ORIG")]:
+        base, orig = k[: -len("_VSCODE_SNAP_ORIG")], env.pop(k)
+        if orig:
+            env[base] = orig
+        else:
+            env.pop(base, None)
+    if "/snap/" in env.get("XDG_DATA_HOME", ""):
+        env.pop("XDG_DATA_HOME")
+    return env
+
+
+@app.post("/api/pick-folder")
+def pick_folder(body: dict = Body(default={})):
+    """Open the desktop's native folder chooser (zenity / kdialog) on this computer and return the chosen path.
+    The app is local, so the dialog appears on the user's screen; browsers cannot reveal full folder paths."""
+    start = str(body.get("start") or "").strip()
+    start = start if start and Path(start).expanduser().is_dir() else str(Path.home())
+    start = str(Path(start).expanduser().resolve())
+    title = str(body.get("title") or "Choose a folder")[:100]
+    if shutil.which("zenity"):
+        cmd = ["zenity", "--file-selection", "--directory", f"--title={title}", f"--filename={start}/"]
+    elif shutil.which("kdialog"):
+        cmd = ["kdialog", "--getexistingdirectory", start, "--title", title]
+    else:
+        raise HTTPException(501, "No folder chooser on this computer (install zenity), type the path instead")
+    r = subprocess.run(cmd, capture_output=True, text=True, env=desktop_env())
+    path = r.stdout.strip()
+    if r.returncode not in (0, 1):                                  # 1 = cancelled
+        raise HTTPException(500, f"Folder chooser failed: {(r.stderr.strip().splitlines() or ['exit ' + str(r.returncode)])[-1][:200]}")
+    return {"path": path if r.returncode == 0 and path else None}
+
+
 @app.get("/api/suggestions")
 def suggestions():
     """Folders on this computer that look like log data or pipeline results (to pre-fill the forms)."""
