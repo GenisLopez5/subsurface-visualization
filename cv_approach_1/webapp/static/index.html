@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lithology Console</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>try { const t = localStorage.getItem("litho.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="5" rx="1" fill="var(--c1)"/><rect x="4" y="8" width="16" height="7" rx="1" fill="var(--c2)"/><rect x="4" y="16" width="16" height="6" rx="1" fill="var(--c3)"/></svg>
+      Lithology Console
+    </a>
+    <nav class="mainnav">
+      <a href="#/new" data-nav="new">New run</a>
+      <a href="#/runs" data-nav="runs">Runs</a>
+      <a href="#/how" data-nav="how">How it works</a>
+    </nav>
+    <div class="spacer"></div>
+    <a class="job-pill hidden" id="jobPill" href="#/"></a>
+    <span class="pill" id="memPill" title="Free memory on this computer"></span>
+    <span class="pill" id="tessPill"></span>
+    <button class="icon-btn" id="themeBtn" title="Switch light / dark theme" aria-label="Switch theme">◐</button>
+  </header>
+  <div id="banner"></div>
+  <main id="view"><p class="muted pad">Loading…</p></main>
+  <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
