@@ -367,10 +367,13 @@ def classify_colour_rows(ink, rgb, swatches, scale, describe, cfg, ccfg) -> tupl
 # One log
 # ----------------------------------------------------------------------------------------------------------------------
 def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: ProgressFn, depth_reader=None,
-                   method_name: str = "hybrid_v2", parallel_depth: bool = False, legend_plot=None) -> dict:
-    """depth_reader / method_name / parallel_depth / legend_plot let hybrid_v3 reuse this (Pau's robust depth fit,
-    depth OCR running in a background thread while the column is analysed, fast legend plot)."""
+                   method_name: str = "hybrid_v2", parallel_depth: bool = False, legend_plot=None,
+                   legend_reader=None) -> dict:
+    """depth_reader / method_name / parallel_depth / legend_plot / legend_reader let hybrid_v3 and lithology_cv reuse
+    this (Pau's robust depth fit, depth OCR in a background thread while the column is analysed, fast legend plot,
+    Pau's grid legend parser)."""
     depth_reader = depth_reader or hy.read_depth
+    legend_reader = legend_reader or read_legend_v2
     legend_plot = legend_plot or cv.plot_legend
     timings, t0 = {}, time.perf_counter()
     tracemalloc.start()
@@ -402,7 +405,7 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     lap("column")
 
     # legend first: it decides between colour mode and the cluster path
-    swatches, legend_method, legend_tried = read_legend_v2(image, boxes, cfg, ccfg)
+    swatches, legend_method, legend_tried = legend_reader(image, boxes, cfg, ccfg)
     groups = cv.lookalike_groups(swatches, describe)
     colour_mode = cfg.hybrid_colour_mode and use_colour_mode(rgb, swatches)
     lap("legend+naming")
