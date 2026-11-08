@@ -6,6 +6,17 @@ namespace Subsurface.Borehole
     public static class DebugCsvFileDialog
     {
         public static Func<string> EditorPicker;
+        public static string SaveCsv(string name)
+        {
+#if UNITY_EDITOR
+            return UnityEditor.EditorUtility.SaveFilePanel("Download CSV","",name,"csv");
+#elif UNITY_STANDALONE_WIN
+            const int capacity=32768;var buffer=Marshal.AllocHGlobal(capacity*2);
+            try{Marshal.Copy((name+'\0').ToCharArray(),0,buffer,name.Length+1);var dialog=new OpenFileName{size=Marshal.SizeOf<OpenFileName>(),owner=GetActiveWindow(),filter="CSV files\0*.csv\0\0",file=buffer,maxFile=capacity,title="Download CSV",defaultExtension="csv",flags=0x00080000|0x00000800|0x00000008|0x2};if(GetSaveFileName(ref dialog))return Marshal.PtrToStringUni(buffer);int error=CommDlgExtendedError();if(error!=0)throw new InvalidOperationException("File dialog error "+error);return null;}finally{Marshal.FreeHGlobal(buffer);}
+#else
+            throw new PlatformNotSupportedException("CSV file dialogs currently require Windows.");
+#endif
+        }
         public static Func<string> EditorImagePicker;
         public static string OpenImage()=>Open(true);
         public static string Open()=>Open(false);
@@ -30,6 +41,7 @@ namespace Subsurface.Borehole
             public int size;public IntPtr owner,instance;[MarshalAs(UnmanagedType.LPWStr)]public string filter;public IntPtr customFilter;public int maxCustomFilter,filterIndex;public IntPtr file;public int maxFile;public IntPtr fileTitle;public int maxFileTitle;[MarshalAs(UnmanagedType.LPWStr)]public string initialDirectory,title;public int flags;public short fileOffset,fileExtension;[MarshalAs(UnmanagedType.LPWStr)]public string defaultExtension;public IntPtr customData,hook;[MarshalAs(UnmanagedType.LPWStr)]public string templateName;public IntPtr reserved;public int reserved2,flagsEx;
         }
         [DllImport("comdlg32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool GetOpenFileName(ref OpenFileName data);
+        [DllImport("comdlg32.dll",CharSet=CharSet.Unicode)]static extern bool GetSaveFileName(ref OpenFileName data);
         [DllImport("comdlg32.dll")]static extern int CommDlgExtendedError();
         [DllImport("user32.dll")]static extern IntPtr GetActiveWindow();
 #endif

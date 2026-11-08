@@ -7,10 +7,46 @@ namespace Subsurface.Borehole.Tests
 {
     public class BoreholeSynchronizationTests
     {
+        [TestCase(800,100)] [TestCase(100,800)] [TestCase(320,240)]
+        public void LegendsPreserveTheirIntrinsicAspectRatio(int width,int height)
+        {
+            var root=new UnityEngine.UIElements.VisualElement();var viewport=new UnityEngine.UIElements.VisualElement{name="documentViewport"};root.Add(viewport);viewport.Add(new UnityEngine.UIElements.VisualElement{name="csvOverlay"});
+            var texture=new Texture2D(width,height);var png=texture.EncodeToPNG();UnityEngine.Object.DestroyImmediate(texture);
+            using(var legends=new BoreholeLegends(root))
+            {
+                legends.Bind(png,png);
+                var images=UnityEngine.UIElements.UQueryExtensions.Query<UnityEngine.UIElements.Image>(root).ToList();
+                Assert.That(images.Count,Is.EqualTo(2));
+                foreach(var image in images){Assert.That(image.scaleMode,Is.EqualTo(ScaleMode.ScaleToFit));Assert.That(image.image.width/(double)image.image.height,Is.EqualTo(width/(double)height));}
+            }
+        }
         [Test]public void TablePreservesOriginalColumnValuesAndOrderWhileGeometrySortsByDepth()
         {
             var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,cluster_id\n20,30,Sandstone,alpha\n0,10,Shale,beta");
             Assert.That(data.Headers[3],Is.EqualTo("cluster_id"));Assert.That(data.SourceRows[0].TopFeet,Is.EqualTo(20));Assert.That(data.SourceRows[0].SourceValues[3],Is.EqualTo("alpha"));Assert.That(data.Intervals[0].TopFeet,Is.EqualTo(0));
+        }
+        [TestCase("aa715df0-ee67-47ee-b700-184bac706b7c")][TestCase("e0971608-6986-4e46-85da-8b2320516f2e")]
+        public void RepresentativePreviewKeepsNativeCoordinatesAndReportsDecodeCost(string id)
+        {
+            string fixtures=Environment.GetEnvironmentVariable("SUBSURFACE_PERF_FIXTURES");if(string.IsNullOrEmpty(fixtures))Assert.Ignore("Set SUBSURFACE_PERF_FIXTURES to the directory containing the documented TIFF fixtures.");
+            string path=Path.Combine(fixtures,id+".tif");if(!File.Exists(path))Assert.Ignore("Representative fixture not available.");
+            for(int run=0;run<3;run++)
+            {
+                var timer=System.Diagnostics.Stopwatch.StartNew();var baseline=BoreholeDocumentImage.Load(path);double before=timer.Elapsed.TotalMilliseconds;
+                timer.Restart();var pixels=System.Threading.Tasks.Task.Run(()=>BoreholeDocumentImage.ReadPreview(path)).GetAwaiter().GetResult();var preview=pixels.CreateTexture();double after=timer.Elapsed.TotalMilliseconds;
+                try{Assert.That(pixels.OriginalWidth,Is.EqualTo(baseline.OriginalWidth));Assert.That(pixels.OriginalHeight,Is.EqualTo(baseline.OriginalHeight));Assert.That(Math.Max(preview.width,preview.height),Is.LessThanOrEqualTo(2048));TestContext.Progress.WriteLine("DOCUMENT_PREVIEW "+id+" run="+run+" baseline_ms="+before.ToString("0.0",System.Globalization.CultureInfo.InvariantCulture)+" preview_ms="+after.ToString("0.0",System.Globalization.CultureInfo.InvariantCulture)+" baseline_pixels="+(baseline.Texture.width*baseline.Texture.height)+" preview_pixels="+(preview.width*preview.height));}
+                finally{UnityEngine.Object.DestroyImmediate(baseline.Texture);UnityEngine.Object.DestroyImmediate(preview);}
+            }
+        }
+        [Test]public void DocumentHitTestingRespectsGapsEdgesAndLegendOffset()
+        {
+            var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,top_y,bottom_y\n20,30,Sandstone,400,600\n0,10,Shale,100,200");
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,172,72),Is.EqualTo(0));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,271.9,72),Is.EqualTo(0));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,272,72),Is.EqualTo(-1));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,522,72),Is.EqualTo(2));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,10,72),Is.EqualTo(-1));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,double.NaN,72),Is.EqualTo(-1));
         }
         const string Header="top_depth,bottom_depth,lithology,top_y,bottom_y\n";
         [Test]public void LegendDisplacementShiftsBothDirectionsWithoutChangingCsvOrScale()

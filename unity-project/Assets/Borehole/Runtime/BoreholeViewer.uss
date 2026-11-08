@@ -98,10 +98,23 @@ Button:hover { background-color: #e9ddff; }
 .document-legends Foldout { margin: 0; padding: 5px 8px; }
 .document-legends .unity-foldout__text { color: #5300b6; font-size: 12px; }
 .legend-scroll { max-height: 480px; }
-.legend-image { width: 100%; min-height: 40px; }
+.legend-image { flex-shrink: 0; }
 .legend-notice { white-space: normal; font-size: 11px; padding: 8px; color: #796b87; }
 .header .source { flex-shrink: 1; min-width: 0; overflow: hidden; }
 .header .host-controls { flex-shrink: 0; }
 .header .filename { overflow: hidden; text-overflow: ellipsis; }
 
 .document-legends.legends-expanded { width: 720px; }
+
+.document-focus .column-pane { display: none; }
+.document-focus .document-pane { border-right-width: 0; }
+
+.subsurface-wordmark { color: #78ff00; -unity-font-style: bold; font-size: 12px; letter-spacing: 1px; flex-shrink: 0; margin-right: 12px; }
+.header { flex-wrap: wrap; height: auto; min-height: 36px; }
+.header .source { flex-shrink: 1; }
+
+.composition { flex-direction: row; flex-shrink: 1; min-width: 40px; overflow: hidden; color: #e4ffcc; font-size: 10px; margin-left: 8px; }
+.composition Label { margin-right: 8px; white-space: nowrap; }
+.composition-chip { border-left-width: 4px; padding-left: 4px; }
+
+.document-viewport.mapped-region-hover { border-left-width: 2px; border-left-color: #78ff00; }

@@ -22,6 +22,8 @@ namespace Subsurface.Borehole
         public double FocusDepthFeet {get;private set;}
         public double WindowFeet {get;private set;}
         public bool DocumentMode => false;
+        public bool DocumentFocus {get;private set;}
+        double savedFocusDepth,savedWindowFeet;
         public bool ShowingSurface => column.Document!=null&&((documentPane!=null&&documentPane.AtHeader)||FocusDepthFeet<=column.Document.TopFeet);
         public bool DocumentSynchronized => documentPane!=null&&documentPane.IsSynchronized;
         public double VisibleTopFeet => FocusDepthFeet-WindowFeet/(2*Math.Cos(pitch*Math.PI/180));
@@ -29,7 +31,32 @@ namespace Subsurface.Borehole
         public string LastError {get;private set;}
         public int AdvancingFrames {get;private set;}
         public string SourceName {get;private set;}
+        public string SourceCsv {get;private set;}
         public Texture2D SegmentedImage {get;private set;}
+        bool annotationsVisible=true;BoreholeDocumentImage cleanPage;string cleanPath,annotatedPath;Texture2D annotatedTexture;int annotatedWidth,annotatedHeight;double annotatedOffset;
+        public void SetAnnotationSource(string path)
+        {
+            annotatedPath=FullResolutionDocumentPath;annotatedTexture=SegmentedImage;annotatedWidth=DocumentPixelWidth;annotatedHeight=DocumentPixelHeight;annotatedOffset=PixelDisplacement;
+            try
+            {
+                cleanPage=BoreholeDocumentImage.Load(path);cleanPath=Path.Combine(Application.temporaryCachePath,"source-"+Guid.NewGuid()+Path.GetExtension(path));File.Copy(path,cleanPath);
+                annotatedPath=FullResolutionDocumentPath;annotatedTexture=SegmentedImage;annotatedWidth=DocumentPixelWidth;annotatedHeight=DocumentPixelHeight;annotatedOffset=PixelDisplacement;
+                var button=root.Q<Button>("toggleAnnotations");button.SetEnabled(true);button.tooltip="Show or hide generated annotations; the green interval selection stays visible";ApplyAnnotations();
+            }
+            catch(Exception ex){ClearAnnotationSource();root.Q<Button>("toggleAnnotations").tooltip="Source image unavailable: "+ex.Message;}
+        }
+        void ApplyAnnotations()
+        {
+            if(cleanPage==null)return;double previousOffset=PixelDisplacement;documentPane?.ClearTiles();
+            SegmentedImage=annotationsVisible?annotatedTexture:cleanPage.Texture;FullResolutionDocumentPath=annotationsVisible?annotatedPath:cleanPath;
+            DocumentPixelWidth=annotationsVisible?annotatedWidth:cleanPage.OriginalWidth;DocumentPixelHeight=annotationsVisible?annotatedHeight:cleanPage.OriginalHeight;PixelDisplacement=annotationsVisible?annotatedOffset:0;
+            root.Q<Button>("toggleAnnotations").text=annotationsVisible?"Annotations: on":"Annotations: off";documentPane?.ReplacePage(column.Document,SegmentedImage,DocumentPixelWidth,DocumentPixelHeight,previousOffset);
+        }
+        void ClearAnnotationSource()
+        {
+            if(cleanPage!=null){var pending=documentPane?.PendingDocumentWork;documentPane?.ClearTiles();FullResolutionDocumentPath=annotatedPath;SegmentedImage=annotatedTexture;DocumentPixelWidth=annotatedWidth;DocumentPixelHeight=annotatedHeight;PixelDisplacement=annotatedOffset;var texture=cleanPage.Texture;if(Application.isPlaying)Destroy(texture);else DestroyImmediate(texture);string path=cleanPath;if(pending!=null&&!pending.IsCompleted)pending.ContinueWith(_=>DeleteDocumentSource(path));else DeleteDocumentSource(path);}
+            cleanPage=null;cleanPath=null;var button=root?.Q<Button>("toggleAnnotations");if(button!=null){button.SetEnabled(false);button.text="Annotations: on";}
+        }
         public double PixelDisplacement {get;private set;}
         public string FullResolutionDocumentPath {get;private set;}
         public int DocumentDetailTileCount=>documentPane?.Tiles.ResidentTiles??0;
@@ -92,6 +119,9 @@ namespace Subsurface.Borehole
             zoomSlider=root.Q<Slider>("zoomSlider");zoomPercent=root.Q<Label>("zoomPercent");
             zoomSlider.RegisterValueChangedCallback(e=>{if(column.Document==null)return;double target=column.Document.SpanFeet*1.4*Math.Pow(1d/1400,e.newValue);Zoom(target/WindowFeet);});
             root.Q<Button>("fit").clicked+=FitColumn;
+            root.Q<Button>("toggleAnnotations").SetEnabled(false);root.Q<Button>("toggleAnnotations").clicked+=()=>{annotationsVisible=!annotationsVisible;ApplyAnnotations();};
+            root.Q<Button>("focusDocument").clicked+=()=>SetDocumentFocus(!DocumentFocus);
+            root.RegisterCallback<KeyDownEvent>(e=>{if(e.keyCode==KeyCode.Escape&&DocumentFocus){SetDocumentFocus(false);e.StopPropagation();}});
             var appearance=root.Q<DropdownField>("appearance");appearance.choices=new List<string>{"Textured lithology","Legend / patterns"};appearance.index=0;
             appearance.RegisterValueChangedCallback(e=>{displayMode=e.newValue=="Legend / patterns"?DisplayMode.Legend:DisplayMode.Texture;column.SetMode(displayMode);});
             ruler.Clear();labelLayer.Clear();ticks.Clear();intervalLabels.Clear();intervalConnectors.Clear();
@@ -99,7 +129,7 @@ namespace Subsurface.Borehole
             for(int i=0;i<24;i++)
             {
                 var connector=new VisualElement{name="intervalConnector"+i,pickingMode=PickingMode.Ignore};connector.AddToClassList("interval-connector");labelLayer.Add(connector);intervalConnectors.Add(connector);
-                var label=new Button();label.enableRichText=false;label.AddToClassList("interval-label");label.RegisterCallback<PointerDownEvent>(e=>e.StopPropagation());label.clicked+=()=>{if(label.userData is int index)SelectInterval(index,false);};labelLayer.Add(label);intervalLabels.Add(label);
+                var label=new Button();label.enableRichText=false;label.AddToClassList("interval-label");label.RegisterCallback<PointerDownEvent>(e=>e.StopPropagation());label.clicked+=()=>{if(label.userData is int index)SelectInterval(index,true);};labelLayer.Add(label);intervalLabels.Add(label);
             }
             viewport.RegisterCallback<GeometryChangedEvent>(_=>{ResizeTarget();poseDirty=true;});
             viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey)Zoom(Math.Pow(1.12,e.delta.y));else ScrollDepth(e.delta.y);e.StopPropagation();});
@@ -125,7 +155,8 @@ namespace Subsurface.Borehole
         {
             try
             {
-                var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                var document=BoreholeCsv.Parse(csv);ClearAnnotationSource();legends?.Clear();column.Build(document);column.SetMode(displayMode);SourceName=sourceName;SourceCsv=csv;csvOverlay?.Bind(document);PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                UpdateComposition(document);
                 LastError=null;error.text="";error.AddToClassList("hidden");filename.text=sourceName;range.text=Format(document.TopFeet)+" – "+Format(document.BottomFeet)+" ft · "+document.SourceIntervalCount+" source intervals";
                 WindowFeet=Math.Min(document.SpanFeet*1.15,Math.Max(Math.Min(100,document.SpanFeet),Math.Min(300,document.SpanFeet*.35)));FocusDepthFeet=document.TopFeet+WindowFeet*.5;SetDepth(FocusDepthFeet);UpdateDocumentImage();
                 root.Q("selectionCard").AddToClassList("hidden");selectedName.text="";selectedDepths.text="";selectedInfo.text="";SetDocumentMode(false);
@@ -178,6 +209,15 @@ namespace Subsurface.Borehole
         void UpdateDocumentImage()
         {
             documentPane?.Bind(column.Document,SegmentedImage,DocumentPixelWidth,DocumentPixelHeight);poseDirty=true;
+        }
+        public void SetDocumentFocus(bool focused)
+        {
+            if(focused==DocumentFocus)return;
+            if(focused){savedFocusDepth=FocusDepthFeet;savedWindowFeet=WindowFeet;}
+            DocumentFocus=focused;root.EnableInClassList("document-focus",focused);
+            root.Q<Button>("focusDocument").text=focused?"Restore split view":"Focus document";
+            if(!focused){WindowFeet=savedWindowFeet;SetDepth(savedFocusDepth);}
+            documentPane?.SetFocus(focused);poseDirty=true;
         }
         public void SetDocumentMode(bool document)
         {
@@ -277,7 +317,8 @@ namespace Subsurface.Borehole
                 if(!selected&&(hide||(!float.IsNaN(selectedY)&&i%2==column.SelectedIndex%2&&Mathf.Abs(positions[n]-selectedY)<46)))continue;
                 var row=column.Document.Intervals[i];var label=intervalLabels[used++];
                 label.style.display=DisplayStyle.Flex;label.style.left=left?8:width*.62f;label.style.width=left?width*.28f:Mathf.Min(195,width*.36f);label.style.top=positions[n]-21;
-                string direction=selected&&anchors[n]<0?" ↑":selected&&anchors[n]>height?" ↓":"";
+                bool above=selected&&row.BottomFeet<VisibleTopFeet,below=selected&&row.TopFeet>VisibleBottomFeet;
+                string direction=above?" ↑":below?" ↓":"";label.tooltip=above?"Selected interval above. Activate to jump to selection.":below?"Selected interval below. Activate to jump to selection.":"Select "+Name(row);
                 label.text=Name(row)+direction+"\n"+Format(row.TopFeet)+"–"+Format(row.BottomFeet)+" ft";label.userData=i;label.style.borderLeftWidth=3;label.style.borderLeftColor=column.IdentifierColors[i];label.EnableInClassList("active",selected);
                 var connector=intervalConnectors[used-1];float anchorX=width*(left?.415f:.585f),edge=left?8+width*.28f:width*.62f;
                 float startX=left?edge:anchorX,endX=left?anchorX:edge,startY=left?positions[n]:anchors[n],endY=left?anchors[n]:positions[n];
@@ -290,13 +331,32 @@ namespace Subsurface.Borehole
             foreach(var tick in ticks){tick.style.left=width*.30f;tick.style.width=width*.10f;}
             for(int i=used;i<intervalLabels.Count;i++){intervalLabels[i].style.display=DisplayStyle.None;intervalConnectors[i].style.display=DisplayStyle.None;}
         }
+        void UpdateComposition(BoreholeDocument document)
+        {
+            var totals=new Dictionary<string,double>(StringComparer.Ordinal);double analysed=0,gaps=0,unknown=0;
+            foreach(var row in document.Intervals)
+            {
+                if(row.IsGap){gaps+=row.ThicknessFeet;continue;}
+                string label=Name(row);if(!totals.ContainsKey(label))totals[label]=0;totals[label]+=row.ThicknessFeet;analysed+=row.ThicknessFeet;
+                if(!column.catalog.Resolve(row.Lithology).IsResolved)unknown+=row.ThicknessFeet;
+            }
+            var entries=new List<KeyValuePair<string,double>>(totals);entries.Sort((a,b)=>{int order=b.Value.CompareTo(a.Value);return order!=0?order:string.CompareOrdinal(a.Key,b.Key);});
+            var full=new List<string>();var compact=new List<string>();double other=0;
+            for(int i=0;i<entries.Count;i++){string text=entries[i].Key+" "+(entries[i].Value/analysed*100).ToString("0.0",CultureInfo.InvariantCulture)+"%";full.Add(text);if(i<2)compact.Add(text);else other+=entries[i].Value;}
+            if(other>0)compact.Add("Other "+(other/analysed*100).ToString("0.0",CultureInfo.InvariantCulture)+"%");
+            full.Add("Depth-weighted; denominator "+Format(analysed)+" ft of source intervals. No-data gaps: "+Format(gaps)+" ft (excluded). Unrecognized labels: "+Format(unknown)+" ft (included under their source labels).");
+            var summary=root.Q("composition");summary.Clear();summary.Add(new Label("Depth %"));
+            for(int i=0;i<Math.Min(2,entries.Count);i++){var chip=new Label(compact[i]){enableRichText=false};chip.AddToClassList("composition-chip");int index=document.Intervals.FindIndex(row=>Name(row)==entries[i].Key);if(index>=0)chip.style.borderLeftColor=column.IdentifierColors[index];summary.Add(chip);}
+            if(other>0)summary.Add(new Label(compact[compact.Count-1]));
+            summary.Add(new Label("Unknown: "+Format(unknown)+" ft · No-data: "+Format(gaps)+" ft"));summary.tooltip=string.Join("\n",full);summary.focusable=true;summary.RemoveFromClassList("hidden");
+        }
         void ShowError(string message){LastError=message;if(error!=null){error.text=message;error.RemoveFromClassList("hidden");}}
         static string Name(BoreholeInterval row)=>string.IsNullOrWhiteSpace(row.Lithology)?"Unspecified lithology":row.Lithology;
         public static string Format(double value)=>value.ToString("N2",CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.');
         void ReleaseTarget(){if(texture==null)return;if(columnCamera!=null)columnCamera.targetTexture=null;texture.Release();if(Application.isPlaying)Destroy(texture);else DestroyImmediate(texture);texture=null;}
         void OnDisable()
         {
-            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;legends?.Dispose();legends=null;ReleaseTarget();ReleaseDocumentSource();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
+            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;legends?.Dispose();legends=null;ClearAnnotationSource();ReleaseTarget();ReleaseDocumentSource();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
         }
     }
 }
