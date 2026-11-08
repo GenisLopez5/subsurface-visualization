@@ -41,6 +41,13 @@ Usage
 """
 from __future__ import annotations
 
+import os
+
+# Tesseract 4 runs 2-3x slower on small images when it uses several OpenMP threads; one thread per call gives the
+# same text. Set before any Tesseract process is started (child processes inherit it).
+if not os.environ.get("OMP_THREAD_LIMIT"):
+    os.environ["OMP_THREAD_LIMIT"] = "1"
+
 import argparse
 import contextlib
 import importlib.metadata
@@ -100,7 +107,7 @@ class Config:
     round_depth: float = 0.1            # round depths to this step (0 = no rounding)
     depth_chunk: int = 1600             # depth column is OCR'd in chunks of this many rows
     depth_max_chunks: int = 12          # at most this many evenly spaced chunks (a line needs few labels; 40 = slow)
-    annotated_tif: bool = True          # also write <stem>_annotated.tif in the challenge notebook's style
+    annotated_tif: bool = False         # write <stem>_annotated.tif during the run (slow on long logs); off = drawn on demand by the Output download
     # --- output -------------------------------------------------------------------------------------------------------
     page_scale: float = 0.25            # size of <stem>_page.png relative to the scan
     column_scale: float = 0.5           # size of <stem>_column.png relative to the scan

@@ -367,9 +367,11 @@ def classify_colour_rows(ink, rgb, swatches, scale, describe, cfg, ccfg) -> tupl
 # One log
 # ----------------------------------------------------------------------------------------------------------------------
 def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: ProgressFn, depth_reader=None,
-                   method_name: str = "hybrid_v2") -> dict:
-    """depth_reader / method_name let hybrid_v3 reuse this with Pau's robust depth fit."""
+                   method_name: str = "hybrid_v2", parallel_depth: bool = False, legend_plot=None) -> dict:
+    """depth_reader / method_name / parallel_depth / legend_plot let hybrid_v3 reuse this (Pau's robust depth fit,
+    depth OCR running in a background thread while the column is analysed, fast legend plot)."""
     depth_reader = depth_reader or hy.read_depth
+    legend_plot = legend_plot or cv.plot_legend
     timings, t0 = {}, time.perf_counter()
     tracemalloc.start()
 
@@ -382,6 +384,16 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     ann = json.loads(Path(log.annotation_path).read_text())
     boxes = ann["bounding_boxes"]
     image = LX.load_page(Path(log.image_path), ann)
+    depth_future = None
+    if parallel_depth and "depth_column" in boxes:
+        # OCR runs in external processes (Tesseract / onnxruntime release the GIL): read the depth labels on the
+        # second core while this thread analyses the column. The page is decoded first: PIL's lazy loading is not
+        # thread-safe.
+        from concurrent.futures import ThreadPoolExecutor
+        image.load()
+        pool = ThreadPoolExecutor(max_workers=1)
+        depth_future = pool.submit(depth_reader, image, boxes["depth_column"], cfg, ccfg)
+        pool.shutdown(wait=False)
 
     ink, rgb, col_x0, col_y0 = cv.prepare_column(image, boxes["interpreted_lithology_column"], ccfg)
     scale = cv.measure_period(ink, ccfg)
@@ -429,7 +441,9 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     lap("segmentation")
 
     y_to_depth, depth_info, depth_how = (None, None, ["no depth_column box"])
-    if "depth_column" in boxes:
+    if depth_future is not None:
+        y_to_depth, depth_info, depth_how = depth_future.result()      # usually finished already
+    elif "depth_column" in boxes:
         y_to_depth, depth_info, depth_how = depth_reader(image, boxes["depth_column"], cfg, ccfg)
     lap("depth")
 
@@ -464,7 +478,7 @@ def process_log_v2(log, out_dir: Path, cfg, ccfg, colours, on_progress: Progress
     column_png = out_dir / f"{log.stem}_column.png"
     cv.render(image, {kk: v for kk, v in boxes.items() if kk != "lithology_legend"}, intervals, colours, region,
               cfg.column_scale).save(column_png)
-    legend_png = cv.plot_legend(swatches, groups, out_dir / f"{log.stem}_legend.png")
+    legend_png = legend_plot(swatches, groups, out_dir / f"{log.stem}_legend.png")
     fit = None if depth_info is None else cv.DepthFit(depth_info["a"], depth_info["b"], depth_info["n_used"],
                                                       depth_info["n_read"], depth_info["points"])
     depth_png = cv.plot_depth(fit, out_dir / f"{log.stem}_depth.png")
