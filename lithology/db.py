@@ -13,6 +13,7 @@ import hashlib
 import json
 import uuid
 
+import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
@@ -77,8 +78,15 @@ class DB:
 
     def open(self):
         self.pool.open(wait=True, timeout=30)
-        with self.pool.connection() as c:
-            c.execute(SCHEMA)
+        # The schema DDL (ALTER TABLE ...) needs exclusive locks: if another session holds the tables
+        # (e.g. a stuck transaction from a previous server), give up after a few seconds instead of
+        # hanging startup forever; the tables already exist in that case.
+        try:
+            with self.pool.connection() as c, c.transaction():
+                c.execute("SET LOCAL lock_timeout = '5s'")
+                c.execute(SCHEMA)
+        except psycopg.errors.LockNotAvailable:
+            print("database schema not updated (tables locked by another session); continuing")
 
     def close(self):
         self.pool.close()

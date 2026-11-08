@@ -201,6 +201,7 @@ async function viewNew() {
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v3" checked> <b>hybrid_v3</b>&nbsp;<span class="muted small">hybrid_v2 + Pau's robust depth fit</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v2" checked> <b>hybrid_v2</b>&nbsp;<span class="muted small">colour mode, blank fix, legend quality</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology2" checked> <b>lithology2</b>&nbsp;<span class="muted small">lithology + shape naming, one name per pattern, noise → neighbour, no "?"</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology" checked> <b>lithology</b>&nbsp;<span class="muted small">Pau's lithology/ package only</span></label>
         <label class="check" style="display:flex;margin-bottom:12px"><input type="checkbox" data-method="cv" checked> <b>cv</b>&nbsp;<span class="muted small">clustering only</span></label>
         <div class="row"><button class="primary big" id="evalBtn" disabled>▶ Start evaluation</button></div>
@@ -554,6 +555,7 @@ function viewHow() {
       <dt><code>hybrid_v3</code></dt><dd>Same as lithology_cv without Pau's grid legend reader.</dd>
       <dt><code>hybrid_v2</code></dt><dd>Colour mode, blank fix and legend quality score; simpler depth fit. The shared engine the newer methods plug into.</dd>
       <dt><code>hybrid</code></dt><dd>First hybrid: classic CV segmentation with OCR fallbacks.</dd>
+      <dt><code>lithology2</code></dt><dd>lithology + clean-up (<code>methods/lithology2.py</code>): black-and-white patterns named by the shapes of their ink blobs (dots, dashes, bars, Г hooks, bricks), intervals that look alike get one name, intervals that match nothing take the previous/next name (or stay blank), no "?".</dd>
       <dt><code>lithology</code></dt><dd>Pau's <code>lithology/</code> package on its own (classifies windows directly against the legend).</dd>
       <dt><code>cv</code></dt><dd>Classic computer vision only (clustering, Tesseract).</dd>
     </dl>
@@ -953,7 +955,9 @@ function tabMonitor(id, st) {
       case "log_done": {
         const m = e.metrics;
         txt = `    ✓ ${e.n_intervals} intervals · ${e.runtime_s.toFixed(1)} s${m ? ` · row acc ${m.row_acc}% · boundary ${m.boundary_mean_px} px` : ""}${e.ambiguous && e.ambiguous.length ? ` · ambiguous: ${e.ambiguous.join(", ")}` : ""}`;
-        cls = "e-ok"; break;
+        cls = "e-ok";
+        if (e.legend) txt += `\n    legend (${e.legend.length}): ${e.legend.length ? e.legend.map((x) => x.name + (x.ignored ? " (ignored)" : "")).join(", ") : "no swatches found"}`;
+        break;
       }
       case "log_error": txt = `    ✗ ERROR ${e.error}`; cls = "e-err"; k = "err"; break;
       case "done": txt = `■ done in ${fmtSec(e.total_s)} · errors: ${e.n_errors}${e.mean_metrics ? ` · mean row acc ${e.mean_metrics.row_acc}%` : ""}`; cls = "e-start"; break;
@@ -1345,7 +1349,7 @@ async function viewLog(id, stem) {
       ${d.files.csv ? `<a class="btn primary" id="outputBtn" href="/api/runs/${id}/logs/${enc(stem)}/output" title="Zip with the CSV and the annotated image (.tif)">⬇ Output</a>` : ""}
     </div></div>
   ${d.error ? `<div class="notice err"><strong>This log failed:</strong> ${esc(d.error)}</div>` : ""}
-  ${!r && !d.error ? `<div class="notice">Details (clusters, legend, depth, timings) appear when the whole run has finished; intervals come from the CSV.</div>` : ""}
+  ${!r && !d.error ? `<div class="notice">Details (clusters, legend, depth, timings) appear as soon as this log has finished; intervals come from the CSV.</div>` : ""}
   <div class="log-layout">
     <div class="card tight viewer-card">
       <div class="viewer-tools">
@@ -1430,14 +1434,14 @@ async function viewLog(id, stem) {
         <td class="nowrap"><span class="swatch" style="background:${colour(iv.lithology)}"></span>${esc(iv.lithology)}${iv.ambiguous ? `<span class="q" title="Ambiguous. Alternatives: ${esc(alts || "look-alike swatch")}">?</span>` : ""}</td>
         <td class="num">${iv.cluster_id}</td></tr>`; }).join("")}</tbody></table></div>`,
     clusters: () => !r ? `<div class="muted">Available when the run has finished.</div>` : !Object.keys(r.clusters).length ? `<div class="empty">No clusters (blank column).</div>` : `
-      <div class="small muted" style="margin-bottom:8px">${r.method === "lithology" ? "Each interval is classified directly against the legend fingerprints; one row per lithology found. Confidence = (2nd best - best) / 2nd best distance, averaged over its intervals (higher = surer)." : "Each cluster of similar texture is named after the nearest legend swatch. Margin = how much better the best swatch is than the 2nd (higher = surer)."}</div>
-      <table class="data"><thead><tr><th class="num">Cl.</th><th>Name</th><th class="num">Intervals</th><th class="num">Share</th><th class="num">${r.method === "lithology" ? "Confidence" : "Margin"}</th><th>Nearest swatches (distance)</th></tr></thead><tbody>
+      <div class="small muted" style="margin-bottom:8px">${(r.method === "lithology" || r.method === "lithology2") ? "Each interval is classified directly against the legend fingerprints; one row per lithology found. Confidence = (2nd best - best) / 2nd best distance, averaged over its intervals (higher = surer)." : "Each cluster of similar texture is named after the nearest legend swatch. Margin = how much better the best swatch is than the 2nd (higher = surer)."}</div>
+      <table class="data"><thead><tr><th class="num">Cl.</th><th>Name</th><th class="num">Intervals</th><th class="num">Share</th><th class="num">${(r.method === "lithology" || r.method === "lithology2") ? "Confidence" : "Margin"}</th><th>Nearest swatches (distance)</th></tr></thead><tbody>
       ${Object.entries(r.clusters).map(([cid, c]) => {
         const ivs = rows.filter((iv) => String(iv.cluster_id) === cid), px = ivs.reduce((a, iv) => a + iv.bottom_y - iv.top_y, 0), tot = rows.reduce((a, iv) => a + iv.bottom_y - iv.top_y, 0) || 1;
         return `<tr class="${c.ambiguous ? "amb" : ""}"><td class="num">${cid}</td><td class="nowrap"><span class="swatch" style="background:${colour(c.name)}"></span>${esc(c.name)}${c.ambiguous ? `<span class="q" title="Alternatives: ${esc(c.alternatives.join(", "))}">?</span>` : ""}</td>
           <td class="num">${ivs.length}</td><td class="num">${fmtNum((100 * px) / tot, 0)}%</td><td class="num">${fmtNum(c.margin, 2)}</td>
           <td class="small">${Object.entries(c.distances).map(([n, v]) => `${esc(n)} <span class="muted">${fmtNum(v, 2)}</span>`).join("<br>") || "–"}</td></tr>`; }).join("")}</tbody></table>
-      <dl class="kv" style="margin-top:12px"><dt>${r.method === "lithology" ? "Lithologies found" : "k (clusters)"}</dt><dd>${r.k}</dd>${r.silhouette != null ? `<dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd>` : ""}<dt>Transition clusters removed</dt><dd>${(r.transition_clusters_removed || []).length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
+      <dl class="kv" style="margin-top:12px"><dt>${(r.method === "lithology" || r.method === "lithology2") ? "Lithologies found" : "k (clusters)"}</dt><dd>${r.k}</dd>${r.silhouette != null ? `<dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd>` : ""}<dt>Transition clusters removed</dt><dd>${(r.transition_clusters_removed || []).length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
     legend: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       ${r.swatches.length ? "" : `<div class="notice warn"><strong>No legend swatches found.</strong> Every cluster is named "Unknown". The swatch finder expects same-size framed squares with a readable name below or to the right.</div>`}
       ${d.files.legend_png ? `<img class="legend-img zoomable" data-big="${file(d.files.legend_png)}" data-title="Detected legend swatches" src="${file(d.files.legend_png)}" alt="Detected legend swatches" title="Click to enlarge">

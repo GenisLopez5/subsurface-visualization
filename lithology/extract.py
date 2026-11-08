@@ -656,7 +656,9 @@ def legend_parser(name: str | None = None):
 # ----------------------------------------------------------------------------------------------
 
 
-def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_blank=False, legend_method_name=None):
+def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_blank=False, legend_method_name=None,
+            refine=None):
+    """refine: clean the intervals with refine.py (None = LITHO_REFINE, default on). The depth fit is unchanged."""
     ann = json.loads(Path(annotation_path).read_text())
     boxes = ann["bounding_boxes"]
     img = load_page(Path(image_path), ann)
@@ -669,6 +671,16 @@ def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_bl
     if not entries:
         raise RuntimeError("no legend entries found")
     runs = classify_column(img, boxes["interpreted_lithology_column"], entries, verbose=verbose)
+    refine_info = None
+    if refine is None:
+        import os
+        refine = os.environ.get("LITHO_REFINE", "1").strip().lower() not in ("0", "false", "no", "off")
+    if refine and runs:  # one name per pattern, shape naming on B/W logs, noise -> neighbour, no ties (refine.py)
+        from .refine import refine as _refine
+        runs, refine_info = _refine(img, boxes["interpreted_lithology_column"], entries, runs)
+        if verbose:
+            print(f"[refine] {refine_info.get('n_input')} -> {refine_info.get('n_output')} intervals, "
+                  f"{refine_info.get('groups')} patterns, {refine_info.get('noise')} noise", file=sys.stderr)
 
     def rd(v):
         return float(np.round(v / round_depth) * round_depth) if round_depth else float(v)
@@ -698,6 +710,7 @@ def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_bl
             {k: v for k, v in e.items() if k not in ("feature", "swatch_height")} for e in entries
         ],
         "intervals": intervals,
+        "refine": {k: v for k, v in (refine_info or {}).items() if k != "group_detail"} or None,
     }
 
 

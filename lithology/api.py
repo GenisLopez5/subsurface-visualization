@@ -48,13 +48,15 @@ import sys
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from .annotations import IMAGE_EXT, AnnotationNotFound, AnnotationStore, ImageStore, load_annotation, resolve_annotation
+from .annotations import (IMAGE_EXT, AnnotationNotFound, AnnotationStore, ImageStore, box_source,
+                          load_annotation, resolve_annotation)
 from .config import Settings
 from . import drawing
 from .jobs import Job, JobManager
@@ -92,8 +94,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         detector = load_detector(s.detector)
     except Exception as e:
         print(f"LITHO_DETECTOR could not be loaded ({type(e).__name__}: {e}); continuing without it")
+    print(f"bounding boxes by default: {s.box_source} "
+          + ("(the matching dataset JSON; detection only with boxes=detector)" if s.box_source == "dataset"
+             else "(automatic detection, dataset JSONs as fallback)"))
     if detector is not None:
-        print(f"bounding boxes: automatic detection ({s.detector}), dataset JSONs as fallback")
+        print(f"bounding-box detector: {s.detector}")
         if hasattr(detector, "warm_up"):  # load the models in the background, not on the first upload
             import threading
             threading.Thread(target=detector.warm_up, daemon=True).start()
@@ -134,9 +139,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         p = p.resolve()
         return any(p.is_relative_to(Path(r).resolve()) for r in roots)
 
-    def pick_inputs(paths: list[Path]):
+    BOXES_DOC = ("where the bounding boxes come from when no JSON is sent: `dataset` (the matching JSON from "
+                 "the annotation folders) or `detector` (automatic detection, dataset JSON as fallback). "
+                 f"Default: the server's LITHO_BOX_SOURCE ({s.box_source})")
+
+    def pick_inputs(paths: list[Path], boxes: str | None = None):
         """(image, annotation, notes) from a list of files, finding the missing partner.
         Returns a JSONResponse on failure."""
+        try:
+            source = box_source(boxes, s.box_source)
+        except ValueError as e:
+            return err(str(e))
         img = ann_path = None
         notes = []
         for p in paths:
@@ -148,7 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return err(f"Unsupported file type: {p.name}")
         if img and not ann_path:
             try:
-                ann_path, how = resolve_annotation(img, store, detector)
+                ann_path, how = resolve_annotation(img, store, detector, source=source)
             except AnnotationNotFound as e:
                 return err(str(e), need="json", keep=upload_token(img) if img.is_relative_to(s.uploads) else None)
             notes.append(f"annotation: {ann_path.name}" + (f" ({how})" if how else ""))
@@ -215,9 +228,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 output: str = Query("zip", pattern="^(zip|json)$",
                                     description="zip: <name>_annotated.tif + <name>_lithology.csv; "
                                                 "json: intervals + CSV text + links to the files"),
-                force: bool = Query(False, description="ignore cached results")):
+                force: bool = Query(False, description="ignore cached results"),
+                boxes: Literal["dataset", "detector"] | None = Query(None, description=BOXES_DOC)):
         paths = save_uploads([file] + ([annotation] if annotation else []))
-        picked = pick_inputs(paths)
+        picked = pick_inputs(paths, boxes)
         if isinstance(picked, JSONResponse):
             return picked
         img, ann_path, notes = picked
@@ -250,7 +264,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/jobs")
     def start_job(file: list[UploadFile] = File(default=[]), keep: str | None = Form(None),
-                  dataset: str | None = Form(None), force: str = Form("0")):
+                  dataset: str | None = Form(None), force: str = Form("0"),
+                  boxes: str | None = Form(None, description=BOXES_DOC)):
         paths = save_uploads(file)
         if keep and (p := from_token(keep)):
             paths.append(p)
@@ -261,7 +276,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             paths.append(p)
         if not paths:
             return err("No file")
-        picked = pick_inputs(paths)
+        picked = pick_inputs(paths, boxes)
         if isinstance(picked, JSONResponse):
             return picked
         img, ann_path, notes = picked

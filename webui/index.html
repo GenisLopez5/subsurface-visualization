@@ -57,7 +57,8 @@ button.ghost{background:none;border:1px solid var(--line);color:var(--ink);borde
   <details class="log" id="logBox" hidden><summary>Log</summary><pre id="log"></pre></details>
   <input type="file" id="file" multiple accept=".json,.pdf,.tif,.tiff,.png,.jpg,.jpeg" hidden>
 </div>
-<div class="pick">Dataset <select id="ds"><option value="">-</option></select></div>
+<div class="pick">Dataset <select id="ds"><option value="">-</option></select>
+  <label class="meta" title="Without a JSON, find the bounding boxes with the detector (bbox server) instead of looking up the dataset JSON"><input type="checkbox" id="detect"> Detect boxes (bbox server)</label></div>
 
 <div id="results" hidden>
   <div class="card">
@@ -126,13 +127,15 @@ async function start(opts){
   if(busy)return;busy=true;
   const fd=new FormData();const files=[...(opts.files||[])];files.forEach(f=>fd.append('file',f));
   if(keep&&!opts.dataset)fd.append('keep',keep);if(opts.dataset)fd.append('dataset',opts.dataset);
+  if(opts.detect||$('detect').checked)fd.append('boxes','detector');
   const names=files.map(f=>f.name).concat(keep&&!opts.dataset?[keep]:[]).join(' + ')||opts.dataset.split(/[\\/]/).pop();
   dropState('busy',`<span class="spin"></span>${files.some(f=>f.size>5e6)?'Uploading':'Starting'} ${esc(names)}`,'');
   $('logBox').hidden=true;$('log').textContent='';
   let r,j;try{r=await fetch('/api/jobs',{method:'POST',body:fd});j=await r.json()}catch(e){j={error:'could not reach the server'};r={ok:false}}
   if(!r.ok){busy=false;
-    if(j.need){keep=j.keep;dropState('need',esc(j.error),`Drop the ${j.need==='json'?'JSON':'image or PDF'} · <a href="#" id="cancel">cancel</a>`);
-      $('cancel').onclick=e=>{e.preventDefault();e.stopPropagation();idle()}}
+    if(j.need){keep=j.keep;dropState('need',esc(j.error),`Drop the ${j.need==='json'?'JSON':'image or PDF'}${j.need==='json'?' · <a href="#" id="detectNow">detect the boxes</a>':''} · <a href="#" id="cancel">cancel</a>`);
+      $('cancel').onclick=e=>{e.preventDefault();e.stopPropagation();idle()};
+      if($('detectNow'))$('detectNow').onclick=e=>{e.preventDefault();e.stopPropagation();start({detect:true})}}
     else{keep=null;dropState('error',esc(j.error),'')}
     return}
   keep=null;track(j)}

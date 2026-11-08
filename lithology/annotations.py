@@ -1,9 +1,12 @@
 """
 Getting the bounding boxes (depth column, lithology column, legend) for an image.
 
-Automatic detection (`BoxDetector`, by default the int8 models in bbox_detector.py) comes first;
-existing annotation JSONs matched by file name (`AnnotationStore`) are the fallback. A JSON sent
-along with the image always wins.
+A JSON sent along with the image always wins. Otherwise it depends on the box source:
+  dataset   (default) the existing annotation JSON matched by file name (`AnnotationStore`); the
+            detector is not called.
+  detector  automatic detection first (`BoxDetector`: the bbox service at LITHO_BBOX_URL, or the int8
+            models in-process), the dataset JSON as fallback when it fails.
+The server default is LITHO_BOX_SOURCE; every endpoint can override it per request (`boxes=`).
 """
 from __future__ import annotations
 
@@ -18,8 +21,29 @@ IMAGE_EXT = PAGE_EXT | {".png", ".jpg", ".jpeg"}
 REQUIRED_BOXES = ("depth_column", "interpreted_lithology_column", "lithology_legend")
 
 
+BOX_SOURCES = ("dataset", "detector")
+DEFAULT_BOX_SOURCE = "detector"  # the int8 OpenVINO detector of bbox-final first, the dataset JSON as fallback
+
+
 class AnnotationNotFound(LookupError):
     pass
+
+
+def box_source(value: str | None, default: str = DEFAULT_BOX_SOURCE) -> str:
+    """Validate a `boxes=` value ('dataset' / 'detector'); None/'' gives the default."""
+    v = (value or default).strip().lower()
+    if v not in BOX_SOURCES:
+        raise ValueError(f"boxes must be one of {', '.join(BOX_SOURCES)}, not {value!r}")
+    return v
+
+
+def _plan(source: str, detector) -> tuple[bool, str]:
+    """(call the detector?, reason when it isn't / the dataset is the fallback)."""
+    if source != "detector":
+        return False, "dataset JSON requested (boxes=dataset)"
+    if detector is None:
+        return False, "detection requested but no detector is configured (set LITHO_BBOX_URL)"
+    return True, ""
 
 
 def norm(s: str) -> str:
@@ -152,12 +176,13 @@ def _find_in_store(image_path: Path, store: AnnotationStore, why: str) -> tuple[
 
 
 def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector | None = None,
-                       out_dir: Path | None = None) -> tuple[Path, str]:
-    """Annotation JSON for an image: the detector first (if any), then an existing JSON from the store
-    (also used when the detector fails). A detected annotation is written to out_dir as a file."""
+                       out_dir: Path | None = None, source: str = DEFAULT_BOX_SOURCE) -> tuple[Path, str]:
+    """Annotation JSON for an image. source='dataset': the existing JSON from the store only.
+    source='detector': the detector first, the store's JSON when it fails. A detected annotation is
+    written to out_dir as a file."""
     image_path = Path(image_path)
-    failure = "no automatic detector configured"
-    if detector is not None:
+    use_detector, failure = _plan(source, detector)
+    if use_detector:
         ann, failure = _detect(image_path, detector)
         if ann is not None:
             out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
@@ -167,15 +192,17 @@ def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector
         path, how = _find_in_store(image_path, store, failure)
         return path, "; ".join(x for x in (how, f"existing JSON used: {failure}") if x)
     except AnnotationNotFound as e:
-        raise AnnotationNotFound(f"{e} ({failure})") from None
+        hint = "; send the JSON, or use boxes=detector to detect them" if source != "detector" else ""
+        raise AnnotationNotFound(f"{e} ({failure}{hint})") from None
 
 
 # ---------------------------------------------------------------------------------------------
 # Annotation for an uploaded image (the /api/v1 file API). Sources, first match wins:
 #   uploaded  a JSON file sent in the same upload, paired by its image_name or by file name
 #   provided  annotation JSON sent as data (e.g. by an external box-extraction algorithm)
-#   detector  the configured BoxDetector (LITHO_DETECTOR="module:object")
-#   dataset   an existing JSON from the annotation folders (AnnotationStore), if the detector fails
+#   detector  the configured BoxDetector, only with source='detector'
+#   dataset   an existing JSON from the annotation folders (AnnotationStore): the default source, and the
+#             fallback when the detector fails
 
 def annotation_matches(ann: dict, image_name: str, json_name: str = "") -> bool:
     return bool(_name_keys(Path(image_name).name) & _name_keys(ann.get("image_name", ""), json_name))
@@ -205,10 +232,11 @@ def load_detector(spec: str | None) -> BoxDetector | None:
 
 def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[tuple[str, dict]],
                               provided: dict | None, store: AnnotationStore | None,
-                              detector: BoxDetector | None = None) -> tuple[dict | None, str | None, str]:
+                              detector: BoxDetector | None = None,
+                              source: str = DEFAULT_BOX_SOURCE) -> tuple[dict | None, str | None, str]:
     """(annotation, source, note) for one uploaded image; (None, None, reason) when nothing fits.
     `uploaded`: (json file name, annotation) pairs from the same upload. `provided`: an annotation
-    already chosen for this image from the request data."""
+    already chosen for this image from the request data. `source`: 'dataset' or 'detector' (see top)."""
     for json_name, ann in uploaded:
         if annotation_matches(ann, image_name, json_name):
             bbox_log(image_name, f"using the JSON uploaded with it ({json_name})")
@@ -216,8 +244,8 @@ def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[
     if provided is not None:
         bbox_log(image_name, "using the bounding boxes sent with the request")
         return validate_annotation(provided), "provided", ""
-    failure = "no automatic detector configured"
-    if detector is not None:
+    use_detector, failure = _plan(source, detector)
+    if use_detector:
         ann, failure = _detect(Path(image_path), detector)
         if ann is not None:
             return ann, "detector", ""
@@ -230,4 +258,5 @@ def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[
             pass
     else:
         bbox_log(image_name, f"no bounding boxes ({failure}; no annotation folders configured)")
-    return None, None, f"{failure}; no annotation JSON uploaded, provided or found in the dataset"
+    hint = "; set the boxes, or run the detector (POST .../detect-boxes)" if source != "detector" else ""
+    return None, None, f"{failure}; no annotation JSON uploaded, provided or found in the dataset{hint}"

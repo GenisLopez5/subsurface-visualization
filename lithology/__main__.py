@@ -52,6 +52,8 @@ def main(argv=None):
     p = sub.add_parser("process", help="one image -> CSV + annotated TIF (no server)")
     p.add_argument("image")
     p.add_argument("--annotation", help="bounding-box JSON (default: look it up in --annotations)")
+    p.add_argument("--boxes", choices=["dataset", "detector"],
+                   help="without --annotation: the dataset JSON (default, LITHO_BOX_SOURCE) or automatic detection")
     p.add_argument("--annotations", nargs="+", help="folders with existing annotation JSONs")
     p.add_argument("-o", "--out", default=".", help="output folder")
     p.add_argument("--data-dir")
@@ -89,7 +91,9 @@ def main(argv=None):
             ann = Path(a.annotation)
         else:
             out.mkdir(parents=True, exist_ok=True)
-            ann, how = resolve_annotation(img, AnnotationStore(s.annotation_dirs), load_detector(s.detector), out)
+            source = a.boxes or s.box_source
+            ann, how = resolve_annotation(img, AnnotationStore(s.annotation_dirs),
+                                          load_detector(s.detector) if source == "detector" else None, out, source=source)
             print(f"bounding boxes: {ann.name}" + (f" ({how})" if how else ""))
         r = pipeline.process(img, ann, out, img.stem, s.cache, s.tmp, log=print,
                              debug_dir=out if a.debug else None)

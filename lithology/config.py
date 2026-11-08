@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .annotations import box_source
+
 
 def _load_dotenv():
     try:
@@ -48,6 +50,10 @@ class Settings:
     # Automatic bounding-box detector, "module:object" (see annotations.BoxDetector). Default: the int8
     # OpenVINO models of bbox-final. LITHO_DETECTOR=none turns it off (only uploaded/dataset JSONs are used).
     detector: str | None = DEFAULT_DETECTOR
+    # Where an image's bounding boxes come from when no JSON is sent with it (LITHO_BOX_SOURCE):
+    # "dataset" the matching JSON from --annotations, the detector is not called;
+    # "detector" (default) the detector first, the dataset JSON as fallback. Overridable per request (boxes=).
+    box_source: str = "detector"
 
     @property
     def uploads(self) -> Path:
@@ -85,4 +91,5 @@ class Settings:
                           if o.strip()],
             max_upload_mb=int(e("LITHO_MAX_UPLOAD_MB", "200")),
             detector=None if e("LITHO_DETECTOR", DEFAULT_DETECTOR).lower() in ("", "none", "0", "off") else e("LITHO_DETECTOR", DEFAULT_DETECTOR),
+            box_source=box_source(e("LITHO_BOX_SOURCE")),
         )
