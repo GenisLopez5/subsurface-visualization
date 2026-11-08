@@ -41,8 +41,10 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import shutil
 import subprocess
+import sys
 import uuid
 import zipfile
 from pathlib import Path
@@ -390,11 +392,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def pick_folder(start: str = Form("")):
         if not s.desktop:
             return err("Desktop features are disabled (start the server with --desktop)", 403)
-        if not shutil.which("zenity"):
-            return err("zenity is not installed")
-        r = subprocess.run(["zenity", "--file-selection", "--directory", "--title=Choose the folder with the logs",
-                            f"--filename={(start or str(Path.home())).rstrip('/')}/"], capture_output=True, text=True)
-        return {"cancelled": True} if r.returncode != 0 else {"path": r.stdout.strip()}
+        title = "Choose the folder with the logs"
+        start_dir = start if start and Path(start).is_dir() else str(Path.home())
+        if shutil.which("zenity"):
+            cmd = ["zenity", "--file-selection", "--directory", f"--title={title}",
+                   f"--filename={start_dir.rstrip('/')}/"]
+        else:  # Windows / macOS / no zenity: Tk's native dialog, in its own process (Tk wants the main thread)
+            code = ("import sys, tkinter as tk; from tkinter import filedialog; r = tk.Tk(); r.withdraw(); "
+                    "r.attributes('-topmost', True); "
+                    "p = filedialog.askdirectory(title=sys.argv[1], initialdir=sys.argv[2], parent=r); "
+                    "sys.exit(1) if not p else print(p)")
+            cmd = [sys.executable, "-c", code, title, start_dir]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True)
+        except OSError as e:
+            return err(f"no folder dialog available: {e}")
+        path = r.stdout.strip()
+        return {"cancelled": True} if r.returncode != 0 or not path else {"path": str(Path(path))}
 
     @app.post("/api/desktop/open")
     def open_path(path: str = Form(...)):
@@ -404,7 +418,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         roots = [s.data_dir, *s.annotation_dirs, *s.image_dirs] + [b["scan"]["folder"] for b in jobs.batches.values()]
         if not p.exists() or not inside(p, roots):
             return err("Path not allowed")
-        subprocess.Popen(["xdg-open", str(p)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if sys.platform == "win32":
+            os.startfile(str(p))  # noqa: S606 - path checked against the allowed roots above
+        else:
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(p)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"ok": True}
 
     # ------------------------------------------------------------------ static UI (optional)

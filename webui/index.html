@@ -126,7 +126,7 @@ async function start(opts){
   if(busy)return;busy=true;
   const fd=new FormData();const files=[...(opts.files||[])];files.forEach(f=>fd.append('file',f));
   if(keep&&!opts.dataset)fd.append('keep',keep);if(opts.dataset)fd.append('dataset',opts.dataset);
-  const names=files.map(f=>f.name).concat(keep&&!opts.dataset?[keep]:[]).join(' + ')||opts.dataset.split('/').pop();
+  const names=files.map(f=>f.name).concat(keep&&!opts.dataset?[keep]:[]).join(' + ')||opts.dataset.split(/[\\/]/).pop();
   dropState('busy',`<span class="spin"></span>${files.some(f=>f.size>5e6)?'Uploading':'Starting'} ${esc(names)}`,'');
   $('logBox').hidden=true;$('log').textContent='';
   let r,j;try{r=await fetch('/api/jobs',{method:'POST',body:fd});j=await r.json()}catch(e){j={error:'could not reach the server'};r={ok:false}}
@@ -195,7 +195,7 @@ async function scan(){const path=$('bPath').value.trim();if(!path)return;$('bSta
   $('bScan').innerHTML='<span class="spin"></span>Scanning';
   const[ok,j]=await post('/api/batch/scan',{path});
   if(!ok){$('bScan').innerHTML=`<span class="st-error">${esc(j.error)}</span>`;return}
-  const done=j.pairs.filter(p=>p.done).length,short=p=>p.split('/').pop();
+  const done=j.pairs.filter(p=>p.done).length,short=p=>p.split(/[\\/]/).pop();
   $('bScan').innerHTML=`JSON: <b>${esc(short(j.json_folder))}/</b> · Images: <b>${esc(short(j.image_folder))}/</b> · <b>${j.pairs.length}</b> pairs${done?` (${done} already processed)`:''}
     ${j.json_without_image.length?`<br><span class="st-error">No image for:</span> ${j.json_without_image.map(esc).join(', ')}`:''}
     ${j.images_without_json.length?`<br>No JSON for: ${j.images_without_json.map(esc).join(', ')}`:''}

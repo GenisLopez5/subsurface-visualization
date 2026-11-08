@@ -34,7 +34,7 @@ status by file, ZIP downloads, previews, delete; everything stored in Postgres).
 | `--desktop` | enable the folder-dialog / open-file endpoints (only when the server runs on the user's machine) |
 
 The same settings can be set with environment variables: `LITHO_ANNOTATION_DIRS`, `LITHO_IMAGE_DIRS`
-(separated by `:`), `LITHO_DATA_DIR`, `LITHO_UI_DIR`, `LITHO_SPLIT_FILE`, `LITHO_DESKTOP=1`.
+(separated by `:`, `;` on Windows), `LITHO_DATA_DIR`, `LITHO_UI_DIR`, `LITHO_SPLIT_FILE`, `LITHO_DESKTOP=1`.
 
 **Bounding boxes are detected automatically** by a separate service, so the heavy models can run on
 another machine. `bbox-final/server.py` serves the int8 OpenVINO models (two YOLO11s detectors: depth +
@@ -52,6 +52,19 @@ original-image pixels. Order: a JSON sent with the image wins, then the service,
 `--annotations` if the service fails or is unreachable. Without `LITHO_BBOX_URL` there is no automatic
 detection (`LITHO_BBOX_LOCAL=1` runs the models in-process instead, if torch/ultralytics/openvino are
 installed). `LITHO_BBOX_TIMEOUT` (default 300 s) bounds each call.
+
+### Two ways to run it
+
+- **All on the Windows GPU machine:** double-click `run_windows.bat`. It opens the bounding-box service in
+  its own window (`bbox-final\run_server.bat`: NVIDIA GPU with the `.pt` weights in `bbox-final\models-pt\`,
+  else Intel GPU, else CPU) and starts the main server + web UI on port 8000, calling the service at
+  `127.0.0.1:8100`. First run creates both venvs. Other machines reach the UI at `http://<its ip>:8000`.
+- **App on the laptop, models on Windows:** run `bbox-final\run_server.bat` (or `run_windows.bat`) on
+  Windows, then the laptop's `run_ui.sh` / `runserver`, which point `LITHO_BBOX_URL` at the Windows
+  machine's Tailscale IP.
+
+On Windows, path lists in `LITHO_ANNOTATION_DIRS` / `LITHO_IMAGE_DIRS` are separated by `;`, and the
+`--desktop` folder dialog uses Tk instead of zenity.
 
 `LITHO_LEGEND_METHOD` picks the legend parser used for extraction: `grid` (default), `boxes`, `xycut`
 or `old`. It is a server setting only (API users can't choose it). Changing it doesn't reuse cached
