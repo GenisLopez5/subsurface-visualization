@@ -1,0 +1,14 @@
+{
+  "name": "Explorer.Tests",
+  "rootNamespace": "Subsurface.Explorer.Tests",
+  "references": [
+    "Explorer.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}
