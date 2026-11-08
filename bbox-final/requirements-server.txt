@@ -1,0 +1,7 @@
+# Bounding-box service (server.py), on the machine that runs the models.
+# CPU-only torch keeps the install small; run_server.sh installs it from the PyTorch CPU index first.
+-r requirements.txt
+openvino>=2024.0
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9

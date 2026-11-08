@@ -36,11 +36,22 @@ status by file, ZIP downloads, previews, delete; everything stored in Postgres).
 The same settings can be set with environment variables: `LITHO_ANNOTATION_DIRS`, `LITHO_IMAGE_DIRS`
 (separated by `:`), `LITHO_DATA_DIR`, `LITHO_UI_DIR`, `LITHO_SPLIT_FILE`, `LITHO_DESKTOP=1`.
 
-**Bounding boxes are detected automatically** from the uploaded image with the int8 OpenVINO models in
-`bbox-final/` (two YOLO11s detectors: depth column + lithology column, then a legend specialist; CPU,
-~5–10 s per log). Order: a JSON sent with the image wins, then the detector, then a matching JSON from
-`--annotations` if detection fails. `LITHO_DETECTOR=none` turns detection off; `LITHO_BBOX_DIR` points to
-another `bbox-final` folder.
+**Bounding boxes are detected automatically** by a separate service, so the heavy models can run on
+another machine. `bbox-final/server.py` serves the int8 OpenVINO models (two YOLO11s detectors: depth +
+lithology column, then a legend specialist) at `POST /detect`:
+
+```bash
+# on the model machine (copy the bbox-final folder there). First run creates .venv and installs it all
+bbox-final/run_server.sh                # port 8100 (PORT=...), check: curl http://<ip>:8100/health
+# on the app machine, in the environment or .env
+LITHO_BBOX_URL=http://<model machine ip>:8100
+```
+
+The app does the preprocessing (PDFs are rendered to a PNG) and sends the image; boxes come back in
+original-image pixels. Order: a JSON sent with the image wins, then the service, then a matching JSON from
+`--annotations` if the service fails or is unreachable. Without `LITHO_BBOX_URL` there is no automatic
+detection (`LITHO_BBOX_LOCAL=1` runs the models in-process instead, if torch/ultralytics/openvino are
+installed). `LITHO_BBOX_TIMEOUT` (default 300 s) bounds each call.
 
 `LITHO_LEGEND_METHOD` picks the legend parser used for extraction: `grid` (default), `boxes`, `xycut`
 or `old`. It is a server setting only (API users can't choose it). Changing it doesn't reuse cached
@@ -150,6 +161,9 @@ File status: `uploading` → `queued` (or `needs_annotation`) → `processing` �
 | `POST /api/v1/uploads` | multipart `files` (images `.tif/.tiff/.pdf/.png/.jpg` and optional JSONs), optional `annotations`. Each image becomes its own independent file. Returns the files with their ids, `rejected` files and `unused_annotations`. |
 | `GET /api/v1/status?ids=a,b,c` | light status of many files, for polling |
 | `GET /api/v1/files/{id}` | full detail: status, error, stats, outputs, download and preview URLs |
+| `PATCH /api/v1/files/{id}` | rename an item: JSON `{"name": "new name"}` (1–200 characters, no `/`, `\` or control characters). Downloads are named after it from then on. Any status; results are kept. |
+
+Item names are always returned **without the file extension** (`log.tif` → `log`), in every response.
 | `GET /api/v1/files?status=&q=&limit=&offset=` | list/search files, newest first |
 | `GET /api/v1/files/{id}/result` | the result TIF, the result CSV and the **offset** (result TIF height − original height: the colour key bar on top; `y_result = offset_y_px + y_original`). Default: `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, `<name>_offset.json`, `<name>_legend_original.png` (the log's own legend, cut from the original at the `lithology_legend` box, given as `offset.legend_original_box`) and `<name>_legend_generated.png` (the colour key bar on top of the result TIF: same width, height = `offset_y_px`), plus an `X-Offset-Y` header. `?format=json`: `{id, name, offset, csv: {filename, content}, result_tif, legend_original, legend_generated: {filename, base64}}`. The legends are missing/`null` for results computed before they existed (reprocess). 404 until finished. |
 | `GET /api/v1/files/{id}/download` | `<name>_solved.zip` with the original image `<name>.tif`, the result TIF `<name>_solved.tif` and the result CSV `<name>_solved.csv` (404 until all three exist). `<name>` is the file name as uploaded, spaces included. |

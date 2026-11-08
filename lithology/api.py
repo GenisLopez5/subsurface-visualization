@@ -95,6 +95,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if hasattr(detector, "warm_up"):  # load the models in the background, not on the first upload
             import threading
             threading.Thread(target=detector.warm_up, daemon=True).start()
+    else:
+        print("bounding boxes: automatic detection off (set LITHO_BBOX_URL to the bbox service); "
+              "uploaded / dataset JSONs only")
     hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store, detector)
     from . import legend_review
 

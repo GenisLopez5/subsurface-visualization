@@ -30,6 +30,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 import shutil
 import tempfile
 import threading
@@ -51,7 +52,7 @@ from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_ma
 from .config import Settings
 from . import drawing
 from .db import BLOB_KINDS, DB, STATUSES, dumps
-from .worker import CONTENT_TYPES, Uploader, Worker, display_name, result_filename, safe_name, spool_dir
+from .worker import CONTENT_TYPES, Uploader, Worker, display_name, item_name, result_filename, safe_name, spool_dir
 
 MAX_JSON_BYTES = 5 * 1024 * 1024
 
@@ -131,9 +132,13 @@ class ResultOut(BaseModel):
                                                                   "for older results)")
 
 
+class RenameIn(BaseModel):
+    name: str = Field(description="the new name, without an extension", examples=["Well 12 - mud log"])
+
+
 class FileOut(BaseModel):
     id: UUID
-    name: str
+    name: str = Field(description="the item's name, without an extension")
     status: Literal["uploading", "needs_annotation", "queued", "processing", "done", "error"]
     computed: bool  # result TIF and CSV are both stored
     outputs: Outputs
@@ -199,8 +204,9 @@ def file_out(row: dict) -> FileOut:
     outputs = Outputs(**{k: k in blobs for k in BLOB_KINDS})
     preview = {k: f"{base}/preview/{k}" for k in PREVIEW_KINDS if k in blobs}
     computed = outputs.result_tif and outputs.result_csv
-    return FileOut(**{k: row[k] for k in ("id", "name", "status", "annotation_source", "note", "error",
+    return FileOut(**{k: row[k] for k in ("id", "status", "annotation_source", "note", "error",
                                           "stats", "created_at", "updated_at", "started_at", "finished_at")},
+                   name=item_name(row["name"]),
                    computed=computed, outputs=outputs, files=files, preview=preview,
                    download=f"{base}/download" if computed and outputs.original else None)
 
@@ -446,7 +452,7 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         up = state.get("uploader")
         return Health(ok=bool(w and w.alive), db="ok", worker_alive=bool(w and w.alive), queued=q,
                       uploads_pending=up.pending if up else None,
-                      processing={"id": cur["id"], "name": cur["name"], "last_log": (cur["log"] or [""])[-1]}
+                      processing={"id": cur["id"], "name": item_name(cur["name"]), "last_log": (cur["log"] or [""])[-1]}
                       if cur else None)
 
     # ---------------- uploads
@@ -549,10 +555,24 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
             raise HTTPException(422, "ids must be comma-separated file ids")
         if len(wanted) > 1000:
             raise HTTPException(422, "at most 1000 ids")
-        return [StatusOut(**row) for row in db.statuses(wanted)]
+        return [StatusOut(**{**row, "name": item_name(row["name"])}) for row in db.statuses(wanted)]
 
     @r.get("/files/{fid}", response_model=FileOut)
     def get_file(fid: UUID, db: DB = Depends(get_db)):
+        return file_out(file_or_404(db, fid))
+
+    @r.patch("/files/{fid}", response_model=FileOut, summary="Rename an item",
+             description="Body: `{\"name\": \"new name\"}`, without an extension (names are always returned "
+                         "without one). Downloads are named after it from then on (`<name>_solved.tif`, ...). "
+                         "Works in any status; results are kept.")
+    def rename_file(fid: UUID, body: RenameIn, db: DB = Depends(get_db)):
+        name = body.name.strip()
+        if not name or len(name) > 200:
+            raise HTTPException(422, "name must be 1 to 200 characters")
+        if re.search(r'[\x00-\x1f\x7f/\\]', name):
+            raise HTTPException(422, "name can't contain / \\ or control characters")
+        stored = file_or_404(db, fid)["name"]
+        db.rename_file(fid, name + Path(stored).suffix)  # keep the upload's extension, internally
         return file_out(file_or_404(db, fid))
 
     def result_layout(db: DB, fid) -> dict | None:
@@ -649,7 +669,7 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         legends = {k: b for k in ("legend_original", "legend_generated") if (b := db.get_blob(fid, k))}
         if format == "json":
             b64 = lambda data: base64.b64encode(bytes(data)).decode("ascii")  # noqa: E731
-            return ResultOut(id=row["id"], name=row["name"], offset=off,
+            return ResultOut(id=row["id"], name=item_name(row["name"]), offset=off,
                              csv=ResultFile(filename=csv_name, content_type="text/csv",
                                             content=bytes(csv["data"]).decode("utf-8")),
                              result_tif=ResultFile(filename=tif_name, content_type="image/tiff", base64=b64(tif["data"])),
@@ -677,7 +697,7 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                 for row in rows:
                     blobs = _bundle_blobs(db, row["id"])
                     if blobs is None:
-                        skipped.append(f"{row['name']}\t{row['id']}\t{row['status']}")
+                        skipped.append(f"{item_name(row['name'])}\t{row['id']}\t{row['status']}")
                         continue
                     folder = display_name(Path(row["name"]).stem)
                     if folder in folders:  # same name uploaded twice

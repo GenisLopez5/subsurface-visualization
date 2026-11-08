@@ -134,6 +134,11 @@ class DB:
                    AND EXISTS (SELECT 1 FROM litho_blobs b WHERE b.file_id = f.id AND b.kind = 'result_csv') AS computed
                 FROM litho_files f WHERE f.id = ANY(%s)""", (list(ids),)).fetchall()
 
+    def rename_file(self, file_id, name: str) -> bool:
+        with self.pool.connection() as c:
+            return c.execute("UPDATE litho_files SET name = %s, updated_at = now() WHERE id = %s RETURNING id",
+                             (name, file_id)).fetchone() is not None
+
     def delete_files(self, ids) -> list:
         """Delete files (any status) with their blobs. Returns the ids that existed."""
         with self.pool.connection() as c:

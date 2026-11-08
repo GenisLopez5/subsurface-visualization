@@ -89,6 +89,12 @@ def safe_name(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._") or "file"
 
 
+def item_name(stored: str) -> str:
+    """An item's name for the frontend: the stored name (the upload's file name) without its extension.
+    The extension stays in the database: it names the original image inside the ZIPs."""
+    return Path(stored).stem or stored
+
+
 def display_name(name: str) -> str:
     """The name as uploaded, for what users download (ZIP entries, folders): keeps spaces and accents,
     drops only what can't be in a file name (path separators, control and Windows-reserved characters)."""
