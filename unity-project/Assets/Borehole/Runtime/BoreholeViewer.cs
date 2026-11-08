@@ -30,6 +30,11 @@ namespace Subsurface.Borehole
         public int AdvancingFrames {get;private set;}
         public string SourceName {get;private set;}
         public Texture2D SegmentedImage {get;private set;}
+        public double PixelDisplacement {get;private set;}
+        public string FullResolutionDocumentPath {get;private set;}
+        public int DocumentDetailTileCount=>documentPane?.Tiles.ResidentTiles??0;
+        public bool DocumentDetailReady=>documentPane!=null&&documentPane.Tiles.Ready;
+        public int DocumentSourcePixelsPerTexel=>documentPane?.Tiles.SourcePixelsPerTexel??1;
         public int DocumentPixelWidth {get;private set;}
         public int DocumentPixelHeight {get;private set;}
         VisualElement root,viewport,ruler,labelLayer;
@@ -48,6 +53,9 @@ namespace Subsurface.Borehole
         bool poseDirty=true,dragging,moved,initializationPending;
         int pointerId;
         Vector2 pointerStart,pointerPrevious;
+        BoreholeLegends legends;
+        public void SetLegends(byte[] original,byte[] generated)=>legends?.Bind(original,generated);
+        Slider zoomSlider;Label zoomPercent;
         DisplayMode displayMode;
         public VisualElement Root => root;
         void OnEnable()
@@ -79,11 +87,10 @@ namespace Subsurface.Borehole
             filename=root.Q<Label>("filename");range=root.Q<Label>("range");error=root.Q<Label>("error");status=root.Q<Label>("status");
             selectedName=root.Q<Label>("selectedName");selectedDepths=root.Q<Label>("selectedDepths");selectedInfo=root.Q<Label>("selectedInfo");depthReadout=root.Q<Label>("depthReadout");
             foreach(var text in root.Query<TextElement>().ToList())text.enableRichText=false;
-            root.Q<Button>("loadCsv").clicked+=OpenCsv;
-            root.Q<Button>("loadImage").clicked+=OpenImage;
-            documentPane=new BoreholeDocumentPane(this,root);csvOverlay=new BoreholeCsvOverlay(this,root);
+            legends=new BoreholeLegends(root);documentPane=new BoreholeDocumentPane(this,root);csvOverlay=new BoreholeCsvOverlay(this,root);
             cutaway=GetComponent<BoreholeCutaway>();if(cutaway==null)cutaway=gameObject.AddComponent<BoreholeCutaway>();cutaway.Initialize(column,columnCamera);
-            root.Q<Button>("zoomIn").clicked+=()=>Zoom(.75);root.Q<Button>("zoomOut").clicked+=()=>Zoom(1/.75);
+            zoomSlider=root.Q<Slider>("zoomSlider");zoomPercent=root.Q<Label>("zoomPercent");
+            zoomSlider.RegisterValueChangedCallback(e=>{if(column.Document==null)return;double target=column.Document.SpanFeet*1.4*Math.Pow(1d/1400,e.newValue);Zoom(target/WindowFeet);});
             root.Q<Button>("fit").clicked+=FitColumn;
             var appearance=root.Q<DropdownField>("appearance");appearance.choices=new List<string>{"Textured lithology","Legend / patterns"};appearance.index=0;
             appearance.RegisterValueChangedCallback(e=>{displayMode=e.newValue=="Legend / patterns"?DisplayMode.Legend:DisplayMode.Texture;column.SetMode(displayMode);});
@@ -118,7 +125,7 @@ namespace Subsurface.Borehole
         {
             try
             {
-                var document=BoreholeCsv.Parse(csv);column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
+                var document=BoreholeCsv.Parse(csv);legends?.Clear();column.Build(document);column.SetMode(displayMode);csvOverlay?.Bind(document);SourceName=sourceName;PixelDisplacement=0;ReleaseDocumentSource();ReleaseOwnedImage();SegmentedImage=null;DocumentPixelWidth=DocumentPixelHeight=0;
                 LastError=null;error.text="";error.AddToClassList("hidden");filename.text=sourceName;range.text=Format(document.TopFeet)+" – "+Format(document.BottomFeet)+" ft · "+document.SourceIntervalCount+" source intervals";
                 WindowFeet=Math.Min(document.SpanFeet*1.15,Math.Max(Math.Min(100,document.SpanFeet),Math.Min(300,document.SpanFeet*.35)));FocusDepthFeet=document.TopFeet+WindowFeet*.5;SetDepth(FocusDepthFeet);UpdateDocumentImage();
                 root.Q("selectionCard").AddToClassList("hidden");selectedName.text="";selectedDepths.text="";selectedInfo.text="";SetDocumentMode(false);
@@ -144,15 +151,29 @@ namespace Subsurface.Borehole
         public bool LoadDocumentFile(string path)
         {
             Texture2D loaded=null;
-            try{var page=BoreholeDocumentImage.Load(path);loaded=page.Texture;ReleaseOwnedImage();ownedImage=loaded;SegmentedImage=loaded;DocumentPixelWidth=page.OriginalWidth;DocumentPixelHeight=page.OriginalHeight;UpdateDocumentImage();poseDirty=true;return true;}
+            try{var page=BoreholeDocumentImage.Load(path);loaded=page.Texture;ReleaseDocumentSource();ReleaseOwnedImage();ownedImage=loaded;SegmentedImage=loaded;DocumentPixelWidth=page.OriginalWidth;DocumentPixelHeight=page.OriginalHeight;SetDocumentSource(path);UpdateDocumentImage();poseDirty=true;return true;}
             catch(Exception ex){if(loaded!=null)Destroy(loaded);ShowError(ex.Message);return false;}
         }
         void ReleaseOwnedImage(){if(ownedImage==null)return;if(Application.isPlaying)Destroy(ownedImage);else DestroyImmediate(ownedImage);ownedImage=null;}
         /// <summary>Backend integration point. CSV and image must refer to the same analysis result. Image ownership stays with the caller.</summary>
-        public bool SetAnalysisResult(string csv,Texture2D segmentedPage,string sourceName="Analysis result",int originalImageWidth=0,int originalImageHeight=0)
+        public bool SetAnalysisResult(string csv,Texture2D segmentedPage,string sourceName="Analysis result",int originalImageWidth=0,int originalImageHeight=0,double pixelDisplacement=0,string sourceImagePath=null)
         {
             if(originalImageWidth<0||originalImageHeight<0||(originalImageWidth>0)!=(originalImageHeight>0)){ShowError("Provide both original image dimensions, or omit both for an original-size texture.");return false;}
-            if(!LoadCsvText(csv,sourceName))return false;SegmentedImage=segmentedPage;DocumentPixelWidth=originalImageWidth>0?originalImageWidth:segmentedPage!=null?segmentedPage.width:0;DocumentPixelHeight=originalImageHeight>0?originalImageHeight:segmentedPage!=null?segmentedPage.height:0;UpdateDocumentImage();return true;
+            if(!BoreholeCsv.Finite(pixelDisplacement)||pixelDisplacement<0){ShowError("Invalid image displacement.");return false;}
+            if(!LoadCsvText(csv,sourceName))return false;if(!string.IsNullOrEmpty(sourceImagePath)&&!SetDocumentSource(sourceImagePath))return false;PixelDisplacement=pixelDisplacement;SegmentedImage=segmentedPage;DocumentPixelWidth=originalImageWidth>0?originalImageWidth:segmentedPage!=null?segmentedPage.width:0;DocumentPixelHeight=originalImageHeight>0?originalImageHeight:segmentedPage!=null?segmentedPage.height:0;UpdateDocumentImage();return true;
+        }
+        bool SetDocumentSource(string path)
+        {
+            string owned=Path.Combine(Application.temporaryCachePath,"document-source-"+Guid.NewGuid()+Path.GetExtension(path));
+            try{File.Copy(path,owned);ReleaseDocumentSource();FullResolutionDocumentPath=owned;return true;}
+            catch(Exception ex){DeleteDocumentSource(owned);ShowError("Cannot retain original document: "+ex.Message);return false;}
+        }
+        static void DeleteDocumentSource(string path)
+        {try{if(!string.IsNullOrEmpty(path)&&File.Exists(path))File.Delete(path);}catch(IOException){}catch(UnauthorizedAccessException){}}
+        void ReleaseDocumentSource()
+        {
+            string path=FullResolutionDocumentPath;var pending=documentPane?.PendingDocumentWork;documentPane?.ClearTiles();FullResolutionDocumentPath=null;
+            if(pending!=null&&!pending.IsCompleted)pending.ContinueWith(_=>DeleteDocumentSource(path));else DeleteDocumentSource(path);
         }
         void UpdateDocumentImage()
         {
@@ -185,6 +206,12 @@ namespace Subsurface.Borehole
             if(column.Document==null||!BoreholeCsv.Finite(factor)||factor<=0)return;var d=column.Document;WindowFeet=Math.Max(d.SpanFeet/1000,Math.Min(d.SpanFeet*1.4,WindowFeet*factor));poseDirty=true;documentPane?.Refresh();
         }
         public void FitColumn(){if(column.Document==null)return;double gap=cutaway!=null?cutaway.SurfaceOffset:0;WindowFeet=column.Document.SpanFeet*(1.15+gap/column.displayHeight);SetDepth(column.Document.TopFeet+column.Document.SpanFeet*(.5-gap/(2*column.displayHeight)));documentPane?.Fit();}
+        void UpdateZoomControl()
+        {
+            double span=column.Document.SpanFeet;double fit=span*(1.15+(cutaway!=null?cutaway.SurfaceOffset:0)/column.displayHeight);
+            zoomSlider.SetValueWithoutNotify((float)(Math.Log(span*1.4/WindowFeet)/Math.Log(1400)));zoomPercent.text=Math.Round(fit/WindowFeet*100)+"%";
+            zoomSlider.tooltip="Zoom · Fit = 100%";
+        }
         void ResizeTarget()
         {
             if(!isActiveAndEnabled||viewport==null||DocumentMode)return;int w=Mathf.Clamp(Mathf.CeilToInt(viewport.contentRect.width),64,2048),h=Mathf.Clamp(Mathf.CeilToInt(viewport.contentRect.height),64,1600);
@@ -192,13 +219,18 @@ namespace Subsurface.Borehole
         }
         void LateUpdate()
         {
-            AdvancingFrames++;if(initializationPending)InitializeWhenReady();if(!poseDirty||column.Document==null||DocumentMode)return;ResizeTarget();poseDirty=false;
-            var map=column.DepthMap;columnCamera.orthographicSize=Mathf.Max(.000001f,(float)(WindowFeet/column.Document.SpanFeet)*column.displayHeight*.5f);
+            AdvancingFrames++;documentPane?.Tick();if(initializationPending)InitializeWhenReady();if(!poseDirty||column.Document==null||DocumentMode)return;ResizeTarget();poseDirty=false;
+            UpdateZoomControl();var map=column.DepthMap;columnCamera.orthographicSize=Mathf.Max(.000001f,(float)(WindowFeet/column.Document.SpanFeet)*column.displayHeight*.5f);
             bool atSurface=ShowingSurface;
             if(atSurface)columnCamera.orthographicSize=Mathf.Max(4.5f,columnCamera.orthographicSize);
-            float radialScale=columnCamera.orthographicSize*columnCamera.aspect*.17f/column.radius;
+            float zoomAmount=Mathf.Clamp01((float)(Math.Log(2500/WindowFeet)/Math.Log(2500/60d)));
+            float widthFraction=Mathf.Lerp(.14f,.24f,zoomAmount);
+            float radialScale=columnCamera.orthographicSize*columnCamera.aspect*widthFraction/column.radius;
             column.transform.localScale=new Vector3(radialScale,1,radialScale);
             cutaway?.SetWidth(radialScale);
+            // Reference appearance: the 60 ft close-up shown in the material acceptance image.
+            float referenceSize=(float)(60/column.Document.SpanFeet)*column.displayHeight*.5f;
+            column.SetTextureDisplayScale(referenceSize/(1.4f*Mathf.Max(.00001f,columnCamera.orthographicSize)));
             column.SetHighlightWidth(columnCamera.orthographicSize*4/Mathf.Max(1,viewport.contentRect.height));
             var rotation=Quaternion.Euler(pitch,yaw,0);var focus=column.transform.TransformPoint(new Vector3(0,map.ToY(FocusDepthFeet)+(atSurface?(cutaway!=null?cutaway.SurfaceOffset:0)+columnCamera.orthographicSize*.1f:0),0));
             columnCamera.transform.SetPositionAndRotation(focus+rotation*Vector3.back*45,rotation);
@@ -264,7 +296,7 @@ namespace Subsurface.Borehole
         void ReleaseTarget(){if(texture==null)return;if(columnCamera!=null)columnCamera.targetTexture=null;texture.Release();if(Application.isPlaying)Destroy(texture);else DestroyImmediate(texture);texture=null;}
         void OnDisable()
         {
-            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;ReleaseTarget();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
+            if(columnCamera!=null)columnCamera.enabled=false;if(presentationCamera!=null)presentationCamera.enabled=false;legends?.Dispose();legends=null;ReleaseTarget();ReleaseDocumentSource();ReleaseOwnedImage();foreach(var go in mutedRoots)if(go!=null)go.SetActive(true);mutedRoots.Clear();
         }
     }
 }

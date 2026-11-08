@@ -9,14 +9,14 @@ namespace Subsurface.Borehole
         readonly List<double> depths=new List<double>(),pixels=new List<double>();
         public double FirstPixel=>pixels[0];
         public double LastPixel=>pixels[pixels.Count-1];
-        public static bool TryCreate(BoreholeDocument document,out BoreholeImageMap map,out string reason)
+        public static bool TryCreate(BoreholeDocument document,out BoreholeImageMap map,out string reason,double displacement=0)
         {
             map=null;reason=null;var candidate=new BoreholeImageMap();
             foreach(var row in document.Intervals)
             {
                 if(row.IsGap)continue;
                 if(!row.HasImageCoordinates){reason="Document sync needs valid top_y and bottom_y on every CSV row.";return false;}
-                if(!candidate.Add(row.TopFeet,row.TopPixel)||!candidate.Add(row.BottomFeet,row.BottomPixel))
+                if(!candidate.Add(row.TopFeet,row.TopPixel+displacement)||!candidate.Add(row.BottomFeet,row.BottomPixel+displacement))
                 {reason="Document sync paused: pixel coordinates overlap, reverse, or disagree at a shared depth.";return false;}
             }
             if(candidate.depths.Count<2){reason="No image coordinates are available.";return false;}

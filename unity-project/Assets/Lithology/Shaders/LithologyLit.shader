@@ -47,6 +47,8 @@ Shader "Lithology/URP Lithology Lit"
   _WorldSpace("World geological coordinates",Float)=1
   _Triplanar("Triplanar (UV needs tangents)",Float)=1
   _UnitMetres("Metres per Unity unit",Float)=1
+  _DisplayScale("Viewer texture density",Float)=1
+  _DisplayOrigin("Viewer section anchor",Vector)=(0,0,0,0)
   _VeinWidth("Vein width metres",Float)=.004
   _Irregularity("Bedding irregularity",Range(0,1))=.15
   _Seed("Stable illustrative seed",Float)=1001
@@ -78,10 +80,10 @@ Shader "Lithology/URP Lithology Lit"
   CBUFFER_START(UnityPerMaterial)
    float4 _Tint,_MineralLight,_MineralDark,_LegendColor,_LayerColor1,_LayerColor2;
    float4 _Layer1,_Layer2,_LayerSurface1,_LayerSurface2,_Structure,_Spacing,_Fabric;
-   float4 _GeoOrigin,_BeddingNormal,_CleavageNormal;
+   float4 _GeoOrigin,_BeddingNormal,_CleavageNormal,_DisplayOrigin;
    float _MacroScale,_GrainScale,_DetailStrength,_DetailEnabled,_NormalStrength,_HasNormal,_HasDetailNormal,_HasSurface,_InvertGreen,_Smoothness;
    float _WorldSpace,_Triplanar,_UnitMetres,_VeinWidth,_Irregularity,_Seed,_Legend,_Schematic,_StatusPattern,_LayerCount,_ProceduralDark;
-   float _HasCoverageMask,_MineralBalance,_HasMineralRegions;
+   float _HasCoverageMask,_MineralBalance,_HasMineralRegions,_DisplayScale;
   CBUFFER_END
   struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; float4 tangentOS:TANGENT; float2 uv:TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
   struct Varyings { float4 positionCS:SV_POSITION; float3 positionWS:TEXCOORD0; float3 positionOS:TEXCOORD1; float3 normalWS:TEXCOORD2; float4 tangentWS:TEXCOORD3; float2 uv:TEXCOORD4; float fog:TEXCOORD5; UNITY_VERTEX_INPUT_INSTANCE_ID UNITY_VERTEX_OUTPUT_STEREO };
@@ -163,27 +165,31 @@ Shader "Lithology/URP Lithology Lit"
   {
    RockSurface s=(RockSurface)0;
    float3 nWS=normalize(i.normalWS),n=(_WorldSpace>.5||_Triplanar<.5)?nWS:normalize(TransformWorldToObjectNormal(nWS));
-   float3 p=(_WorldSpace>.5?i.positionWS-_GeoOrigin.xyz:i.positionOS-_GeoOrigin.xyz)*_UnitMetres;
-   float3 macro=p/max(_MacroScale,.00001),grain=p/max(_GrainScale,.00001);
+   float3 original=(_WorldSpace>.5?i.positionWS:i.positionOS)-_GeoOrigin.xyz;
+   float3 anchor=(_WorldSpace>.5?TransformObjectToWorld(float3(0,-.5,0)):float3(0,-.5,0))-_GeoOrigin.xyz;
+   float3 density=_WorldSpace>.5?float3(_DisplayScale,_DisplayScale,_DisplayScale):float3(1,_DisplayScale,1);
+   float3 p=(anchor+(original-anchor)*density)*_UnitMetres;
+   float3 texturePosition=p;
+   float3 macro=texturePosition/max(_MacroScale,.00001),grain=texturePosition/max(_GrainScale,.00001);
    grain*=lerp(float3(1,1,1),float3(.55,4,1),_Fabric.x);
    float fade=DetailFade(grain)*_DetailEnabled;
-   s.color=Map(TEXTURE2D_ARGS(_BaseMap,sampler_BaseMap),macro,n,i.uv/max(_MacroScale,.00001)).rgb*_Tint.rgb;
+   s.color=Map(TEXTURE2D_ARGS(_BaseMap,sampler_BaseMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001)).rgb*_Tint.rgb;
    s.color*=lerp(.94,1.06,Noise(p/max(_Spacing.w,.00001)));
-   float4 detail=Map(TEXTURE2D_ARGS(_DetailMap,sampler_DetailMap),grain,n,i.uv/max(_GrainScale,.00001));
-   float4 regions=Map(TEXTURE2D_ARGS(_MineralMask,sampler_MineralMask),grain,n,i.uv/max(_GrainScale,.00001));
+   float4 detail=Map(TEXTURE2D_ARGS(_DetailMap,sampler_DetailMap),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001));
+   float4 regions=Map(TEXTURE2D_ARGS(_MineralMask,sampler_MineralMask),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001));
    s.color*=lerp(1,detail.rgb*1.65,fade*_DetailStrength);
    s.color=lerp(s.color,s.color*_MineralLight.rgb*1.3,regions.r*fade*.55);
    float darkRegion=lerp(regions.g,1-smoothstep(_MineralBalance-.03,_MineralBalance+.03,regions.b),_HasMineralRegions);
    s.color=lerp(s.color,s.color*_MineralDark.rgb*2,darkRegion*fade*.8);
-   float4 packed=Map(TEXTURE2D_ARGS(_SurfaceMap,sampler_SurfaceMap),macro,n,i.uv/max(_MacroScale,.00001));
+   float4 packed=Map(TEXTURE2D_ARGS(_SurfaceMap,sampler_SurfaceMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001));
    s.metal=0; // Bulk host is dielectric. Only explicit component masks can be metallic.
    s.ao=lerp(1,packed.g,_HasSurface);s.smooth=saturate(_Smoothness*lerp(1,packed.a*2,_HasSurface));
    s.smooth=lerp(s.smooth,saturate(s.smooth+.06),(1-_Fabric.w)*_Fabric.z); // Cement between supported grains, never assumed open voids.
    float3 normal=n;
-   if(_HasNormal>.5)normal=ProjectedNormal(TEXTURE2D_ARGS(_NormalMap,sampler_NormalMap),macro,n,i.uv/max(_MacroScale,.00001),i.tangentWS);
+   if(_HasNormal>.5)normal=ProjectedNormal(TEXTURE2D_ARGS(_NormalMap,sampler_NormalMap),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001),i.tangentWS);
    if(_HasDetailNormal>.5)
    {
-    float3 dn=ProjectedNormal(TEXTURE2D_ARGS(_DetailNormal,sampler_DetailNormal),grain,n,i.uv/max(_GrainScale,.00001),i.tangentWS);
+    float3 dn=ProjectedNormal(TEXTURE2D_ARGS(_DetailNormal,sampler_DetailNormal),grain,n,(i.uv*float2(1,_DisplayScale))/max(_GrainScale,.00001),i.tangentWS);
     // RNM in an orthonormal local surface frame, then return to projection space.
     float3 t=normalize(cross(abs(n.y)<.95?float3(0,1,0):float3(1,0,0),n)),b=cross(n,t);
     float3 a=float3(dot(normal,t),dot(normal,b),dot(normal,n)),d=float3(dot(dn,t),dot(dn,b),dot(dn,n));
@@ -202,11 +208,11 @@ Shader "Lithology/URP Lithology Lit"
    {
     float4 layer=k==0?_Layer1:_Layer2,ls=k==0?_LayerSurface1:_LayerSurface2;
     float3 color=k==0?_LayerColor1.rgb:_LayerColor2.rgb;float mask=Mask(p,layer);
-    if(_HasCoverageMask>.5)mask*=Map(TEXTURE2D_ARGS(_CoverageMask,sampler_CoverageMask),macro,n,i.uv/max(_MacroScale,.00001)).r;
+    if(_HasCoverageMask>.5)mask*=Map(TEXTURE2D_ARGS(_CoverageMask,sampler_CoverageMask),macro,n,(i.uv*float2(1,_DisplayScale))/max(_MacroScale,.00001)).r;
     float3 cn=s.normal;float smooth=ls.x,metal=ls.y,ao=1;
     if(ls.z>.5)
     {
-     float3 cp=p/max(layer.z,.00001);float2 cu=i.uv/max(layer.z,.00001);float4 data=float4(0,1,0,.5);
+     float3 cp=texturePosition/max(layer.z,.00001);float2 cu=(i.uv*float2(1,_DisplayScale))/max(layer.z,.00001);float4 data=float4(0,1,0,.5);
      if(k==0) { color*=Map(TEXTURE2D_ARGS(_ComponentMap1,sampler_ComponentMap1),cp,n,cu).rgb;cn=ProjectedNormal(TEXTURE2D_ARGS(_ComponentNormal1,sampler_ComponentNormal1),cp,n,cu,i.tangentWS);data=Map(TEXTURE2D_ARGS(_ComponentSurface1,sampler_ComponentSurface1),cp,n,cu); }
      else { color*=Map(TEXTURE2D_ARGS(_ComponentMap2,sampler_ComponentMap2),cp,n,cu).rgb;cn=ProjectedNormal(TEXTURE2D_ARGS(_ComponentNormal2,sampler_ComponentNormal2),cp,n,cu,i.tangentWS);data=Map(TEXTURE2D_ARGS(_ComponentSurface2,sampler_ComponentSurface2),cp,n,cu); }
      if(_WorldSpace<.5&&_Triplanar>.5)cn=TransformObjectToWorldNormal(cn);
@@ -215,7 +221,7 @@ Shader "Lithology/URP Lithology Lit"
     s.color=lerp(s.color,color,mask);s.smooth=lerp(s.smooth,smooth,mask);s.metal=lerp(s.metal,metal,mask);s.ao=lerp(s.ao,ao,mask);
     cn=normalize(lerp(nWS,cn,_NormalStrength));s.normal=normalize(lerp(s.normal,cn,mask));h+=mask*layer.w*.0015;
    }
-   s.normal=Bump(s.normal,i.positionWS,h,_NormalStrength);
+   s.normal=Bump(s.normal,i.positionWS,h/max(_DisplayScale,.000001),_NormalStrength);
    if(_ProceduralDark>.5)s.color=lerp(s.color,float3(.025,.018,.012),.95)*lerp(.85,1.1,Noise(p/max(_Spacing.w,.00001))); // Explicit tar/bitumen role.
    if(_Legend>.5||_Schematic>.5)
    {

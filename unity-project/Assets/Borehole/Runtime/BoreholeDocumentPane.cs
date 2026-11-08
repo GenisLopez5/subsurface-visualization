@@ -8,10 +8,20 @@ namespace Subsurface.Borehole
         readonly BoreholeViewer viewer;readonly VisualElement viewport,window,placeholder,selection;readonly Image image;readonly Label state,notice,readout;
         BoreholeImageMap map;Texture2D texture;float scale;double center;bool initialized,dragging;int pointer;float previousY;string problem;int originalWidth,originalHeight;
         public bool IsSynchronized{get;private set;}
+        readonly BoreholeDocumentTiles tiles;
+        public System.Threading.Tasks.Task PendingDocumentWork=>tiles.PendingWork;
+        public BoreholeDocumentTiles Tiles=>tiles;
+        public void ClearTiles()=>tiles.Clear();
+        public void Tick()
+        {
+            tiles.Tick();
+            if(!string.IsNullOrEmpty(tiles.Error)){notice.text="Full-resolution detail unavailable: "+tiles.Error;notice.RemoveFromClassList("hidden");}
+        }
         public bool AtHeader=>IsSynchronized&&center<map.FirstPixel;
         public BoreholeDocumentPane(BoreholeViewer viewer,VisualElement root)
         {
             this.viewer=viewer;viewport=root.Q("documentViewport");window=root.Q("documentWindow");selection=root.Q("documentSelection");placeholder=root.Q("documentPlaceholder");image=root.Q<Image>("documentImage");state=root.Q<Label>("syncState");notice=root.Q<Label>("documentNotice");readout=root.Q<Label>("pixelReadout");image.scaleMode=ScaleMode.StretchToFill;
+            tiles=new BoreholeDocumentTiles(root.Q("documentTiles"));
             viewport.RegisterCallback<GeometryChangedEvent>(_=>Refresh());
             viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey)viewer.Zoom(Math.Pow(1.12,e.delta.y));else Pan(e.delta.y*20);e.StopPropagation();});
             viewport.RegisterCallback<PointerDownEvent>(e=>{if(e.button!=0)return;dragging=true;pointer=e.pointerId;previousY=e.localPosition.y;viewport.CapturePointer(pointer);});
@@ -20,8 +30,9 @@ namespace Subsurface.Borehole
         }
         public void Bind(BoreholeDocument data,Texture2D page,int width,int height)
         {
+            tiles.Clear();
             texture=page;image.image=page;image.EnableInClassList("hidden",page==null);originalWidth=width;originalHeight=height;map=null;problem=null;IsSynchronized=false;initialized=false;
-            if(data==null)problem="Load a CSV.";else if(!BoreholeImageMap.TryCreate(data,out map,out problem)){}else if(page==null)problem="Load the matching document.";else if(width<=0||height<=0||map.LastPixel>height)problem="Image size mismatch. Load the matching original document; synchronization is paused.";else IsSynchronized=true;
+            if(data==null)problem="Load a CSV.";else if(!BoreholeImageMap.TryCreate(data,out map,out problem,viewer.PixelDisplacement)){}else if(page==null)problem="Load the matching document.";else if(width<=0||height<=0||map.LastPixel>height)problem="Image size mismatch. Load the matching original document; synchronization is paused.";else IsSynchronized=true;
             center=IsSynchronized?map.ToPixel(viewer.FocusDepthFeet):0;initialized=true;placeholder.EnableInClassList("hidden",page!=null);state.text=IsSynchronized?"Linked":"Unlinked";Refresh();
         }
         public void CenterOnDepth(double feet){if(IsSynchronized)center=map.ToPixel(feet);Refresh();}
@@ -46,6 +57,8 @@ namespace Subsurface.Borehole
             float drawnWidth=originalWidth*scale,drawnHeight=originalHeight*scale,left=(width-drawnWidth)*.5f;
             float offset=drawnHeight<=height?(height-drawnHeight)*.5f:Mathf.Clamp(height*.5f-(float)center*scale,height-drawnHeight,0);
             image.style.left=left;image.style.top=offset;image.style.width=drawnWidth;image.style.height=drawnHeight;
+            tiles.SetView(viewer.FullResolutionDocumentPath,originalWidth,originalHeight,left,offset,scale,width,height);
+            readout.tooltip="Source image resolution · detail tiles load as you navigate";
             if(IsSynchronized&&!viewer.ShowingSurface&&drawnWidth>=width-.5f&&drawnHeight>height+.5f)
             {
                 double top=map.ToPixel(viewer.VisibleTopFeet),bottom=map.ToPixel(viewer.VisibleBottomFeet);float h=(float)((bottom-top)*scale);
@@ -57,7 +70,7 @@ namespace Subsurface.Borehole
                 var row=viewer.column.Document.Intervals[selected];
                 if(!row.IsGap&&row.HasImageCoordinates)
                 {
-                    float top=offset+(float)(row.TopPixel*scale),h=(float)((row.BottomPixel-row.TopPixel)*scale);
+                    float top=offset+(float)((row.TopPixel+viewer.PixelDisplacement)*scale),h=(float)((row.BottomPixel-row.TopPixel)*scale);
                     if(top<height&&top+h>0)
                     {
                         selection.style.display=DisplayStyle.Flex;selection.style.left=left;selection.style.width=drawnWidth;selection.style.top=top;selection.style.height=h;

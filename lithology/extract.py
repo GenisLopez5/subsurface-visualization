@@ -337,7 +337,9 @@ def clean_label(text: str) -> str:
     return " ".join(words)
 
 
-def parse_legend(img, box, verbose=False):
+def parse_legend(img, box, verbose=False, debug: dict | None = None):
+    """Legend entries. If `debug` is a dict, it is filled with the intermediate steps (OCR words,
+    swatch candidates, rejected blobs, swatch->label links, continuation joins), in legend-crop pixels."""
     lx0, ly0, lx1, ly1 = box
     arr = crop_rgb(img, box)
     H, W = arr.shape[:2]
@@ -361,10 +363,14 @@ def parse_legend(img, box, verbose=False):
     th_med = float(np.median([w["box"][3] - w["box"][1] for w in words])) if words else 10.0
     min_side = max(6, 0.5 * th_med)  # smaller blobs are leftovers of letters, not swatches
     comps = []
+    rejected = []
     for sl in ndimage.find_objects(lab):
         y0, y1, x0, x1 = sl[0].start, sl[0].stop, sl[1].start, sl[1].stop
         w, h = x1 - x0, y1 - y0
         if w < min_side or h < min_side or w > 0.6 * W or h > 0.6 * H:  # specks, or the legend's outer frame
+            if debug is not None and max(w, h) >= 4:
+                rejected.append({"box": [int(x0), int(y0), int(x1), int(y1)],
+                                 "why": "too big (frame?)" if w > 0.6 * W or h > 0.6 * H else "too small"})
             continue
         comps.append([x0, y0, x1, y1])
 
@@ -397,6 +403,9 @@ def parse_legend(img, box, verbose=False):
             wi = best[1]
             if wi not in owner or best[0] < owner[wi][0]:
                 owner[wi] = (best[0], ci)
+        if debug is not None:
+            debug.setdefault("claims", []).append({"swatch": ci, "word": int(best[1]) if best else None,
+                                                   "dist": float(best[0]) if best else None})
 
     # labels without a swatch are continuation lines/words of a neighbouring label ("Sand and" / "Sandstone")
     # Each orphan joins the closest text piece (owner word or an already-joined orphan), top to bottom.
@@ -419,6 +428,8 @@ def parse_legend(img, box, verbose=False):
         if best:
             names[best[1]] += " " + words[oi]["text"]
             pieces.append((words[oi]["box"], best[1]))
+        if debug is not None:
+            debug.setdefault("orphans", []).append({"word": int(oi), "joined_to": int(best[1]) if best else None})
 
     entries = []
     for wi, (_, ci) in owner.items():
@@ -436,6 +447,18 @@ def parse_legend(img, box, verbose=False):
                 "feature": feat,
             }
         )
+    if debug is not None:
+        debug.update({
+            "crop_box": [int(v) for v in box], "crop_size": [int(W), int(H)], "upscale": up,
+            "background": [int(v) for v in bg], "min_side": float(min_side),
+            "words": [{"box": [float(v) for v in w["box"]], "text": w["text"]} for w in words],
+            "swatches": [[int(v) for v in c] for c in comps],
+            "rejected": rejected,
+            "links": [{"word": int(wi), "swatch": int(ci), "dist": float(d)} for wi, (d, ci) in owner.items()],
+            "unowned_swatches": [i for i in range(len(comps)) if i not in {ci for _, ci in owner.values()}],
+        })
+        debug.setdefault("orphans", [])
+        debug.setdefault("claims", [])
     if verbose:
         print(f"[legend] {len(words)} text boxes, {len(comps)} swatch candidates, {len(entries)} entries:", file=sys.stderr)
         for e in entries:
@@ -592,11 +615,48 @@ def _runs(lab):
 
 
 # ----------------------------------------------------------------------------------------------
+# Legend method
+# ----------------------------------------------------------------------------------------------
+# Several legend parsers exist; compare them on the review page (webui/legend.html). The one used
+# for extraction is a server setting, not something API users choose: LITHO_LEGEND_METHOD
+# (environment or .env), default "grid". All return the same entries.
+#   grid   columns of swatches, text read per column strip (legend_grid.py)      <- default
+#   boxes  proximity grouping: grow ink until each swatch touches its text (legend_boxes.py)
+#   xycut  recursive cuts along empty lines, one swatch per cell (legend_boxes.py)
+#   old    parse_legend above: nearest label per swatch
+
+LEGEND_METHODS = ("grid", "boxes", "xycut", "old")
+DEFAULT_LEGEND_METHOD = "grid"
+
+
+def legend_method(name: str | None = None) -> str:
+    """The legend method to use: `name` if given, else LITHO_LEGEND_METHOD, else the default."""
+    import os
+
+    m = (name or os.environ.get("LITHO_LEGEND_METHOD") or DEFAULT_LEGEND_METHOD).strip().lower()
+    if m not in LEGEND_METHODS:
+        raise ValueError(f"unknown legend method {m!r} (choose from {', '.join(LEGEND_METHODS)})")
+    return m
+
+
+def legend_parser(name: str | None = None):
+    """The parse function for a legend method: f(img, box, verbose=False, debug=None) -> entries."""
+    m = legend_method(name)
+    if m == "old":
+        return parse_legend
+    if m == "grid":
+        from .legend_grid import parse_legend_grid
+        return parse_legend_grid
+    from .legend_boxes import parse_legend_boxes, parse_legend_xycut
+    return {"boxes": parse_legend_boxes, "xycut": parse_legend_xycut}[m]
+
+
+# ----------------------------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------------------------
 
 
-def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_blank=False):
+def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_blank=False, legend_method_name=None):
     ann = json.loads(Path(annotation_path).read_text())
     boxes = ann["bounding_boxes"]
     img = load_page(Path(image_path), ann)
@@ -604,7 +664,8 @@ def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_bl
         print(f"warning: image is {img.size}, annotation says {(ann['width'], ann['height'])}", file=sys.stderr)
 
     y_to_depth, calib = calibrate_depth(img, boxes["depth_column"], verbose=verbose)
-    entries = parse_legend(img, boxes["lithology_legend"], verbose=verbose)
+    method = legend_method(legend_method_name)
+    entries = legend_parser(method)(img, boxes["lithology_legend"], verbose=verbose)
     if not entries:
         raise RuntimeError("no legend entries found")
     runs = classify_column(img, boxes["interpreted_lithology_column"], entries, verbose=verbose)
@@ -632,6 +693,7 @@ def extract(image_path, annotation_path, verbose=False, round_depth=0.1, keep_bl
         "height": ann["height"],
         "bounding_boxes": boxes,
         "depth_calibration": calib,
+        "legend_method": method,
         "legend": [
             {k: v for k, v in e.items() if k not in ("feature", "swatch_height")} for e in entries
         ],
@@ -688,10 +750,13 @@ def main(argv=None):
     ap.add_argument("--preview", help="write a PNG comparing the column with the prediction")
     ap.add_argument("--round-depth", type=float, default=0.1, help="round depths to this step (0 = no rounding)")
     ap.add_argument("--keep-blank", action="store_true", help="also output intervals where the column is empty")
+    ap.add_argument("--legend-method", choices=LEGEND_METHODS,
+                    help=f"legend parser (default: LITHO_LEGEND_METHOD or {DEFAULT_LEGEND_METHOD})")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
 
-    result = extract(a.image, a.annotation, verbose=a.verbose, round_depth=a.round_depth, keep_blank=a.keep_blank)
+    result = extract(a.image, a.annotation, verbose=a.verbose, round_depth=a.round_depth, keep_blank=a.keep_blank,
+                     legend_method_name=a.legend_method)
     text = json.dumps(result, indent=2)
     if a.output:
         Path(a.output).write_text(text)

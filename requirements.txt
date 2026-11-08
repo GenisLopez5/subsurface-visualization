@@ -11,3 +11,5 @@ python-multipart==0.0.33
 psycopg[binary]==3.3.8
 psycopg-pool==3.3.3
 python-dotenv==1.2.4
+# Automatic bounding boxes run in a separate service (bbox-final/server.py, its own requirements-server.txt);
+# this app only calls it over HTTP (LITHO_BBOX_URL), so it needs nothing extra.

@@ -14,6 +14,18 @@ from .legend_pipeline import LegendPolicy, apply_legend_policy
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def model_digest(path):
+    """sha256 of a .pt file, or of an exported model folder (every file, by name, in order)."""
+    path = Path(path)
+    if path.is_file():
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    for item in sorted(p for p in path.rglob("*") if p.is_file()):
+        digest.update(item.relative_to(path).as_posix().encode() + b"\0")
+        digest.update(item.read_bytes())
+    return digest.hexdigest()
+
+
 class BoundingBoxPredictor:
     """Load models once and reuse them for documents; no labels or caches needed."""
 
@@ -40,17 +52,21 @@ class BoundingBoxPredictor:
             if not isinstance(filename, str) or Path(filename).name != filename:
                 raise ValueError("Model filenames must be local to models/")
             path = self.models_dir/filename
-            if not path.is_file():
+            if not path.exists():
                 raise FileNotFoundError(f"Missing packaged model: {path}")
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            digest = model_digest(path)
             if digest != metadata["sha256"]:
                 raise ValueError(f"Model checksum mismatch for {role}: {path}")
             if metadata["classes"] != expected_classes:
                 raise ValueError(f"Incorrect class mapping for {role}")
             self.model_paths[role], self.model_hashes[role] = path, digest
+        self.exported = any(path.is_dir() for path in self.model_paths.values())
         if device in (None, "auto"):
-            import torch
-            device = "0" if torch.cuda.is_available() else "cpu"
+            if self.exported:
+                device = "cpu"  # OpenVINO int8 export: runs on the CPU via OpenVINO
+            else:
+                import torch
+                device = "0" if torch.cuda.is_available() else "cpu"
         self.device = str(device)
         if self.device == "cpu" and cpu_threads is not None:
             if isinstance(cpu_threads, bool) or not isinstance(cpu_threads, int) or cpu_threads < 1:

@@ -108,3 +108,17 @@ la predicció. El paquet no conté entrenaments ni dades anotades.
 La configuració de llegenda prové del benchmark de 10 documents de
 desenvolupament: IoU mitjana 0,950 i 10/10 llegendes amb IoU ≥ 0,8, però només
 6/10 amb IoU ≥ 0,95. No són garanties de fidelitat sobre documents nous.
+
+## Servei HTTP (per a una altra màquina)
+
+`server.py` exposa el mateix workflow amb FastAPI, perquè l'aplicació de litologia el cridi per xarxa:
+
+```bash
+./run_server.sh                      # primer cop: crea .venv i instal·la requirements-server.txt (torch CPU)
+curl http://<ip>:8100/health
+curl -F file=@document.tif http://<ip>:8100/detect
+```
+
+`POST /detect` accepta `.tif/.tiff/.png/.jpg` (els PDF els renderitza el client) i retorna el mateix JSON
+que `predict.py`, més `seconds`. 422 si no es resolen les tres regions. Variables: `PORT`, `HOST`,
+`BBOX_DEVICE` (`auto`, `cpu`, `0`), `BBOX_MAX_UPLOAD_MB`.

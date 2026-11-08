@@ -52,7 +52,34 @@ namespace Subsurface.Borehole
             var row=Document.Intervals[index];SetRing(topHighlight,DepthMap.ToY(row.TopFeet));SetRing(bottomHighlight,DepthMap.ToY(row.BottomFeet));
         }
         void SetRing(LineRenderer line,float y){if(line==null)return;for(int i=0;i<64;i++){float a=i*Mathf.PI*2/64;line.SetPosition(i,new Vector3(Mathf.Cos(a)*radius*1.015f,y,Mathf.Sin(a)*radius*1.015f));}}
-        public void SetMode(DisplayMode mode){foreach(var s in Surfaces)s.SetDisplayMode(mode);}
+        readonly Dictionary<Material,Material> displayMaterials=new Dictionary<Material,Material>();
+        readonly Dictionary<Material,Material> displaySources=new Dictionary<Material,Material>();
+        float textureDisplayScale=1;
+        public void SetMode(DisplayMode mode)
+        {
+            RestoreDisplayMaterials();foreach(var surface in Surfaces)surface.SetDisplayMode(mode);SetTextureDisplayScale(textureDisplayScale);
+        }
+        public void SetTextureDisplayScale(float scale)
+        {
+            textureDisplayScale=scale;
+            foreach(var surface in Surfaces)if(surface!=null&&surface.target!=null)
+            {
+                var current=surface.target.sharedMaterial;if(current==null)continue;
+                var source=displaySources.TryGetValue(current,out var original)?original:current;
+                surface.target.SetPropertyBlock(null);
+                if(Mathf.Abs(scale-1)<.00001f){surface.target.sharedMaterial=source;continue;}
+                if(!displayMaterials.TryGetValue(source,out var material))
+                {
+                    material=new Material(source){name=source.name+" / viewer detail",hideFlags=HideFlags.DontSave};displayMaterials.Add(source,material);displaySources.Add(material,source);
+                }
+                material.SetFloat("_DisplayScale",scale);surface.target.sharedMaterial=material;
+            }
+        }
+        void RestoreDisplayMaterials(bool immediate=false)
+        {
+            foreach(var surface in Surfaces)if(surface!=null&&surface.target!=null&&surface.target.sharedMaterial!=null&&displaySources.TryGetValue(surface.target.sharedMaterial,out var source))surface.target.sharedMaterial=source;
+            foreach(var material in displayMaterials.Values)DestroyOwned(material,immediate);displayMaterials.Clear();displaySources.Clear();
+        }
         public void SetHighlightWidth(float width){if(topHighlight!=null)topHighlight.widthMultiplier=width;if(bottomHighlight!=null)bottomHighlight.widthMultiplier=width;}
         public int Pick(Ray ray)
         {
@@ -60,6 +87,7 @@ namespace Subsurface.Borehole
         }
         void Clear(bool immediate=false)
         {
+            RestoreDisplayMaterials(immediate);
             foreach(var s in Surfaces)if(s!=null)s.enabled=false;Surfaces.Clear();IdentifierColors.Clear();
             if(generation!=null){generation.SetActive(false);DestroyOwned(generation,immediate);}generation=null;
             if(highlightMaterial!=null)DestroyOwned(highlightMaterial,immediate);highlightMaterial=null;topHighlight=null;bottomHighlight=null;

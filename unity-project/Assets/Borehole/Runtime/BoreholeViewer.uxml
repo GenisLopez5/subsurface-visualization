@@ -3,14 +3,13 @@
   <ui:VisualElement class="app">
     <ui:VisualElement class="header">
       <ui:VisualElement class="source"><ui:Label name="filename" class="filename" /><ui:Label name="range" class="source-range" /></ui:VisualElement>
-      <ui:Button name="loadCsv" text="Load CSV · debug" class="header-button" />
-      <ui:Button name="loadImage" text="Load document" class="header-button" />
     </ui:VisualElement>
     <ui:Label name="error" class="error hidden" />
     <ui:VisualElement class="workspace">
       <ui:VisualElement name="documentView" class="document-pane">
         <ui:VisualElement name="documentViewport" class="document-viewport">
           <ui:Image name="documentImage" class="document-image" picking-mode="Ignore" />
+          <ui:VisualElement name="documentTiles" class="document-tiles" picking-mode="Ignore" />
           <ui:VisualElement name="documentWindow" class="document-window" picking-mode="Ignore" />
           <ui:VisualElement name="documentSelection" class="document-selection" picking-mode="Ignore" />
           <ui:VisualElement name="documentPlaceholder" class="placeholder" picking-mode="Ignore"><ui:Label text="THE SOURCE, IN CONTEXT" class="placeholder-title" /><ui:Label text="Load the segmented document to link image pixels with depth. The cylinder remains available while you choose a page." class="placeholder-copy" /></ui:VisualElement>
@@ -27,7 +26,7 @@
           <ui:VisualElement name="intervalLabels" class="annotation-layer" picking-mode="Ignore" />
           <ui:VisualElement name="selectionCard" class="selection-card hidden" picking-mode="Ignore"><ui:Label text="SELECTED INTERVAL" class="selection-caption" /><ui:Label name="selectedName" class="selected-name" /><ui:Label name="selectedDepths" class="selected-depths" /><ui:Label name="selectedInfo" class="selected-info" /></ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="navigation" class="navigation"><ui:Button name="zoomOut" text="−" class="zoom-button" /><ui:Button name="zoomIn" text="+" class="zoom-button" /><ui:Button name="fit" text="Fit" /><ui:DropdownField name="appearance" class="appearance" /></ui:VisualElement>
+        <ui:VisualElement name="navigation" class="navigation"><ui:Slider name="zoomSlider" low-value="0" high-value="1" class="zoom-slider" /><ui:Label name="zoomPercent" class="zoom-percent" /><ui:Button name="fit" text="Fit" /><ui:DropdownField name="appearance" class="appearance" /></ui:VisualElement>
       </ui:VisualElement>
     </ui:VisualElement>
     <ui:VisualElement class="footer"><ui:Label name="depthReadout" class="depth-readout" /><ui:Label name="status" class="status" /></ui:VisualElement>

@@ -40,17 +40,19 @@ def extract_cached(img_path, ann_path, cache_dir: Path, force=False, log=print):
     """Run extract.extract, or reuse the saved result for the same image + annotation.
     Returns (result dict, cache file path)."""
     img_path, ann_path = Path(img_path), Path(ann_path)
+    method = X.legend_method()  # part of the key: switching LITHO_LEGEND_METHOD never reuses old results
     key = hashlib.sha1(
         ann_path.read_bytes() + str(img_path.resolve()).encode() + str(img_path.stat().st_size).encode()
+        + method.encode()
     ).hexdigest()[:12]
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache = cache_dir / f"{img_path.stem}.{key}.json"
     if cache.exists() and not force:
         log(f"cached: {cache.name}")
         return json.loads(cache.read_text()), cache
-    log("extracting")
+    log(f"extracting (legend method: {method})")
     with contextlib.redirect_stderr(LogTee(log)):
-        result = X.extract(str(img_path), str(ann_path), verbose=True)
+        result = X.extract(str(img_path), str(ann_path), verbose=True, legend_method_name=method)
     cache.write_text(json.dumps(result, indent=2))
     return result, cache
 
@@ -86,8 +88,10 @@ def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_r
             force=False, log=print, debug_dir: Path | None = None) -> dict:
     """Extract + draw one log.
 
-    Writes out_dir/<name>.csv and out_dir/<name>.tif (full resolution, Deflate-compressed) and, if
-    debug_dir is given, debug_dir/<name>.json. Returns a summary dict including the file paths and
+    Writes out_dir/<name>.csv and out_dir/<name>.tif (full resolution, Deflate-compressed), the two
+    legends as PNGs: out_dir/<name>_legend_original.png (the log's own legend, cut from the page) and
+    out_dir/<name>_legend_generated.png (the colour key drawn on top of the TIF), and, if debug_dir is
+    given, debug_dir/<name>.json. Returns a summary dict including the file paths and
     the TIF's layout (legend bar height on top, scale: see drawing.make_layout).
     """
     t0 = time.time()
@@ -104,7 +108,12 @@ def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_r
     try:
         page, image = page_for_notebook(img_path, result, tmp, log)
         log("drawing")
-        layout = drawing.render_tif(image, ann_path, result, files["tif"])
+        files["legend_generated"] = out_dir / f"{name}_legend_generated.png"
+        layout = drawing.render_tif(image, ann_path, result, files["tif"], key_path=files["legend_generated"])
+        legend_box = drawing.crop_legend(image, ann_path, out_dir / f"{name}_legend_original.png")
+        if legend_box is not None:
+            files["legend_original"] = out_dir / f"{name}_legend_original.png"
+            layout = {**layout, "legend_original_box": legend_box}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return {"status": "done", "seconds": round(time.time() - t0), **stats(result),

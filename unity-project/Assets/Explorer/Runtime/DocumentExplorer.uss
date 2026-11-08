@@ -1,0 +1,86 @@
+.explorer { flex-grow: 1; background-color: #f7f6fa; color: #30283e; padding: 24px 28px 16px; }
+.toolbar, .actions, .file-header, .file-row, .activity-header, .feedback { flex-direction: row; align-items: center; }
+.toolbar { margin-bottom: 22px; min-height: 58px; }
+.identity { width: 190px; flex-shrink: 0; }
+.eyebrow { color: #5300b6; font-size: 10px; -unity-font-style: bold; letter-spacing: 2px; margin-bottom: 3px; }
+.brand { font-size: 25px; -unity-font-style: bold; }
+.search-shell { flex-grow: 1; min-width: 180px; height: 44px; flex-direction: row; align-items: center; margin-right: 20px; background-color: #ece8f3; border-width: 1px; border-color: #ece8f3; border-radius: 12px; padding: 0 12px; }
+.search-shell.focused { background-color: white; border-color: #7d43ba; }
+.search-icon { width: 13px; height: 13px; border-width: 2px; border-color: #867495; border-radius: 10px; margin-left: 2px; margin-right: 14px; flex-shrink: 0; }
+.search-handle { position: absolute; width: 7px; height: 2px; right: -6px; bottom: -3px; background-color: #867495; rotate: 45deg; }
+.search { flex-grow: 1; margin: 0; padding: 0; }
+.search .unity-base-field__label { display: none; }
+.search .unity-text-field__input { background-color: transparent; color: #30283e; border-width: 0; border-radius: 0; padding: 7px 0; font-size: 14px; }
+.search-placeholder { position: absolute; left: 44px; top: 12px; color: #84758f; font-size: 14px; }
+.explorer Button, .activity Button { background-color: white; color: #4800a8; border-width: 0; border-radius: 8px; padding: 10px 15px; margin-left: 8px; }
+.explorer Button:hover, .activity Button:hover { background-color: #e6dcf6; }
+.explorer Button:disabled { color: #a59eaf; }
+.explorer .search-clear { width: 26px; height: 30px; padding: 0; margin: 0; background-color: transparent; font-size: 20px; color: #84758f; }
+.explorer .primary { background-color: #5300b6; color: white; }
+.explorer .primary:hover { background-color: #6c1cc4; }
+.actions { margin-bottom: 14px; color: #81728d; min-height: 36px; }
+.grow { flex-grow: 1; }
+.file-card { flex-grow: 1; background-color: white; border-width: 1px; border-color: #e7e0ee; border-radius: 12px; overflow: hidden; }
+.file-header { height: 46px; padding: 0 18px; border-bottom-width: 1px; border-bottom-color: #ebe5f1; color: #91839b; }
+.name { flex-grow: 1; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
+.file-header .name { margin-left: 0; padding-left: 0; background-color: transparent; color: #81728d; }
+.file-list { flex-grow: 1; }
+.file-row { min-height: 66px; padding: 12px 18px; border-bottom-width: 1px; border-bottom-color: #f0ebf5; }
+.file-row:hover { background-color: #f7f3fc; }
+.file-row.selected { background-color: #ede4fb; border-left-width: 3px; border-left-color: #5300b6; padding-left: 15px; }
+.feedback { min-height: 34px; padding-top: 8px; }
+.message { flex-grow: 1; white-space: normal; color: #84758f; font-size: 11px; }
+.message-error { color: #b32642; }
+.feedback > .spinner { margin-right: 10px; }
+.spinner { width: 17px; height: 17px; flex-shrink: 0; border-width: 2px; border-color: #ded5ec; border-top-color: #6200be; border-right-color: #78d928; border-radius: 20px; }
+.spinner-large { width: 34px; height: 34px; border-width: 3px; margin-bottom: 18px; }
+.status-pill { flex-direction: row; align-items: center; align-self: flex-start; border-radius: 20px; padding: 5px 10px; }
+.status-text { font-size: 11px; -unity-font-style: bold; margin: 0; }
+.status-pill .spinner { width: 12px; height: 12px; margin-right: 7px; }
+.status-dot { width: 5px; height: 5px; border-radius: 5px; margin-right: 7px; background-color: #777; }
+.status-done { color: #347325; background-color: #ecf7e8; }
+.status-done .status-dot { background-color: #65ac38; }
+.status-uploading { color: #6534ab; background-color: #f0e8fb; }
+.status-processing { color: #9a6014; background-color: #fff3d9; }
+.status-processing .spinner { border-top-color: #be7d20; border-right-color: #eed398; border-left-color: #eed398; border-bottom-color: #eed398; }
+.status-queued { color: #637188; background-color: #edf1f7; }
+.status-queued .spinner { border-top-color: #7185a3; border-right-color: #d3dce8; }
+.status-error { color: #b02e48; background-color: #fcebf0; }
+.status-error .status-dot { background-color: #c74d66; }
+.status-attention { color: #9a6014; background-color: #fff3d9; }
+.activity { position: absolute; right: 24px; bottom: 22px; width: 380px; max-height: 400px; background-color: white; color: #30283e; border-width: 1px; border-color: #d9cce8; border-radius: 12px; overflow: hidden; }
+.activity-header { background-color: #5300b6; color: white; padding: 11px 14px; }
+.activity-body { max-height: 320px; }
+.upload-entry { padding: 15px; border-bottom-width: 1px; border-bottom-color: #f0ebf5; }
+.upload-name { white-space: normal; margin-bottom: 9px; font-size: 12px; }
+.upload-error { color: #b32642; white-space: normal; margin-top: 7px; font-size: 11px; }
+.upload-progress { height: 3px; background-color: #eee7f7; border-radius: 3px; margin-top: 10px; overflow: hidden; }
+.upload-progress-fill { height: 3px; background-color: #76d72e; border-radius: 3px; }
+.context-menu { position: absolute; width: 220px; background-color: white; color: #30283e; border-width: 1px; border-color: #d5cddd; border-radius: 8px; padding: 5px; }
+.context-menu Button { background-color: white; color: #4800a8; border-width: 0; padding: 12px; margin: 0; -unity-text-align: middle-left; }
+.context-menu Button:hover { background-color: #ede6f6; }
+.context-menu Button:disabled { color: #a59eaf; }
+.context-menu .danger, .confirm-card .danger { color: #b32632; }
+.modal-overlay, .opening-overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; align-items: center; justify-content: center; background-color: rgba(24, 12, 40, 0.3); }
+.opening-card { align-items: center; width: 360px; max-width: 85%; padding: 30px; border-radius: 14px; background-color: white; }
+.opening-title { font-size: 19px; -unity-font-style: bold; margin-bottom: 10px; }
+.opening-file { color: #84758f; white-space: normal; -unity-text-align: middle-center; font-size: 12px; }
+.confirm-card { width: 440px; max-width: 90%; background-color: white; color: #30283e; border-radius: 12px; padding: 24px; }
+.confirm-title { font-size: 22px; -unity-font-style: bold; margin-bottom: 16px; }
+.confirm-copy { white-space: normal; margin-bottom: 16px; }
+.confirm-actions { flex-direction: row; justify-content: flex-end; }
+.confirm-actions Button { padding: 10px 20px; margin-left: 8px; background-color: #ede6f6; border-width: 0; color: #4800a8; }
+.activity .activity-toggle { width: 32px; height: 30px; padding: 0; background-color: #78ff00; align-items: center; justify-content: center; }
+.activity .activity-toggle:hover { background-color: #a1ff50; }
+.activity-chevron { width: 9px; height: 9px; border-bottom-width: 2px; border-right-width: 2px; border-color: #30283e; rotate: 45deg; margin-top: -4px; }
+.collapsed .activity-chevron { rotate: 225deg; margin-top: 4px; }
+.activity .activity-close { font-size: 20px; padding: 0; width: 30px; height: 30px; }
+
+.file-row .name { color: #4d3f5a; font-size: 13px; }
+.host-controls { flex-direction: row; align-items: center; margin-right: 10px; }
+.host-field { width: 255px; margin-right: 5px; }
+.host-field .unity-base-field__label { min-width: 48px; color: #9585aa; font-size: 10px; }
+.host-field .unity-text-field__input { background-color: #eee9f5; color: #403149; border-width: 0; border-radius: 5px; padding: 5px; font-size: 11px; }
+.host-state { max-width: 145px; overflow: hidden; text-overflow: ellipsis; color: #65a339; font-size: 10px; margin-left: 8px; }
+.host-error { color: #db6478; }
+.header .host-controls Button { padding: 4px 8px; background-color: #78ff00; color: #30283e; border-width: 0; border-radius: 4px; }

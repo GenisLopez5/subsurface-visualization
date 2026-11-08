@@ -2,8 +2,8 @@
   "version": 1,
   "models": {
     "general": {
-      "file": "general.pt",
-      "sha256": "195361471104ba4a2751247f82cd66ccc391dcb132233cc01926f91792c221ce",
+      "file": "general_int8_openvino_model",
+      "sha256": "eb1a3fa9dd51b6637649fe3b4067f281afa7e1d6bdfdfffbae2197fc83320b91",
       "classes": [
         "depth_column",
         "interpreted_lithology_column",
@@ -11,8 +11,8 @@
       ]
     },
     "legend": {
-      "file": "legend.pt",
-      "sha256": "cc55672255ac742b79b52c562eb01c93a46021e563679bdc97a00d0574889482",
+      "file": "legend_int8_openvino_model",
+      "sha256": "4fa00da5920d3e8a765edb960fff08ed4265edfe54e8e8cbc11b50acbff0396e",
       "classes": [
         "lithology_legend"
       ]

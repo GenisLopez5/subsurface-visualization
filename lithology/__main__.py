@@ -81,11 +81,16 @@ def main(argv=None):
 
     elif a.cmd == "process":
         from . import pipeline
-        from .annotations import AnnotationStore, resolve_annotation
+        from .annotations import AnnotationStore, load_detector, resolve_annotation
         s = _settings(a)
         img = Path(a.image)
-        ann = Path(a.annotation) if a.annotation else resolve_annotation(img, AnnotationStore(s.annotation_dirs))[0]
         out = Path(a.out)
+        if a.annotation:
+            ann = Path(a.annotation)
+        else:
+            out.mkdir(parents=True, exist_ok=True)
+            ann, how = resolve_annotation(img, AnnotationStore(s.annotation_dirs), load_detector(s.detector), out)
+            print(f"bounding boxes: {ann.name}" + (f" ({how})" if how else ""))
         r = pipeline.process(img, ann, out, img.stem, s.cache, s.tmp, log=print,
                              debug_dir=out if a.debug else None)
         print(f"{r['intervals']} intervals -> " + ", ".join(r["files"].values()))

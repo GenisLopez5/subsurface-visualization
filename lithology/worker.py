@@ -84,8 +84,31 @@ class Uploader:
 
 
 def safe_name(name: str) -> str:
+    """ASCII-only name for files on the server's disk (work folders, spool)."""
     name = Path(name).name
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._") or "file"
+
+
+def item_name(stored: str) -> str:
+    """An item's name for the frontend: the stored name (the upload's file name) without its extension.
+    The extension stays in the database: it names the original image inside the ZIPs."""
+    return Path(stored).stem or stored
+
+
+def display_name(name: str) -> str:
+    """The name as uploaded, for what users download (ZIP entries, folders): keeps spaces and accents,
+    drops only what can't be in a file name (path separators, control and Windows-reserved characters)."""
+    name = Path(str(name).replace("\\", "/")).name
+    return re.sub(r'[\x00-\x1f\x7f<>:"/|?*]+', "_", name).strip(" .") or "file"
+
+
+# Results are named after the uploaded image + "_solved", so they never clash with the original
+RESULT_SUFFIXES = {"result_tif": "_solved.tif", "result_csv": "_solved.csv", "result_json": "_solved.json",
+                   "legend_original": "_legend_original.png", "legend_generated": "_legend_generated.png"}
+
+
+def result_filename(image_name: str, kind: str) -> str:
+    return display_name(Path(image_name).stem) + RESULT_SUFFIXES[kind]
 
 
 class Worker:
@@ -156,13 +179,15 @@ class Worker:
                 r = pipeline.process(img, ann, out, stem, self.s.cache, self.s.tmp, force=bool(job["force"]),
                                      log=log.append)
             files = r["files"]
-            base = Path(name).stem
             results = {
-                "result_tif": (f"{base}_annotated.tif", "image/tiff", Path(files["tif"]).read_bytes()),
-                "result_csv": (f"{base}_lithology.csv", "text/csv", Path(files["csv"]).read_bytes()),
-                "result_json": (f"{base}_result.json", "application/json",
+                "result_tif": (result_filename(name, "result_tif"), "image/tiff", Path(files["tif"]).read_bytes()),
+                "result_csv": (result_filename(name, "result_csv"), "text/csv", Path(files["csv"]).read_bytes()),
+                "result_json": (result_filename(name, "result_json"), "application/json",
                                 dumps({**r["result"], "layout": r["layout"]})),
             }
+            for kind in ("legend_original", "legend_generated"):  # the log's own legend + the colour key
+                if files.get(kind):
+                    results[kind] = (result_filename(name, kind), "image/png", Path(files[kind]).read_bytes())
             stats = {k: r[k] for k in ("seconds", "intervals", "top_depth", "bottom_depth", "px_per_depth_unit",
                                        "depth_labels_used", "depth_fit_rms_px", "legend_entries")}
             stats["layout"] = r["layout"]  # result TIF = legend bar on top + the page: y shift for the UI

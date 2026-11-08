@@ -27,7 +27,6 @@
 <fieldset>
   <legend>Upload</legend>
   <p><input type="file" id="files" multiple accept=".tif,.tiff,.pdf,.png,.jpg,.jpeg,.json"></p>
-  <p>Batch name (optional): <input id="name"></p>
   <p>Annotations JSON (optional, e.g. from the box algorithm):<br><textarea id="ann" rows="3" placeholder='{"bounding_boxes": {...}}  or  {"log.tif": {...}}'></textarea></p>
   <button id="up">Upload</button>
   <pre id="upOut" hidden></pre>
@@ -36,6 +35,8 @@
 <fieldset>
   <legend>Files (refreshes every 2 s)</legend>
   <button id="delSel">Delete selected</button>
+  <button id="dlSel">Download selected</button>
+  <a href="/api/v1/download/all"><button>Download all</button></a>
   <table>
     <thead><tr><th><input type="checkbox" id="all"></th><th>name</th><th>status</th><th>computed</th><th>boxes from</th><th>intervals</th><th>actions</th></tr></thead>
     <tbody id="rows"></tbody>
@@ -65,7 +66,7 @@ async function refresh() {
   try { d = await (await fetch(API + '/files?limit=200')).json(); } catch { return; }
   if (!d.items) { $('rows').innerHTML = `<tr><td colspan="7">${esc(JSON.stringify(d))}</td></tr>`; return; }
   $('rows').innerHTML = d.items.map(f => {
-    const dl = Object.keys(f.files).map(k => `<a href="${API}/files/${f.id}/download/${k}">${k}</a>`).join('');
+    const dl = f.download ? `<a href="${f.download}">download zip</a>` : '';
     const pv = Object.keys(f.preview).map(k => `<button class="link" data-prev="${f.preview[k]}">view ${k === 'original' ? 'original' : 'result'}</button>`).join('');
     const fix = f.status === 'needs_annotation' || f.status === 'error'
       ? `<button class="link" data-ann="${f.id}">set boxes…</button>` : '';
@@ -84,14 +85,13 @@ async function refresh() {
 $('up').onclick = async () => {
   const fd = new FormData();
   for (const f of $('files').files) fd.append('files', f);
-  if ($('name').value.trim()) fd.append('name', $('name').value.trim());
   if ($('ann').value.trim()) fd.append('annotations', $('ann').value.trim());
   $('up').disabled = true; $('upOut').hidden = false; $('upOut').textContent = 'uploading…';
   try {
     const r = await fetch(API + '/uploads', { method: 'POST', body: fd });
     const j = await r.json();
     $('upOut').textContent = r.ok
-      ? `batch ${j.batch.id}\n` + j.files.map(f => `${f.id}  ${f.status}  ${f.name}`).join('\n') +
+      ? j.files.map(f => `${f.id}  ${f.status}  ${f.name}`).join('\n') +
         (j.rejected.length ? `\nrejected: ${JSON.stringify(j.rejected)}` : '') +
         (j.unused_annotations.length ? `\nunused JSONs: ${j.unused_annotations.join(', ')}` : '')
       : `${r.status}: ${JSON.stringify(j.detail ?? j)}`;
@@ -125,6 +125,9 @@ $('delSel').onclick = async () => {
   if (!selected.size) return;
   await fetch(`${API}/files?ids=${[...selected].join(',')}`, { method: 'DELETE' });
   selected.clear(); $('all').checked = false; refresh();
+};
+$('dlSel').onclick = () => {
+  if (selected.size) location.href = `${API}/download?ids=${[...selected].join(',')}`;
 };
 $('closePrev').onclick = () => { $('previewBox').hidden = true; $('prev').removeAttribute('src'); };
 
