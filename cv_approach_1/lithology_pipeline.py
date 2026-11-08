@@ -13,7 +13,7 @@ app (webapp/) and the command line: same inputs (image + bounding-box JSON), sam
 and one summary.json for the whole folder (plus metrics when ground-truth labels are available).
 Methods: "hybrid" (default), "lithology" (lithology/ package only), "cv" (cv_pipeline.py only).
 
-How it works (method "hybrid", the default: hybrid_pipeline.py, CPU only, no training)
+How it works (method "hybrid", hybrid_pipeline.py; the default "hybrid_v2" adds colour mode, see hybrid_v2.py)
 ----------------------------------------------------------------------------------------
  1. Column        crop the lithology column, strip its frame and track borders, blank isolated grid lines (cv).
  2. Scale         measure the vertical pattern period and size every window and kernel from it (cv).
@@ -75,8 +75,9 @@ EXAMPLE_STEM = cv.EXAMPLE_STEM
 IMAGE_SUFFIXES = (".tif", ".tiff", ".png", ".jpg", ".jpeg", ".pdf")
 STAGES = {"lithology": ["column", "legend+naming", "segmentation", "depth", "render"],
           "cv": ["column", "segmentation", "legend+naming", "depth", "render"],
-          "hybrid": ["column", "segmentation", "legend+naming", "depth", "render"]}
-CHOICES = {"method": ["hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
+          "hybrid": ["column", "segmentation", "legend+naming", "depth", "render"],
+          "hybrid_v2": ["column", "legend+naming", "segmentation", "depth", "render"]}
+CHOICES = {"method": ["hybrid_v2", "hybrid", "lithology", "cv"]}                     # settings with a fixed set of values (a select in the UI)
 
 
 # ======================================================================================================================
@@ -86,10 +87,11 @@ CHOICES = {"method": ["hybrid", "lithology", "cv"]}                     # settin
 class Config:
     """All settings. The web app builds its settings form from this class (the comments become the help text)."""
     # --- method -------------------------------------------------------------------------------------------------------
-    method: str = "hybrid"              # "hybrid" = cv segmentation/naming + lithology/ OCR fallbacks (hybrid_pipeline.py); "lithology" = lithology/ package only; "cv" = clustering only
+    method: str = "hybrid_v2"           # "hybrid_v2" = revised hybrid (colour mode, blank fix, legend quality; hybrid_v2.py); "hybrid" = first hybrid; "lithology" = lithology/ package only; "cv" = clustering only
     # --- hybrid method ------------------------------------------------------------------------------------------------
     hybrid_prefer_rapidocr: bool = False  # read the legend with RapidOCR first (slower; default: Tesseract first, RapidOCR if it looks wrong)
     hybrid_depth_min_labels: int = 4    # fewer Tesseract depth labels than this -> also try RapidOCR
+    hybrid_colour_mode: bool = True     # hybrid_v2: read colour logs row by row by fill colour (thin colour bands)
     # --- lithology method ---------------------------------------------------------------------------------------------
     window_px: int = 0                  # classification window height in px; 0 = median legend swatch height (8-40)
     ambiguous_conf: float = 0.15        # intervals whose confidence is below this are flagged ambiguous
@@ -133,7 +135,7 @@ def cv_config(cfg: Config) -> cv.Config:
 # ======================================================================================================================
 def ocr_info(method: str = "lithology") -> dict:
     """{'ok', 'version', 'path' or 'message'} for the OCR engine the method needs."""
-    if method in ("cv", "hybrid"):                                  # hybrid: Tesseract first, RapidOCR optional
+    if method in ("cv", "hybrid", "hybrid_v2"):                                  # hybrid: Tesseract first, RapidOCR optional
         try:
             cv.check_tesseract()
             return dict(ok=True, version="Tesseract", path=str(cv.pytesseract.pytesseract.tesseract_cmd))
@@ -306,7 +308,10 @@ def process_log(log: Log, out_dir: Path, cfg: Config = Config(), colours: Option
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     colours = colours or cv.Colours()
-    if cfg.method == "hybrid":
+    if cfg.method == "hybrid_v2":
+        import hybrid_v2
+        record = hybrid_v2.process_log_v2(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
+    elif cfg.method == "hybrid":
         import hybrid_pipeline
         record = hybrid_pipeline.process_log_hybrid(log, out_dir, cfg, cv_config(cfg), colours, on_progress)
     elif cfg.method == "cv":
@@ -393,7 +398,7 @@ def main(argv=None) -> int:
     ap.add_argument("data_dir", help="folder with <stem>.json + image, or a dataset folder with bbox_annotation/ + images/")
     ap.add_argument("--out", default="outputs", help="output folder (default: outputs)")
     ap.add_argument("--labels", default=None, help="ground-truth folder with <stem>.csv (default: <data_dir>/labels)")
-    ap.add_argument("--method", default="hybrid", choices=CHOICES["method"])
+    ap.add_argument("--method", default="hybrid_v2", choices=CHOICES["method"])
     a = ap.parse_args(argv)
     s = run_folder(a.data_dir, a.out, a.labels, Config(method=a.method), on_progress=cv._print)
     print(f"outputs: {Path(a.out).resolve()}")

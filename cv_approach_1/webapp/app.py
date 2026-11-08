@@ -327,6 +327,10 @@ def preflight(d: Path) -> dict:
             img = by_name[ann["image_name"]]
         if img is None:
             img = next((p for p in images if p.stem == jp.stem), None)
+        if img is not None and img.stem != jp.stem:
+            row["errors"].append(f"name mismatch: the annotation is '{jp.name}' but its image is '{img.name}'. "
+                                 f"Rename one of them so both have the same name ('{img.stem}.json').")
+            row["mismatch"] = dict(json=jp.name, image=img.name)
         if img is None:
             want = ann.get("image_name") if isinstance(ann, dict) and ann.get("image_name") else f"{jp.stem}.tif"
             row["errors"].append(f"image not found (expected '{want}')")
@@ -372,7 +376,18 @@ def preflight(d: Path) -> dict:
     for p in files:
         if p.suffix.lower() not in IMAGE_EXT | {".json", ".csv"}:
             unmatched.append(dict(name=p.name, problem="unsupported file type"))
-    return dict(rows=rows, unmatched=unmatched, n_ok=sum(r["ok"] for r in rows), n_logs=len(rows))
+    # file-name mismatches block the run: an annotation must be named exactly like its image (X.tif <-> X.json)
+    mismatches = [dict(json=r["mismatch"]["json"], images=[r["mismatch"]["image"]],
+                       message=f"'{r['mismatch']['json']}' does not have the same name as its image "
+                               f"'{r['mismatch']['image']}'.") for r in rows if r.get("mismatch")]
+    lonely_json = [r["json"] for r in rows if r["image"] is None and not r.get("mismatch")]
+    lonely_img = [u["name"] for u in unmatched if u["problem"].startswith("image without")]
+    if lonely_json and lonely_img:
+        for j in lonely_json:
+            mismatches.append(dict(json=j, images=lonely_img,
+                                   message=f"'{j}' has no image with the same name; the image(s) "
+                                           f"{', '.join(repr(i) for i in lonely_img)} have no annotation with the same name."))
+    return dict(rows=rows, unmatched=unmatched, mismatches=mismatches, n_ok=sum(r["ok"] for r in rows), n_logs=len(rows))
 
 
 # ======================================================================================================================
@@ -885,6 +900,9 @@ def prepare_run(d: Path, body: dict) -> None:
     overrides = body.get("config") or {}
     cfg = validate_config(overrides)
     pf = preflight(d)
+    if pf["mismatches"]:
+        raise HTTPException(400, "file names do not match: " + " ".join(m["message"] for m in pf["mismatches"])
+                            + " The .json must have the same name as the image (e.g. log.tif + log.json).")
     ok = [r for r in pf["rows"] if r["ok"]]
     want = body.get("logs")
     sel = [r for r in ok if want is None or r["stem"] in set(want)]
@@ -1175,6 +1193,54 @@ def original_legend(rid: str, stem: str):
             x0, y0, x1, y1 = (int(v) for v in boxes["lithology_legend"])
             page.crop((max(0, x0), max(0, y0), min(page.width, x1), min(page.height, y1))).convert("RGB").save(out)
     return FileResponse(out, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/runs/{rid}/logs/{stem}/output")
+def log_output(rid: str, stem: str):
+    """Zip with the image's result: <stem>.csv + <stem>_annotated.tif. When the run did not write the annotated TIF
+    (e.g. method cv) it is drawn now in the challenge notebook's style; without a depth scale, the painted page is
+    saved as TIFF instead."""
+    d = run_path(rid)
+    try:
+        stem = safe_name(stem)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    out = d / "outputs"
+    csv_p, tif_p = out / f"{stem}.csv", out / f"{stem}_annotated.tif"
+    if not csv_p.is_file():
+        raise HTTPException(404, "no result for this image yet")
+    export_dir = d / "exports"
+    export_dir.mkdir(exist_ok=True)
+    tif = tif_p if tif_p.is_file() else export_dir / f"{stem}_annotated.tif"
+    if not tif.is_file():
+        summary = json.loads((out / "summary.json").read_text()) if (out / "summary.json").is_file() else None
+        rec = next((r for r in (summary or {}).get("logs", []) if r["stem"] == stem), None)
+        img = image_for(d, stem, summary)
+        ann_p = next((p for p in (d / "work" / f"{stem}.json", d / "data" / f"{stem}.json") if p.is_file()), None)
+        if ann_p is None and summary and summary.get("data_dir"):
+            ann_p = next((l.annotation_path for l in lp.find_logs(Path(summary["data_dir"])) if l.stem == stem), None)
+        with TILE_LOCK:
+            try:
+                ivs = rec["intervals"] if rec else []
+                if rec and img is not None and ann_p is not None and ivs and all(i.get("top_depth") is not None for i in ivs):
+                    from lithology import drawing as LD
+                    from lithology import extract as LX
+                    page = LX.load_page(Path(img), json.loads(Path(ann_p).read_text()))
+                    LD.render_tif(page, ann_p, dict(intervals=ivs), tif)
+                elif (out / f"{stem}_page.png").is_file():
+                    with Image.open(out / f"{stem}_page.png") as im:
+                        im.convert("RGB").save(tif, compression="tiff_lzw")
+                else:
+                    raise HTTPException(404, "no annotated image for this image")
+            except HTTPException:
+                raise
+            except Exception as e:                                  # noqa: BLE001
+                raise HTTPException(500, f"could not draw the annotated TIFF: {type(e).__name__}: {e}")
+    z = export_dir / f"{stem}_output.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.write(csv_p, csv_p.name, compress_type=zipfile.ZIP_DEFLATED)
+        zf.write(tif, f"{stem}_annotated.tif", compress_type=zipfile.ZIP_STORED)   # already LZW-compressed
+    return FileResponse(z, filename=f"{stem}_output.zip", media_type="application/zip")
 
 
 @app.get("/api/runs/{rid}/download")

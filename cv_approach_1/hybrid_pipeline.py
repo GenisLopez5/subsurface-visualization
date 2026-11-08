@@ -30,9 +30,14 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-import cv_pipeline as cv
-from lithology import drawing as LD
-from lithology import extract as LX
+import sys
+_REPO = str(Path(__file__).resolve().parent.parent)                 # the repository root holds lithology/
+if _REPO not in sys.path:
+    sys.path.insert(0, _REPO)
+
+import cv_pipeline as cv                                            # noqa: E402
+from lithology import drawing as LD                                 # noqa: E402
+from lithology import extract as LX  # noqa: E402
 
 ProgressFn = Callable[[dict], None]
 

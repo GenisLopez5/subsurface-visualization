@@ -182,7 +182,8 @@ async function viewNew() {
         <p class="small muted">Ground truth = a <code>&lt;image name&gt;.csv</code> in <code id="defLabels">cv_approach_1/labels</code> (columns top_depth, bottom_depth, lithology, top_y, bottom_y). Add more CSVs there to evaluate more images.</p>
       </div>
       <div class="card"><h2>2 · Methods to compare</h2>
-        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid_v2" checked> <b>hybrid_v2</b>&nbsp;<span class="muted small">revised hybrid: colour mode, blank fix (default)</span></label>
+        <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="hybrid" checked> <b>hybrid</b>&nbsp;<span class="muted small">cv segmentation + naming, OCR fallbacks</span></label>
         <label class="check" style="display:flex;margin-bottom:6px"><input type="checkbox" data-method="lithology" checked> <b>lithology</b>&nbsp;<span class="muted small">Pau's lithology/ package only</span></label>
         <label class="check" style="display:flex;margin-bottom:12px"><input type="checkbox" data-method="cv" checked> <b>cv</b>&nbsp;<span class="muted small">clustering only</span></label>
         <div class="row"><button class="primary big" id="evalBtn" disabled>▶ Start evaluation</button></div>
@@ -501,7 +502,8 @@ async function tabSetup(id, st) {
       <div class="card"><h2>Logs in this run (${(m.selected || []).length})</h2><div class="scroll-y small mono">${(m.selected || []).map(esc).join("<br>")}</div></div></div>`;
     return;
   }
-  S.sel = null;
+  S.sel = new Set();
+  S.seen = new Set();                                   // images already shown as valid (so a manual untick sticks)
   S.cfgValues = Object.fromEntries(cfg.fields.map((f) => [f.name, f.default]));
   Object.assign(S.cfgValues, m.config_overrides || {});
   body.innerHTML = `
@@ -516,8 +518,10 @@ async function tabSetup(id, st) {
     </div>
     <div id="uploads" class="hidden"><div class="row" style="margin-top:12px"><strong class="small">Uploading</strong><span class="small muted" id="upTotal"></span></div>
       <div class="progress" style="margin:6px 0"><div id="upBar" style="width:0%"></div></div><div class="upload-list" id="upList"></div></div>
+    <div id="fileList"></div>
   </div>
-  <div class="card"><div class="card-head"><h2>Pre-flight check</h2><span id="pfSummary" class="small muted"></span><div class="spacer"></div>
+  <div class="card"><div class="card-head"><h2>Pre-flight check</h2><span id="pfSummary" class="small muted"></span>
+    <span class="small muted" style="flex-basis:100%;margin-top:-6px">One row per image found: are its image, annotation (.json) and optional ground truth there and valid? Ticked images are processed (all valid ones by default).</span><div class="spacer"></div>
     <button id="selAll">Select all</button><button id="selNone">Select none</button></div><div id="pf"></div></div>
   <div class="card"><div class="card-head"><h2>Settings</h2><span class="small muted" id="cfgSummary"></span><div class="spacer"></div>
     <select id="presetSel" title="Load a preset"></select><button id="savePreset">Save as preset</button><button id="resetCfg">Reset to defaults</button></div>
@@ -540,17 +544,46 @@ async function tabSetup(id, st) {
     } catch (e) { fail(e); }
   };
   $("#selAll").onclick = () => { S.sel = new Set(S.pf.rows.filter((r) => r.ok).map((r) => r.stem)); renderPreflight(id, S.pf); };
-  $("#selNone").onclick = () => { S.sel = new Set(); renderPreflight(id, S.pf); };
+  $("#selNone").onclick = () => { S.sel = new Set(); S.pf.rows.forEach((r) => S.seen.add(r.stem)); renderPreflight(id, S.pf); };
   renderConfigForm(cfg);
   $("#startBtn").onclick = () => startRun(id, cfg);
   renderPreflight(id, await api(`/api/runs/${id}/preflight`));
   if (S.pendingUpload) { const f = S.pendingUpload; S.pendingUpload = null; uploadFiles(id, f); }
 }
 
+async function removeFile(id, name, el) {
+  try {
+    const pf = await api(`/api/runs/${id}/data/${enc(name)}`, { method: "DELETE" });
+    if (el) el.remove();
+    toast(`Removed ${name}`);
+    renderPreflight(id, pf);
+  } catch (e) { fail(e); }
+}
+
+function renderFileList(id, pf) {
+  const box = $("#fileList");
+  if (!box) return;
+  const mism = new Set((pf.mismatches || []).flatMap((m) => [m.json, ...m.images]));
+  const files = [];
+  for (const r of pf.rows) {
+    files.push({ name: r.json, kind: "annotation", ok: r.ok && !mism.has(r.json) });
+    if (r.image) files.push({ name: r.image.name, kind: "image", ok: r.ok && !mism.has(r.image.name) });
+    if (r.labels) files.push({ name: r.labels.name, kind: "ground truth", ok: r.labels.ok });
+  }
+  for (const u of pf.unmatched) if (!files.some((f) => f.name === u.name)) files.push({ name: u.name, kind: /\.json$/i.test(u.name) ? "annotation" : /\.csv$/i.test(u.name) ? "ground truth" : "image", ok: false, why: u.problem });
+  box.innerHTML = files.length ? `<div class="row" style="margin-top:14px"><strong class="small">Files in this run (${files.length})</strong><span class="small muted">✕ removes a file (e.g. the one whose name does not match)</span></div>
+    <div class="file-list">${files.map((f) => `<div class="file-item ${f.ok ? "" : "bad"}">
+      <span class="${f.ok ? "yes" : "no"}" title="${f.ok ? "matched" : esc(f.why || "not matched / not usable")}">${f.ok ? "✓" : "⚠"}</span>
+      <span class="ellipsis mono small" title="${esc(f.name)}">${esc(f.name)}</span><span class="badge">${esc(f.kind)}</span>
+      <button class="icon-btn" data-rmfile="${esc(f.name)}" title="Remove ${esc(f.name)} from this run" aria-label="Remove ${esc(f.name)}">✕</button></div>`).join("")}</div>` : "";
+  $$("[data-rmfile]", box).forEach((b) => (b.onclick = () => removeFile(id, b.dataset.rmfile)));
+}
+
 function renderPreflight(id, pf) {
   S.pf = pf;
+  renderFileList(id, pf);
   const ok = pf.rows.filter((r) => r.ok);
-  if (!S.sel) S.sel = new Set(ok.map((r) => r.stem));
+  for (const r of ok) if (!S.seen.has(r.stem)) { S.seen.add(r.stem); S.sel.add(r.stem); }   // new valid image: ticked by default
   for (const s of [...S.sel]) if (!ok.some((r) => r.stem === s)) S.sel.delete(s);
   const nLab = pf.rows.filter((r) => r.labels && r.labels.ok).length;
   $("#pfSummary").innerHTML = pf.rows.length ? `${ok.length} ready · ${pf.rows.length - ok.length} with errors · ${nLab} with labels` : "";
@@ -568,6 +601,9 @@ function renderPreflight(id, pf) {
       <td class="small">${r.errors.map((e) => `<div class="no">${esc(e)}</div>`).join("")}${r.warnings.map((w) => `<div style="color:var(--warn)">${esc(w)}</div>`).join("")}</td>
       <td><button class="icon-btn" data-rm="${esc(r.stem)}" title="Remove this log from the run">×</button></td></tr>`).join("")}
     </tbody></table></div>
+    ${(pf.mismatches || []).length ? `<div class="notice err" style="margin-top:12px" role="alert"><strong>⛔ File names do not match: the run cannot start.</strong>
+      <div class="small" style="margin:4px 0 6px">Each <code>.json</code> annotation must have exactly the same name as its image, e.g. <code>Callaway.tif</code> + <code>Callaway.json</code>. Rename the file(s) and upload them again, or remove them.</div>
+      ${pf.mismatches.map((m) => `<div class="small">• ${esc(m.message)} <a href="#" data-rmf="${esc(m.json)}">remove ${esc(m.json)}</a></div>`).join("")}</div>` : ""}
     ${pf.unmatched.length ? `<div class="notice warn" style="margin-top:12px"><strong>Not used (${pf.unmatched.length}):</strong>
       ${pf.unmatched.map((u) => `<div class="small"><span class="mono">${esc(u.name)}</span>: ${esc(u.problem)} <a href="#" data-rmf="${esc(u.name)}">remove</a></div>`).join("")}</div>` : ""}`;
   $$("[data-sel]").forEach((c) => (c.onchange = () => { c.checked ? S.sel.add(c.dataset.sel) : S.sel.delete(c.dataset.sel); updateStartInfo(); }));
@@ -585,7 +621,9 @@ function uploadFiles(id, files) {
   const items = files.map((f) => {
     const el = document.createElement("div");
     el.className = "upload-item";
-    el.innerHTML = `<span class="ellipsis" title="${esc(f.name)}">${esc(f.name)}</span><span class="num small muted">${fmtNum(f.size / 1e6, 1)} MB</span><div class="progress"><div style="width:0%"></div></div>`;
+    el.innerHTML = `<span class="ellipsis" title="${esc(f.name)}">${esc(f.name)}</span><span class="num small muted">${fmtNum(f.size / 1e6, 1)} MB</span><div class="progress"><div style="width:0%"></div></div>
+      <button class="icon-btn rm-file" title="Remove ${esc(f.name)} from this run" aria-label="Remove ${esc(f.name)}" disabled>✕</button>`;
+    $(".rm-file", el).onclick = () => removeFile(id, f.name, el);
     list.prepend(el);
     return el;
   });
@@ -606,7 +644,7 @@ function uploadFiles(id, files) {
       else {
         $(".progress > div", el).style.width = "100%";
         if (r.rejected.length) { el.querySelector(".progress").classList.add("failed"); toast(`${f.name}: ${r.rejected[0].error}`, true); }
-        else el.querySelector(".progress").classList.add("done");
+        else { el.querySelector(".progress").classList.add("done"); $(".rm-file", el).disabled = false; }
         renderPreflight(id, r.preflight);
       }
       doneBytes += f.size; i++; next();
@@ -686,6 +724,12 @@ function updateStartInfo() {
   const n = S.sel ? S.sel.size : 0, c = Object.keys(overrides(S.cfg)).length;
   const lab = S.pf.rows.filter((r) => S.sel && S.sel.has(r.stem) && r.labels && r.labels.ok).length;
   const busy = S.health && S.health.busy;
+  const mism = (S.pf.mismatches || []).length;
+  if (mism) {
+    $("#startInfo").innerHTML = `<span class="no">⛔ Fix the file names first: ${mism} annotation(s) do not have the same name as their image.</span>`;
+    $("#startBtn").disabled = true;
+    return;
+  }
   $("#startInfo").innerHTML = n ? `<strong>${n}</strong> log(s) selected${lab ? ` (${lab} with labels → accuracy)` : ""} · ${c ? `<strong>${c}</strong> changed setting(s)` : "default settings"}${busy ? ` · <span style="color:var(--warn)">another run is in progress: this one will be queued</span>` : ""}`
     : `<span class="muted">Select at least one valid log.</span>`;
   $("#startBtn").disabled = !n;
@@ -1129,7 +1173,8 @@ async function viewLog(id, stem) {
     <div class="row">
       <button id="prevBtn" ${prev ? "" : "disabled"} title="Previous log (←)">← Prev</button><button id="nextBtn" ${next ? "" : "disabled"} title="Next log (→)">Next →</button>
       ${d.files.annotated_tif ? `<a class="btn" href="/api/runs/${id}/files/outputs/${enc(d.files.annotated_tif)}?download=true" title="High-resolution result in the challenge notebook's style">⬇ Annotated TIF</a>` : ""}
-      ${d.files.csv ? `<a class="btn primary" href="/api/runs/${id}/files/outputs/${enc(d.files.csv)}?download=true">⬇ CSV</a>` : ""}
+      ${d.files.csv ? `<a class="btn primary" href="/api/runs/${id}/files/outputs/${enc(d.files.csv)}?download=true">⬇ CSV</a>
+        <a class="btn primary" id="outputBtn" href="/api/runs/${id}/logs/${enc(stem)}/output" title="Zip with the CSV and the annotated image (.tif)">⬇ Output</a>` : ""}
     </div></div>
   ${d.error ? `<div class="notice err"><strong>This log failed:</strong> ${esc(d.error)}</div>` : ""}
   ${!r && !d.error ? `<div class="notice">Details (clusters, legend, depth, timings) appear when the whole run has finished; intervals come from the CSV.</div>` : ""}
@@ -1149,6 +1194,7 @@ async function viewLog(id, stem) {
   </div>`);
 
   const go = (s) => s && (location.hash = `#/run/${id}/log/${enc(s)}`);
+  if ($("#outputBtn") && !d.files.annotated_tif) $("#outputBtn").onclick = () => toast("Preparing the annotated TIFF (first time only, a few seconds)…");
   $("#prevBtn").onclick = () => go(prev);
   $("#nextBtn").onclick = () => go(next);
   const key = (e) => {
@@ -1226,7 +1272,8 @@ async function viewLog(id, stem) {
       <dl class="kv" style="margin-top:12px"><dt>${r.method === "lithology" ? "Lithologies found" : "k (clusters)"}</dt><dd>${r.k}</dd>${r.silhouette != null ? `<dt>Silhouette</dt><dd>${fmtNum(r.silhouette, 3)}</dd>` : ""}<dt>Transition clusters removed</dt><dd>${(r.transition_clusters_removed || []).length ? r.transition_clusters_removed.join(", ") : "none"}</dd></dl>`,
     legend: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       ${r.swatches.length ? "" : `<div class="notice warn"><strong>No legend swatches found.</strong> Every cluster is named "Unknown". The swatch finder expects same-size framed squares with a readable name below or to the right.</div>`}
-      ${d.files.legend_png ? `<img class="legend-img zoomable" data-big="${file(d.files.legend_png)}" data-title="Detected legend swatches" src="${file(d.files.legend_png)}" alt="Detected legend swatches" title="Click to enlarge">` : ""}
+      ${d.files.legend_png ? `<img class="legend-img zoomable" data-big="${file(d.files.legend_png)}" data-title="Detected legend swatches" src="${file(d.files.legend_png)}" alt="Detected legend swatches" title="Click to enlarge">
+        <div class="row" style="margin-top:8px"><button id="cmpLegend" title="Detected legend (left) next to the legend printed on the scan (right)">⇆ Compare with original</button></div>` : ""}
       ${r.swatches.length ? `<table class="data" style="margin-top:10px"><thead><tr><th>Swatch name (OCR)</th><th>Looks like</th></tr></thead><tbody>
         ${r.swatches.map((w) => `<tr><td>${esc(w.name)}${w.ignored ? ` <span class="muted small">(ignored: ${esc(w.ignored)})</span>` : ""}</td><td class="${w.look_alikes.length ? "no" : "muted"}">${esc(w.look_alikes.join(", ") || "–")}</td></tr>`).join("")}</tbody></table>` : ""}`,
     depth: () => !r ? `<div class="muted">Available when the run has finished.</div>` : !r.depth ? `<div class="notice warn"><strong>No depth found.</strong> OCR could not read at least two consistent depth labels, so depths are empty.</div>` : `
@@ -1244,7 +1291,7 @@ async function viewLog(id, stem) {
     },
     info: () => !r ? `<div class="muted">Available when the run has finished.</div>` : `
       <dl class="kv"><dt>Colour scan</dt><dd>${r.colour_scan ? "yes (fill colour used)" : "no"}</dd>
-        <dt>Method</dt><dd>${esc(r.method || "cv")}${r.legend_method ? ` · legend: ${esc(r.legend_method)}` : ""}</dd>
+        <dt>Method</dt><dd>${esc(r.method || "cv")}${r.segmentation ? ` · segmentation: ${esc(r.segmentation)}` : ""}</dd>${r.legend_method ? `<dt>Legend source</dt><dd class="small">${esc(r.legend_method)}</dd>` : ""}
         ${r.scale ? `<dt>Pattern period P</dt><dd>${fmtNum(r.scale.period, 1)} px ${r.scale.measured ? "(measured)" : '<span class="no">(not measured: default used)</span>'}</dd>
         <dt>Window / stride</dt><dd>${r.scale.window} / ${r.scale.stride} px</dd><dt>Min bed</dt><dd>${r.scale.min_bed} px</dd>
         <dt>Refine radius / window</dt><dd>${r.scale.refine_radius} / ${r.scale.refine_window} px</dd><dt>Stroke / diagonal kernel</dt><dd>${r.scale.stroke} / ${r.scale.diag} px</dd>`
@@ -1264,6 +1311,9 @@ async function viewLog(id, stem) {
   };
   const renderSide = () => {
     $("#sideBody").innerHTML = side[tab]();
+    if ($("#cmpLegend")) $("#cmpLegend").onclick = () => openViewer([
+      { src: file(d.files.legend_png), title: "Detected (what the pipeline found and read)" },
+      { src: `/api/runs/${id}/original-legend/${enc(stem)}`, title: "Original (printed on the scan)" }], `Legend: ${stem}`);
     $$("#ivTable tr[data-i]").forEach((tr) => (tr.onclick = () => showInterval(Number(tr.dataset.i))));
     if (selected >= 0) highlightRow(selected);
   };
@@ -1289,18 +1339,21 @@ route();
 // ---------------------------------------------------------------------------------------------------------------------
 // Lightbox: click any .zoomable image to see it big (click = fit / actual size, Esc or ✕ closes)
 // ---------------------------------------------------------------------------------------------------------------------
-function openLightbox(src, title) {
+function openLightbox(src, title) { openViewer([{ src, title }], title); }
+function openViewer(panels, title) {
+  /* Full-screen viewer with one image, or several side by side (e.g. detected vs original legend). */
   closeLightbox();
   const box = document.createElement("div");
   box.id = "lightbox";
-  box.innerHTML = `<div class="lb-bar"><span class="lb-title">${esc(title || "")}</span><span class="small lb-hint">click the image: fit ↔ actual size · Esc to close</span>
-    <a class="btn" href="${esc(src)}" target="_blank" rel="noopener">Open in new tab ↗</a><button class="btn" id="lbClose" aria-label="Close">✕</button></div>
-    <div class="lb-body"><img src="${esc(src)}" alt="${esc(title || "")}" class="fit"></div>`;
+  const one = panels.length === 1;
+  box.innerHTML = `<div class="lb-bar"><span class="lb-title">${esc(title || "")}</span><span class="small lb-hint">click an image: fit ↔ actual size · Esc to close</span>
+    ${one ? `<a class="btn" href="${esc(panels[0].src)}" target="_blank" rel="noopener">Open in new tab ↗</a>` : ""}<button class="btn" id="lbClose" aria-label="Close">✕</button></div>
+    <div class="lb-panels">${panels.map((p) => `<div class="lb-panel">${one ? "" : `<div class="lb-cap"><span>${esc(p.title || "")}</span><a href="${esc(p.src)}" target="_blank" rel="noopener">open ↗</a></div>`}
+      <div class="lb-body"><img src="${esc(p.src)}" alt="${esc(p.title || "")}" class="fit"></div></div>`).join("")}</div>`;
   document.body.appendChild(box);
   document.body.style.overflow = "hidden";
-  const img = $("img", box);
-  img.onclick = (e) => { e.stopPropagation(); img.classList.toggle("fit"); };
-  $(".lb-body", box).onclick = (e) => { if (e.target === e.currentTarget) closeLightbox(); };
+  $$("img", box).forEach((img) => (img.onclick = (e) => { e.stopPropagation(); img.classList.toggle("fit"); }));
+  $$(".lb-body", box).forEach((b) => (b.onclick = (e) => { if (e.target === e.currentTarget) closeLightbox(); }));
   $("#lbClose").onclick = closeLightbox;
 }
 function closeLightbox() { const b = $("#lightbox"); if (b) { b.remove(); document.body.style.overflow = ""; } }
