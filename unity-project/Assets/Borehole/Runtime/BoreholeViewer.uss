@@ -105,3 +105,7 @@ Button:hover { background-color: #e9ddff; }
 .header .filename { overflow: hidden; text-overflow: ellipsis; }
 
 .document-legends.legends-expanded { width: 720px; }
+
+.subsurface-wordmark { color: #78ff00; -unity-font-style: bold; font-size: 12px; letter-spacing: 1px; flex-shrink: 0; margin-right: 12px; }
+.header { flex-wrap: wrap; height: auto; min-height: 36px; }
+.header .source { flex-shrink: 1; }

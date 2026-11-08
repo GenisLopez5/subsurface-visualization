@@ -2,6 +2,7 @@
   <ui:Style src="BoreholeViewer.uss" />
   <ui:VisualElement class="app">
     <ui:VisualElement class="header">
+      <ui:Label text="SUBSURFACE" name="subsurfaceBrand" class="subsurface-wordmark" tooltip="Subsurface · geological document explorer" />
       <ui:VisualElement class="source"><ui:Label name="filename" class="filename" /><ui:Label name="range" class="source-range" /></ui:VisualElement>
     </ui:VisualElement>
     <ui:Label name="error" class="error hidden" />
