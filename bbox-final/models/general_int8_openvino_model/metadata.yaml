@@ -1,0 +1,24 @@
+description: Ultralytics YOLO11s model trained on /content/subsurface-bboxes/artifacts/dataset/dataset.yaml
+author: Ultralytics
+date: '2026-11-07T23:53:42.392574'
+version: 8.3.228
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 1536
+- 1536
+names:
+  0: depth_column
+  1: interpreted_lithology_column
+  2: lithology_legend
+args:
+  batch: 1
+  fraction: 1.0
+  half: false
+  int8: true
+  dynamic: false
+  nms: false
+channels: 3
