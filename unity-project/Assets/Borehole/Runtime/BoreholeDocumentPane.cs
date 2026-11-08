@@ -17,16 +17,24 @@ namespace Subsurface.Borehole
             tiles.Tick();
             if(!string.IsNullOrEmpty(tiles.Error)){notice.text="Full-resolution detail unavailable: "+tiles.Error;notice.RemoveFromClassList("hidden");}
         }
+        Vector2 pressPosition;bool pointerMoved;float imageLeft,imageTop,imageWidth;int hovered=-1;
+        public int IntervalAt(Vector2 position)
+        {
+            if(!IsSynchronized||scale<=0||position.x<imageLeft||position.x>imageLeft+imageWidth)return -1;
+            return BoreholeImageMap.IntervalAtPixel(viewer.column.Document,(position.y-imageTop)/scale,viewer.PixelDisplacement);
+        }
+        void Hover(Vector2 position){hovered=IntervalAt(position);viewport.tooltip=hovered>=0?"Select "+viewer.column.Document.Intervals[hovered].Lithology+" · click or press Enter":IsSynchronized?"No mapped interval here":"Selection unavailable: document synchronization is unlinked";viewport.EnableInClassList("mapped-region-hover",hovered>=0);}
         public bool AtHeader=>IsSynchronized&&center<map.FirstPixel;
         public BoreholeDocumentPane(BoreholeViewer viewer,VisualElement root)
         {
             this.viewer=viewer;viewport=root.Q("documentViewport");window=root.Q("documentWindow");selection=root.Q("documentSelection");placeholder=root.Q("documentPlaceholder");image=root.Q<Image>("documentImage");state=root.Q<Label>("syncState");notice=root.Q<Label>("documentNotice");readout=root.Q<Label>("pixelReadout");image.scaleMode=ScaleMode.StretchToFill;
+            viewport.focusable=true;viewport.tooltip="Document regions: use Up/Down to browse mapped intervals, Enter to select.";viewport.RegisterCallback<KeyDownEvent>(e=>{if(!IsSynchronized)return;if(e.keyCode==KeyCode.UpArrow||e.keyCode==KeyCode.DownArrow){var rows=viewer.column.Document.Intervals;int direction=e.keyCode==KeyCode.UpArrow?-1:1;int start=hovered>=0?hovered:viewer.column.SelectedIndex;for(int i=start+direction;i>=0&&i<rows.Count;i+=direction)if(!rows[i].IsGap&&rows[i].HasImageCoordinates){hovered=i;viewport.tooltip="Press Enter to select "+rows[i].Lithology;break;}e.StopPropagation();}else if(e.keyCode==KeyCode.Return&&hovered>=0){viewer.SelectInterval(hovered,true);e.StopPropagation();}});viewport.RegisterCallback<PointerLeaveEvent>(_=>{viewport.RemoveFromClassList("mapped-region-hover");});
             tiles=new BoreholeDocumentTiles(root.Q("documentTiles"));
             viewport.RegisterCallback<GeometryChangedEvent>(_=>Refresh());
             viewport.RegisterCallback<WheelEvent>(e=>{if(e.ctrlKey)viewer.Zoom(Math.Pow(1.12,e.delta.y));else Pan(e.delta.y*20);e.StopPropagation();});
-            viewport.RegisterCallback<PointerDownEvent>(e=>{if(e.button!=0)return;dragging=true;pointer=e.pointerId;previousY=e.localPosition.y;viewport.CapturePointer(pointer);});
-            viewport.RegisterCallback<PointerMoveEvent>(e=>{if(!dragging||pointer!=e.pointerId)return;float y=e.localPosition.y;Pan(previousY-y);previousY=y;});
-            viewport.RegisterCallback<PointerUpEvent>(e=>{if(e.pointerId!=pointer)return;dragging=false;viewport.ReleasePointer(pointer);});viewport.RegisterCallback<PointerCaptureOutEvent>(_=>dragging=false);
+            viewport.RegisterCallback<PointerDownEvent>(e=>{if(e.button!=0)return;dragging=true;pointer=e.pointerId;previousY=e.localPosition.y;pressPosition=e.localPosition;pointerMoved=false;viewport.CapturePointer(pointer);});
+            viewport.RegisterCallback<PointerMoveEvent>(e=>{Hover(e.localPosition);if(!dragging||pointer!=e.pointerId)return;if(((Vector2)e.localPosition-pressPosition).sqrMagnitude>25)pointerMoved=true;if(!pointerMoved)return;float y=e.localPosition.y;Pan(previousY-y);previousY=y;});
+            viewport.RegisterCallback<PointerUpEvent>(e=>{if(!dragging||e.pointerId!=pointer)return;dragging=false;viewport.ReleasePointer(pointer);if(!pointerMoved){int index=IntervalAt(e.localPosition);if(index>=0)viewer.SelectInterval(index,true);}});viewport.RegisterCallback<PointerCaptureOutEvent>(_=>dragging=false);
         }
         public void Bind(BoreholeDocument data,Texture2D page,int width,int height)
         {
@@ -56,6 +64,7 @@ namespace Subsurface.Borehole
             if(IsSynchronized&&!AtHeader){double span=map.ToPixel(viewer.VisibleBottomFeet)-map.ToPixel(viewer.VisibleTopFeet);if(span>0)scale=Mathf.Min(scale,(float)(height/span));}
             float drawnWidth=originalWidth*scale,drawnHeight=originalHeight*scale,left=(width-drawnWidth)*.5f;
             float offset=drawnHeight<=height?(height-drawnHeight)*.5f:Mathf.Clamp(height*.5f-(float)center*scale,height-drawnHeight,0);
+            imageLeft=left;imageTop=offset;imageWidth=drawnWidth;
             image.style.left=left;image.style.top=offset;image.style.width=drawnWidth;image.style.height=drawnHeight;
             tiles.SetView(viewer.FullResolutionDocumentPath,originalWidth,originalHeight,left,offset,scale,width,height);
             readout.tooltip="Source image resolution · detail tiles load as you navigate";

@@ -105,3 +105,5 @@ Button:hover { background-color: #e9ddff; }
 .header .filename { overflow: hidden; text-overflow: ellipsis; }
 
 .document-legends.legends-expanded { width: 720px; }
+
+.document-viewport.mapped-region-hover { border-left-width: 2px; border-left-color: #78ff00; }

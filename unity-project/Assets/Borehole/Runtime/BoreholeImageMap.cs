@@ -6,6 +6,13 @@ namespace Subsurface.Borehole
     /// <summary>Piecewise interpolation of original, top-origin document pixels. Never extrapolates.</summary>
     public sealed class BoreholeImageMap
     {
+        public static int IntervalAtPixel(BoreholeDocument data,double resultPixel,double displacement)
+        {
+            if(data==null||!BoreholeCsv.Finite(resultPixel)||!BoreholeCsv.Finite(displacement))return -1;
+            double pixel=resultPixel-displacement;
+            for(int i=0;i<data.Intervals.Count;i++){var row=data.Intervals[i];if(!row.IsGap&&row.HasImageCoordinates&&pixel>=row.TopPixel&&pixel<row.BottomPixel)return i;}
+            return -1;
+        }
         readonly List<double> depths=new List<double>(),pixels=new List<double>();
         public double FirstPixel=>pixels[0];
         public double LastPixel=>pixels[pixels.Count-1];

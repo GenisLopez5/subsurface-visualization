@@ -12,6 +12,16 @@ namespace Subsurface.Borehole.Tests
             var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,cluster_id\n20,30,Sandstone,alpha\n0,10,Shale,beta");
             Assert.That(data.Headers[3],Is.EqualTo("cluster_id"));Assert.That(data.SourceRows[0].TopFeet,Is.EqualTo(20));Assert.That(data.SourceRows[0].SourceValues[3],Is.EqualTo("alpha"));Assert.That(data.Intervals[0].TopFeet,Is.EqualTo(0));
         }
+        [Test]public void DocumentHitTestingRespectsGapsEdgesAndLegendOffset()
+        {
+            var data=BoreholeCsv.Parse("top_depth,bottom_depth,lithology,top_y,bottom_y\n20,30,Sandstone,400,600\n0,10,Shale,100,200");
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,172,72),Is.EqualTo(0));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,271.9,72),Is.EqualTo(0));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,272,72),Is.EqualTo(-1));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,522,72),Is.EqualTo(2));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,10,72),Is.EqualTo(-1));
+            Assert.That(BoreholeImageMap.IntervalAtPixel(data,double.NaN,72),Is.EqualTo(-1));
+        }
         const string Header="top_depth,bottom_depth,lithology,top_y,bottom_y\n";
         [Test]public void LegendDisplacementShiftsBothDirectionsWithoutChangingCsvOrScale()
         {
