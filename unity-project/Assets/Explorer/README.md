@@ -1,5 +1,9 @@
 # Document explorer
 
+Player rendering dependencies are included through `Assets/Borehole/Resources/BoreholeRenderAssets.asset` and its material references. The build preprocessor prepares and validates these assets. Runtime terrain construction does not rely on finding unreferenced shaders, which Unity can strip from standalone builds. A fresh build is required after this fix.
+
+Development Players accept `-borehole-smoke-test` to check terrain, skybox, lithology materials, the render target, and zoom. They log `BOREHOLE_PLAYER_PASS` or `BOREHOLE_PLAYER_FAIL` and exit; this check is absent from release builds.
+
 Open `DocumentExplorer.unity`, or use Tools > Lithology > Open Document Explorer.
 It is the first scene in Build Settings and includes the existing visualizer.
 

@@ -38,7 +38,7 @@ namespace Subsurface.Borehole
                 surface.rawLabel=interval.IsGap?"Not Available":interval.Lithology;surface.Apply();Surfaces.Add(surface);
                 var definition=catalog.Resolve(surface.rawLabel).definition;var recipe=LithologyRecipeCompiler.Compile(catalog,definition);IdentifierColors.Add(interval.IsGap?new Color(.47f,.56f,.63f):recipe.legendColor);
             }
-            Shader unlit=highlightShader!=null?highlightShader:Shader.Find("Universal Render Pipeline/Unlit");
+            Shader unlit=highlightShader!=null?highlightShader:BoreholeRenderAssets.Load().selectionShader;
             if(unlit!=null){highlightMaterial=new Material(unlit){name="Borehole selection",hideFlags=HideFlags.HideAndDontSave};highlightMaterial.SetColor("_BaseColor",new Color(.47f,1,0));topHighlight=Ring("Selection top");bottomHighlight=Ring("Selection bottom");}
             SelectedIndex=-1;
         }

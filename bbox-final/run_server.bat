@@ -19,6 +19,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 REM NVIDIA GPU: swap the CPU-only torch for the CUDA build (once; models-pt\ needs the .pt weights)
+if /i "%BBOX_DEVICE%"=="cpu" goto :serve
 where nvidia-smi >nul 2>nul && (
     ".venv\Scripts\python.exe" -c "import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)" 2>nul || (
         echo NVIDIA GPU found: installing CUDA PyTorch ^(one time, a few minutes^)...
@@ -27,6 +28,7 @@ where nvidia-smi >nul 2>nul && (
     )
 )
 
+:serve
 echo.
 echo Bounding-box service on port %PORT%. Test from the app machine:
 echo     curl http://100.110.83.73:%PORT%/health

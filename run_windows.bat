@@ -15,6 +15,8 @@ if "%APP_PORT%"=="" set APP_PORT=8000
 if "%BBOX_PORT%"=="" set BBOX_PORT=8100
 REM Windows' default file encoding is not UTF-8; the code expects it
 set PYTHONUTF8=1
+REM Use CPU on this machine unless explicitly overridden before launching.
+if "%BBOX_DEVICE%"=="" set "BBOX_DEVICE=cpu"
 
 REM ---- 1. bounding-box service, in its own window (run_server.bat sets up its venv + CUDA torch itself)
 set "PORT=%BBOX_PORT%"
@@ -29,7 +31,13 @@ if not exist ".venv\Scripts\python.exe" (
         echo Could not create the venv. Install Python 3.12+ from python.org ^(tick "Add python.exe to PATH"^).
         pause & exit /b 1
     )
-    ".venv\Scripts\python.exe" -m pip install --upgrade pip
+)
+
+REM Repair interrupted installs too: an existing venv may still lack server dependencies.
+".venv\Scripts\python.exe" -c "import numpy, PIL, scipy, rapidocr, onnxruntime, pypdfium2, fastapi, uvicorn, multipart, psycopg, psycopg_pool, dotenv" 2>nul
+if errorlevel 1 (
+    echo Installing missing main-server dependencies...
+    ".venv\Scripts\python.exe" -m pip install --upgrade pip || goto :fail
     ".venv\Scripts\python.exe" -m pip install -r requirements.txt || ".venv\Scripts\python.exe" -m pip install -e . || goto :fail
 )
 
@@ -58,7 +66,6 @@ pause
 exit /b 0
 
 :fail
-echo Installing the dependencies failed. Delete the .venv folder and run this again.
-rmdir /s /q .venv
+echo Installing the dependencies failed. Check the pip error above and run this again.
 pause
 exit /b 1
