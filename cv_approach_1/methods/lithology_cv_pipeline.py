@@ -6,8 +6,12 @@ lithology_cv = hybrid_v3 + Pau's grid legend reader (lithology/legend_grid.py), 
 What it keeps from hybrid_v3 (hybrid_v3.py / hybrid_v2.py):
     column      ink masks, pattern period, grid-line removal, texture features, colour mode (Lab fill colour per
                 row against legend colour groups), blank fix, transition guard, boundary refinement
-    depth       Tesseract in 3000-row strips with an orientation probe, Pau's robust fit (RANSAC + MAD refit +
-                piecewise), RapidOCR fallback; read in a background thread while the column is analysed
+
+Depth: Pau's code as it is, lithology/extract.calibrate_depth with his defaults (read_depth_pau): RapidOCR on the
+depth column in 1600-row chunks (up to 40, evenly spaced), orientation chosen on 3 probe chunks (0/90/270 deg), then
+RANSAC over label pairs, a MAD refit, and a piecewise-linear model when one line leaves rms > 3 px. It runs in a
+background thread while the column is analysed. Only if it fails (fewer than 2 labels agree) are the depth labels
+read with Tesseract instead (hybrid_v3.read_depth_v3), so a log is never left without depths.
 
 Legend: every reader runs, the best-named result wins (hybrid_v2.name_quality):
     size-groups    Tesseract: boxes of the same size, the text next to them
@@ -136,8 +140,31 @@ def borrow_boxes(grid_sw, other_sw) -> int:
     return n
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Depth
+# ----------------------------------------------------------------------------------------------------------------------
+PAU_DEPTH_CHUNK, PAU_DEPTH_MAX_CHUNKS = 1600, 40                 # lithology/extract.calibrate_depth's own defaults
+
+
+def read_depth_pau(image, box, cfg, ccfg) -> tuple:
+    """Pau's depth calibration (lithology/extract.calibrate_depth), unchanged -> (y -> depth, info, how)."""
+    try:
+        with hy._quiet():
+            f, calib = LX.calibrate_depth(image, box, chunk=PAU_DEPTH_CHUNK, max_chunks=PAU_DEPTH_MAX_CHUNKS)
+    except Exception as e:                                       # noqa: BLE001  e.g. "only 1 depth labels read"
+        y_to_depth, info, how = h3.read_depth_v3(image, box, cfg, ccfg)
+        return y_to_depth, info, [f"Pau's calibrate_depth failed ({e}); Tesseract fallback"] + how
+    labels = calib["labels"]
+    info = dict(a=calib["depth_per_px"], b=calib["intercept"], n_used=calib["n_labels_used"], n_read=len(labels),
+                model=calib["model"], rms_px=round(calib["rms_residual_px"], 2), engine="rapidocr (Pau's calibrate_depth)",
+                points=[dict(y=p["y"], depth=p["depth"], used=p["used"]) for p in labels])
+    how = [f"Pau's calibrate_depth: {info['n_used']} of {info['n_read']} labels used, {calib['model']}, "
+           f"rms {info['rms_px']} px"]
+    return (lambda y: float(f(y))), info, how
+
+
 def process_log_lcv(log, out_dir, cfg, ccfg, colours, on_progress, method_name: str = "lithology_cv") -> dict:
-    return h2.process_log_v2(log, out_dir, cfg, ccfg, colours, on_progress, depth_reader=h3.read_depth_v3,
+    return h2.process_log_v2(log, out_dir, cfg, ccfg, colours, on_progress, depth_reader=read_depth_pau,
                              method_name=method_name, parallel_depth=True, legend_plot=h3.plot_legend_fast,
                              legend_reader=read_legend_lcv)
 
