@@ -457,6 +457,9 @@ function viewHow() {
 
   <details class="group how-more"><summary>📋 Project description: the challenge we are solving</summary><div class="how-body">
     <h3>Viridien challenge: lithology segmentation and clustering</h3>
+    <a class="company" href="https://www.viridiengroup.com/" target="_blank" rel="noopener">
+      <svg viewBox="0 0 1544 1530" width="18" height="18" aria-hidden="true"><path d="M1458 86H365A279 279 0 0 0 86 365V1165A279 279 0 0 0 365 1444H1180A279 279 0 0 0 1458 1165Z"
+        fill="none" stroke="#3cff1a" stroke-width="172"/></svg>https://www.viridiengroup.com/</a>
     <p><b>The problem:</b> Take scanned images of geological well logs and automatically pull out the lithology column as structured data. That means which rock type sits at which depth.</p>
     <p><b>Background</b></p>
     <ul><li>A lithology column is a vertical strip in a well log. It uses colours and patterns (dots, dashes and so on) to show the rock type at each depth: shale, siltstone, sandstone and others.</li>
@@ -479,6 +482,10 @@ function viewHow() {
       <li>In the demo you explain your approach, show results and limitations, and report runtime and resource use.</li>
       <li>They stress <b>correctness and efficiency</b>.</li></ul>
   </div></details>
+
+  <div class="card team"><div><h2>Team</h2><div class="muted small">Project made for the <b>HackTheBurgh 2026</b></div></div>
+    <div class="members">${["Arnau Claramunt", "Genís López", "Jaume López", "Pau Mayench"].map((n) =>
+      `<span class="member"><span class="avatar">${n.split(" ").map((w) => w[0]).join("")}</span>${n}</span>`).join("")}</div></div>
 
   <div class="card"><h2>The idea in one picture</h2>
     <div class="flow">
