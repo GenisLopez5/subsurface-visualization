@@ -40,17 +40,19 @@ def extract_cached(img_path, ann_path, cache_dir: Path, force=False, log=print):
     """Run extract.extract, or reuse the saved result for the same image + annotation.
     Returns (result dict, cache file path)."""
     img_path, ann_path = Path(img_path), Path(ann_path)
+    method = X.legend_method()  # part of the key: switching LITHO_LEGEND_METHOD never reuses old results
     key = hashlib.sha1(
         ann_path.read_bytes() + str(img_path.resolve()).encode() + str(img_path.stat().st_size).encode()
+        + method.encode()
     ).hexdigest()[:12]
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache = cache_dir / f"{img_path.stem}.{key}.json"
     if cache.exists() and not force:
         log(f"cached: {cache.name}")
         return json.loads(cache.read_text()), cache
-    log("extracting")
+    log(f"extracting (legend method: {method})")
     with contextlib.redirect_stderr(LogTee(log)):
-        result = X.extract(str(img_path), str(ann_path), verbose=True)
+        result = X.extract(str(img_path), str(ann_path), verbose=True, legend_method_name=method)
     cache.write_text(json.dumps(result, indent=2))
     return result, cache
 

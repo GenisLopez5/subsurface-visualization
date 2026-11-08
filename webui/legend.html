@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legend Review</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2230;--muted:#6b7280;--line:#e2e5ea;--accent:#2457d6;--accent-soft:#eaf0ff;
+      --err:#b42318;--err-soft:#fdecea;--warn:#9a5b00;--warn-soft:#fff4e0;--ok:#067647;--ok-soft:#e7f6ee}
+@media (prefers-color-scheme:dark){:root{--bg:#13161b;--card:#1c2027;--ink:#e7e9ec;--muted:#9aa3b2;--line:#2d323b;
+      --accent:#7ea4ff;--accent-soft:#1d2a47;--err:#ff8a80;--err-soft:#3a1f1d;--warn:#ffc46b;--warn-soft:#3a2d17;--ok:#6ee7a8;--ok-soft:#173326}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}
+.app{display:grid;grid-template-columns:280px 1fr;height:100vh}
+aside{border-right:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;min-height:0}
+aside .head{padding:14px 14px 8px}aside h1{font-size:16px;margin:0 0 8px}aside h1 a{color:var(--muted);font-size:12px;font-weight:400;margin-left:6px}
+aside input{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+.filters{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.filters button{font-size:12px;padding:2px 8px}
+#logs{overflow:auto;flex:1;padding:4px 0}
+.log{padding:6px 14px;cursor:pointer;font-size:12.5px;word-break:break-all;display:flex;gap:6px;align-items:baseline}
+.log:hover{background:var(--accent-soft)}.log.on{background:var(--accent-soft);font-weight:600}.log.noimg{opacity:.45;cursor:default}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--line)}.dot.good{background:var(--ok)}.dot.problems{background:var(--err)}.dot.partial{background:var(--warn)}
+main{overflow:auto;padding:16px 20px;min-width:0}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.bar .title{font-weight:600;font-size:15px;word-break:break-all;flex:1;min-width:200px}
+button{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);font-weight:600}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.seg{display:inline-flex}.seg button{border-radius:0;margin-left:-1px}.seg button:first-child{border-radius:6px 0 0 6px;margin-left:0}.seg button:last-child{border-radius:0 6px 6px 0}
+.meta{color:var(--muted);font-size:12.5px}.about{font-size:12.5px;color:var(--muted);margin:-4px 0 8px}
+.layers{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0}
+.layers label{display:flex;gap:4px;align-items:center;cursor:pointer}.sw{display:inline-block;width:12px;height:3px}
+.stage{position:relative;border:1px solid var(--line);border-radius:8px;overflow:auto;background:#fff;max-height:62vh}
+.stage .inner{position:relative}
+.stage img{display:block}.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.zoom{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;margin-top:14px}
+@media (max-width:1100px){.cols{grid-template-columns:1fr}.app{grid-template-columns:220px 1fr}}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:500;font-size:12px;position:sticky;top:0;background:var(--bg);z-index:1}
+tr.hl td{background:var(--accent-soft)}tr.ign td{opacity:.6}
+.thumb{border:1px solid var(--line);background-repeat:no-repeat;background-color:#fff}
+.raw{color:var(--muted);font-size:11.5px;font-family:ui-monospace,monospace}
+.verd{display:flex;gap:2px;flex-wrap:wrap}.verd button{font-size:11px;padding:1px 6px;border-radius:4px}
+.verd button.v-ok.on{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.verd button.v-bad.on{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+td input{width:100%;min-width:90px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font:inherit;font-size:12.5px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.panel h3{margin:0 0 6px;font-size:13px}.panel textarea{width:100%;min-height:80px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;font-size:13px;resize:vertical}
+.panel + .panel{margin-top:12px}
+.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--warn-soft);color:var(--warn)}
+.pairs div{font-size:12.5px;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:3px 0}
+.empty{color:var(--muted);padding:40px;text-align:center}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}@keyframes s{to{transform:rotate(1turn)}}
+#saved{font-size:12.5px;color:var(--ok)}
+#cmp{margin-top:14px}#cmp table td{font-size:12.5px}#cmp td.miss{color:var(--muted)}#cmp td.diff{background:var(--warn-soft)}
+#cmp th button{font-size:12px;padding:1px 8px}
+</style></head><body>
+<div class="app">
+<aside>
+  <div class="head"><h1>Legend review<a href="/">extractor</a></h1>
+    <input id="q" placeholder="Filter logs…">
+    <div class="filters" id="filt"><button data-f="all" class="on">all</button><button data-f="todo">not reviewed</button>
+      <button data-f="problems">problems</button><button data-f="good">good</button></div>
+  </div>
+  <div id="logs"></div>
+</aside>
+<main id="main"><div class="empty">Pick a log on the left.</div></main>
+</div>
+<template id="tpl">
+  <div class="bar">
+    <div class="title" id="title"></div>
+    <div class="seg" id="methods"></div>
+    <button id="cmpBtn" title="run every method on this legend and line the results up">Compare all</button>
+    <button id="rerun" title="recompute, ignoring the cache">Recompute</button>
+  </div>
+  <div class="about" id="about"></div>
+  <div class="meta" id="meta"></div>
+  <div class="layers" id="layers"></div>
+  <div class="bar" style="margin:4px 0"><div class="zoom">Zoom <input type="range" id="zoom" min="0.5" max="4" step="0.25" value="1"><span id="zl"></span></div>
+    <span class="meta">Hover a row to see its swatch and text on the image. Click a swatch on the image to jump to its row. Hover a box for details.</span></div>
+  <div class="stage" id="stage"><div class="inner" id="inner"><img id="img" alt="legend crop"><svg id="svg"></svg></div></div>
+  <div id="cmp" hidden></div>
+  <div class="cols">
+    <div>
+      <table><thead><tr><th>#</th><th>swatch</th><th>extracted label</th><th>verdict</th><th>correct label / note</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div>
+      <div class="panel"><h3>Overall <span class="meta" id="forMethod"></span></h3>
+        <div class="seg" id="status"><button data-s="good">all good</button><button data-s="partial">minor issues</button><button data-s="problems">broken</button></div>
+        <h3 style="margin-top:12px">Missing entries <span class="meta">(one per line, as written in the legend)</span></h3>
+        <textarea id="missing" placeholder="e.g. COAL&#10;NO SAMPLE"></textarea>
+        <h3 style="margin-top:10px">What's going wrong</h3>
+        <textarea id="notes" placeholder="e.g. labels in column 3 are shifted one row down; the title 'Rock Types' is read as an entry"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="primary" id="save">Save review</button><span id="saved"></span></div>
+        <div class="meta" style="margin-top:6px">Saved to <code>lithology-data/legend_review/</code>. All reviews: <a href="/api/legend/reviews" target="_blank">/api/legend/reviews</a></div>
+      </div>
+      <div class="panel"><h3>Most similar swatches <span class="meta">(the column classifier may confuse these)</span></h3><div class="pairs" id="pairs"></div></div>
+    </div>
+  </div>
+</template>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const enc=encodeURIComponent;
+let LOGS=[],METHODS=[],cur=null,method=(()=>{try{return localStorage.getItem('lr.method')}catch{return null}})(),data=null,review=null,filter='all',scale=1;
+const VERDICTS=[['ok','ok','v-ok'],['label','wrong label','v-bad'],['swatch','wrong swatch','v-bad'],['merged','merged w/ other','v-bad'],['bogus','not an entry','v-bad']];
+// every overlay a method's debug output can have: [key, label, colour, on by default]
+const ALL_LAYERS=[['words','full-legend OCR','#888',0],['rejected','rejected blobs','#d33',0],['columns','columns','#a6f',1],
+  ['boxes','proximity boxes','#0bb',1],['cuts','xy cuts','#f0a',1],['cells','cells','#0a8',1],['swatches','swatches','#2457d6',1],
+  ['restored','restored / recovered swatches','#e80',1],['pieces','text used for the label','#c0c',0],['unassigned','text not used','#d33',1],
+  ['links','swatch → label','#0a8',1],['unowned','unused swatches','#e80',1]];
+const show=(()=>{try{return JSON.parse(localStorage.getItem('lr.layers')||'{}')}catch{return{}}})();
+const on=k=>show[k]??!!(ALL_LAYERS.find(l=>l[0]===k)||[])[3];
+function store(k,v){try{localStorage.setItem(k,v)}catch{}}
+
+async function loadLogs(){
+  [LOGS,METHODS]=await Promise.all([fetch('/api/legend/logs').then(r=>r.json()),fetch('/api/legend/methods').then(r=>r.json())]);
+  if(!METHODS.some(m=>m.id===method))method=(METHODS.find(m=>m.used_for_extraction)||METHODS[0]).id;renderLogs()}
+function renderLogs(){
+  const q=$('q').value.toLowerCase();
+  $('logs').innerHTML=LOGS.filter(l=>l.name.toLowerCase().includes(q)&&(filter==='all'||(filter==='todo'?!l.review:l.review===filter||(filter==='problems'&&l.review==='partial'))))
+    .map(l=>`<div class="log ${l.image_found?'':'noimg'} ${cur===l.name?'on':''}" data-n="${esc(l.name)}" title="${l.image_found?'':'image not found'}"><span class="dot ${l.review||''}"></span>${esc(l.name)}</div>`).join('');
+}
+$('q').oninput=renderLogs;
+$('filt').onclick=e=>{const b=e.target.closest('button');if(!b)return;filter=b.dataset.f;[...$('filt').children].forEach(x=>x.classList.toggle('on',x===b));renderLogs()};
+$('logs').onclick=e=>{const d=e.target.closest('.log');if(!d||d.classList.contains('noimg'))return;open(d.dataset.n)};
+
+const fetchLegend=(name,m,force)=>fetch(`/api/legend/${enc(name)}?method=${m}${force?'&force=true':''}`).then(r=>r.json());
+async function open(name,force=false){
+  cur=name;renderLogs();history.replaceState(null,'','#'+enc(name));
+  const m=$('main');m.innerHTML='';m.append($('tpl').content.cloneNode(true));
+  $('title').textContent=name;
+  $('methods').innerHTML=METHODS.map(x=>`<button data-m="${x.id}" title="${esc(x.about)}${x.used_for_extraction?' (used for extraction)':''}" class="${x.id===method?'on':''}">${esc(x.name)}${x.used_for_extraction?' ★':''}</button>`).join('');
+  $('methods').onclick=e=>{const b=e.target.closest('button');if(!b)return;method=b.dataset.m;store('lr.method',method);open(cur)};
+  const mi=METHODS.find(x=>x.id===method)||{};
+  $('about').textContent=(mi.about||'')+(mi.used_for_extraction?' · ★ this is the method the extraction uses':' · not used for extraction (★ is; set LITHO_LEGEND_METHOD on the server to change it)');
+  $('rerun').onclick=()=>open(cur,true);
+  $('cmpBtn').onclick=compare;
+  $('meta').innerHTML='<span class="spin"></span>Running OCR on the legend…';
+  const [d,rv]=await Promise.all([fetchLegend(name,method,force),fetch(`/api/legend/${enc(name)}/review`).then(r=>r.json())]);
+  if(cur!==name)return;
+  if(d.error){$('meta').textContent='Error: '+d.error;return}
+  data=d;review=rv||{};
+  const dbg=d.debug;
+  $('meta').innerHTML=`<b>${d.entries.length}</b> entries · ${dbg.words.length} OCR text boxes · ${dbg.swatches.length} swatches`+
+    (dbg.layout?` · labels <b>${dbg.layout}</b> of swatches`:'')+(dbg.columns?` · ${dbg.columns.length} columns`:'')+
+    (dbg.kernel?` · box growth ${dbg.kernel[0]}×${dbg.kernel[1]} px`:'')+(dbg.cuts?` · ${dbg.cuts.length} cuts (${dbg.cuts.filter(c=>c.forced).length} forced)`:'')+
+    ` · crop ${dbg.crop_size[0]}×${dbg.crop_size[1]} px · ${d.seconds}s`+
+    (review.method&&review.method!==method?` · <span class="tag">saved review is for the ${esc(review.method)} method</span>`:'');
+  const have=k=>k==='unowned'?!!dbg.unowned_swatches:k==='links'?!!dbg.links:Array.isArray(dbg[k]);
+  $('layers').innerHTML=ALL_LAYERS.filter(([k])=>have(k)).map(([k,l,c])=>`<label><input type="checkbox" data-k="${k}" ${on(k)?'checked':''}><span class="sw" style="background:${c}"></span>${l}</label>`).join('');
+  $('layers').onchange=e=>{show[e.target.dataset.k]=e.target.checked;store('lr.layers',JSON.stringify(show));draw()};
+  const img=$('img');img.src=`/api/legend/${enc(name)}/crop.png?t=${Date.now()}`;
+  img.onload=()=>{fit();draw()};
+  $('zoom').oninput=()=>fit(+$('zoom').value);
+  $('forMethod').textContent='('+method+' method)';
+  renderRows();renderPairs();renderReview();
+}
+function fit(z){
+  const [W,H]=data.debug.crop_size,st=$('stage');
+  const base=Math.min((st.clientWidth-2)/W,1.0)||1;scale=z?base*z:base;
+  if(!z)$('zoom').value=1;
+  $('zl').textContent=Math.round(scale*100)+'%';
+  $('img').style.width=W*scale+'px';$('img').style.height=H*scale+'px';
+  $('inner').style.width=W*scale+'px';$('inner').style.height=H*scale+'px';
+  renderRows();
+}
+window.addEventListener('resize',()=>data&&$('stage')&&fit(+$('zoom').value||undefined));
+
+function rect(b,c,{dash,w=1.5,fill='none',tip='',op=1}={}){
+  return `<rect x="${b[0]}" y="${b[1]}" width="${Math.max(1,b[2]-b[0])}" height="${Math.max(1,b[3]-b[1])}" fill="${fill}" stroke="${c}"
+    stroke-width="${w}" vector-effect="non-scaling-stroke" ${dash?'stroke-dasharray="4 3"':''} opacity="${op}"><title>${esc(tip)}</title></rect>`}
+const line=(a,b,c,{dash,w=1.5,tip=''}={})=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${dash?'stroke-dasharray="3 2"':''}><title>${esc(tip)}</title></line>`;
+const center=b=>[(b[0]+b[2])/2,(b[1]+b[3])/2];
+function draw(hl=-1){
+  if(!$('svg'))return;
+  const d=data.debug,[W,H]=d.crop_size;let s='';
+  if(on('columns')&&d.columns)for(const c of d.columns)s+=`<rect x="${c.x0}" y="0" width="${c.x1-c.x0}" height="${H}" fill="#a6f" opacity=".08"/>`;
+  if(on('boxes')&&d.boxes)for(const b of d.boxes)s+=rect(b.box,b.status==='ok'?'#0bb':'#d33',{dash:b.status!=='ok',w:1,fill:b.status==='ok'?'rgba(0,187,187,.05)':'rgba(221,51,51,.05)',tip:'box: '+b.status});
+  if(on('rejected')&&d.rejected)for(const r of d.rejected)s+=rect(r.box,'#d33',{dash:1,w:1,tip:'rejected: '+r.why,op:.7});
+  if(on('words'))for(const w of d.words)s+=rect(w.box,'#888',{w:1,tip:'OCR: '+w.text});
+  if(on('cuts')&&d.cuts)for(const c of d.cuts)s+=line([c.line[0],c.line[1]],[c.line[2],c.line[3]],'#f0a',{dash:c.forced,w:1.5,tip:c.forced?'forced cut (no empty line separated the swatches)':'cut along an empty line'});
+  if(method==='old'){
+    const owned=new Set(d.links.map(l=>l.swatch));
+    if(on('swatches'))d.swatches.forEach((b,i)=>{if(owned.has(i))s+=rect(b,'#2457d6',{tip:'swatch '+i})});
+    if(on('unowned'))for(const i of d.unowned_swatches){const cl=(d.claims||[]).find(c=>c.swatch===i);
+      s+=rect(d.swatches[i],'#e80',{dash:1,tip:`unused swatch ${i}`+(cl&&cl.word!=null?` (wanted "${d.words[cl.word].text}" but a closer swatch took it)`:' (no label near it)')})}
+    if(on('links'))for(const l of d.links)s+=line(center(d.swatches[l.swatch]),center(d.words[l.word].box),'#0a8');
+    if(on('links'))for(const o of d.orphans){if(o.joined_to==null){s+=rect(d.words[o.word].box,'#d33',{dash:1,tip:'text not used: '+d.words[o.word].text});continue}
+      s+=line(center(d.words[o.joined_to].box),center(d.words[o.word].box),'#c0c',{dash:1,tip:`continuation joined to "${d.words[o.joined_to].text}"`})}
+  }else{
+    if(on('cells')&&d.cells)d.cells.forEach(c=>s+=rect(c.cell,c.skip?'#d33':'#0a8',{dash:!!c.skip,w:1,tip:c.skip?'cell skipped: '+c.skip:'cell: '+c.raw_text}));
+    if(on('swatches'))for(const b of d.swatches)s+=rect(b,'#2457d6',{tip:'swatch'});
+    if(on('restored')&&d.restored)for(const b of d.restored)s+=rect(b,'#e80',{w:2,tip:'restored / recovered swatch'});
+    if(on('pieces')&&d.cells)for(const c of d.cells)for(const p of c.pieces)s+=rect(p.box,'#c0c',{w:1,tip:'label text: '+p.text});
+    if(on('unassigned')&&d.unassigned)for(const p of d.unassigned)s+=rect(p.box,'#d33',{dash:1,w:1.5,tip:'text not used by any entry: '+p.text});
+  }
+  if(hl>=0){const e=data.entries[hl];s+=rect(e.swatch,'#fc0',{w:3,fill:'rgba(255,220,0,.3)'});
+    const tb=textBox(hl);if(tb)s+=rect(tb,'#fc0',{w:3,fill:'rgba(255,220,0,.2)'})}
+  data.entries.forEach((e,i)=>s+=`<rect x="${e.swatch[0]}" y="${e.swatch[1]}" width="${e.swatch[2]-e.swatch[0]}" height="${e.swatch[3]-e.swatch[1]}" fill="transparent" style="cursor:pointer" data-i="${i}"><title>${esc(e.label)}</title></rect>`);
+  const svg=$('svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=s;
+}
+const union=bs=>bs.length?[Math.min(...bs.map(b=>b[0])),Math.min(...bs.map(b=>b[1])),Math.max(...bs.map(b=>b[2])),Math.max(...bs.map(b=>b[3]))]:null;
+function textBox(i){
+  const d=data.debug,e=data.entries[i];
+  if(method!=='old'){const c=(d.cells||[]).find(c=>c.swatch.join()===e.swatch.join());return c?union(c.pieces.map(p=>p.box)):null}
+  const si=d.swatches.findIndex(b=>b[0]===e.swatch[0]&&b[1]===e.swatch[1]);const l=d.links.find(l=>l.swatch===si);if(!l)return null;
+  return union([l.word,...d.orphans.filter(o=>o.joined_to===l.word).map(o=>o.word)].map(w=>d.words[w].box));
+}
+document.addEventListener('click',e=>{const r=e.target.closest('#svg rect[data-i]');if(!r)return;const tr=document.querySelector(`#rows tr[data-i="${r.dataset.i}"]`);
+  if(tr){tr.scrollIntoView({block:'center',behavior:'smooth'});highlight(+r.dataset.i)}});
+
+const ents=()=>review.method===method?(review.entries||[]):[];
+function entryReview(i){const e=data.entries[i];return ents().find(r=>r.i===i&&r.label===e.label)||ents().find(r=>r.label===e.label&&r.raw_text===e.raw_text)||{}}
+function thumb(sw,maxW=62,maxH=20){
+  const [W,H]=data.debug.crop_size,[x0,y0,x1,y1]=sw,k=Math.min(maxW/Math.max(1,x1-x0),maxH/Math.max(1,y1-y0));
+  return `<div class="thumb" style="background-image:url('${$('img').src}');background-size:${W*k}px ${H*k}px;background-position:${-x0*k}px ${-y0*k}px;width:${(x1-x0)*k+2}px;height:${(y1-y0)*k+2}px"></div>`}
+function renderRows(){
+  if(!data||!$('rows'))return;
+  $('rows').innerHTML=data.entries.map((e,i)=>{const r=entryReview(i);
+    return `<tr data-i="${i}" class="${e.ignored?'ign':''}"><td>${i+1}</td><td>${thumb(e.swatch)}</td>
+    <td><b>${esc(e.label)}</b>${e.ignored?` <span class="tag">${esc(e.ignored)}</span>`:''}${e.raw_text!==e.label?`<div class="raw">OCR: ${esc(e.raw_text)}</div>`:''}</td>
+    <td><div class="verd">${VERDICTS.map(([v,l,c])=>`<button class="${c} ${r.verdict===v?'on':''}" data-v="${v}">${l}</button>`).join('')}</div></td>
+    <td><input data-fix value="${esc(r.fix||'')}" placeholder="${esc(e.label)}"></td></tr>`}).join('');
+}
+function highlight(i){document.querySelectorAll('#rows tr').forEach(t=>t.classList.toggle('hl',+t.dataset.i===i));draw(i)}
+document.addEventListener('mouseover',e=>{const tr=e.target.closest('#rows tr');if(tr)highlight(+tr.dataset.i)});
+document.addEventListener('click',e=>{const b=e.target.closest('.verd button');if(!b)return;const tr=b.closest('tr');
+  const was=b.classList.contains('on');tr.querySelectorAll('.verd button').forEach(x=>x.classList.remove('on'));if(!was)b.classList.add('on');
+  if(!was&&b.dataset.v!=='ok')tr.querySelector('input').focus();dirty()});
+document.addEventListener('input',e=>{if(e.target.matches('[data-fix],#missing,#notes'))dirty()});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'&&data){e.preventDefault();save()}});
+function dirty(){const s=$('saved');if(s)s.textContent=''}
+
+function renderPairs(){
+  $('pairs').innerHTML=(data.closest_pairs||[]).map(p=>`<div><span>${esc(data.entries[p.a].label)} ↔ ${esc(data.entries[p.b].label)}</span><span class="meta">${p.dist.toFixed(3)}</span></div>`).join('')||'<span class="meta">—</span>';
+}
+function renderReview(){
+  [...$('status').children].forEach(b=>{b.classList.toggle('on',b.dataset.s===review.status);
+    b.onclick=()=>{const was=b.classList.contains('on');[...$('status').children].forEach(x=>x.classList.remove('on'));if(!was)b.classList.add('on');dirty()}});
+  $('missing').value=review.missing||'';$('notes').value=review.notes||'';
+  $('save').onclick=save;
+  if(review.saved_at)$('saved').textContent='saved '+review.saved_at;
+}
+async function save(){
+  const entries=[...document.querySelectorAll('#rows tr')].map(tr=>{const i=+tr.dataset.i,e=data.entries[i];
+    const v=tr.querySelector('.verd button.on');return{i,label:e.label,raw_text:e.raw_text,verdict:v?v.dataset.v:null,fix:tr.querySelector('input').value.trim()}})
+    .filter(r=>r.verdict||r.fix);
+  const st=document.querySelector('#status button.on');
+  let status=st?st.dataset.s:null;
+  if(!status&&entries.length)status=entries.some(r=>r.verdict&&r.verdict!=='ok')||$('missing').value.trim()?'problems':'good';
+  const body={method,status,entries,missing:$('missing').value,notes:$('notes').value};
+  const r=await fetch(`/api/legend/${enc(cur)}/review`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){$('saved').textContent='save failed';return}
+  review={...body,saved_at:new Date().toLocaleString()};$('saved').textContent='saved ✓';
+  const l=LOGS.find(l=>l.name===cur);if(l){l.review=status;renderLogs()}
+}
+
+// ---------------------------------------------------------------- compare all methods
+async function compare(){
+  const box=$('cmp'),name=cur;box.hidden=false;
+  if($('cmpBtn').classList.toggle('on')===false){box.hidden=true;return}
+  box.innerHTML='<div class="meta"><span class="spin"></span>Running every method (each one is cached afterwards)…</div>';
+  const res={};
+  for(const m of METHODS){res[m.id]=await fetchLegend(name,m.id);if(cur!==name)return;
+    box.querySelector('.meta').innerHTML=`<span class="spin"></span>Running every method… done: ${Object.keys(res).join(', ')}`}
+  // line the entries up by swatch: same swatch = centres closer than half a swatch
+  const sz=(data.debug.swatch_size||[40,20]);const rows=[];
+  for(const m of METHODS){const r=res[m.id];if(r.error)continue;
+    for(const e of r.entries){const [cx,cy]=center(e.swatch);
+      let row=rows.find(o=>!o[m.id]&&Math.abs(o.cx-cx)<Math.max(8,sz[0]/2)&&Math.abs(o.cy-cy)<Math.max(5,sz[1]/2));
+      if(!row){row={cx,cy,sw:e.swatch};rows.push(row)}row[m.id]=e.label}}
+  rows.sort((a,b)=>(a.cx-b.cx)||(a.cy-b.cy));
+  // reading order: by column (x clusters), then top to bottom
+  const xs=[...new Set(rows.map(r=>Math.round(r.cx/Math.max(20,sz[0]))))];
+  rows.sort((a,b)=>Math.round(a.cx/Math.max(20,sz[0]))-Math.round(b.cx/Math.max(20,sz[0]))||a.cy-b.cy);
+  const ids=METHODS.map(m=>m.id).filter(id=>!res[id].error);
+  box.innerHTML=`<div class="bar" style="margin:0 0 6px"><b>All methods side by side</b><span class="meta">one row per swatch position · yellow = methods disagree · click a method to open it</span></div>
+  <div style="max-height:50vh;overflow:auto"><table><thead><tr><th>swatch</th>${ids.map(id=>`<th><button data-m="${id}">${esc(id)} (${res[id].entries.length})</button></th>`).join('')}</tr></thead><tbody>
+  ${rows.map(r=>{const vals=ids.map(id=>r[id]);const same=vals.every(v=>v===vals[0]);
+    return `<tr><td>${thumb(r.sw,62,20)}</td>${ids.map(id=>r[id]==null?'<td class="miss">—</td>':`<td class="${same?'':'diff'}">${esc(r[id])}</td>`).join('')}</tr>`}).join('')}
+  </tbody></table></div>`;
+  box.querySelectorAll('th button').forEach(b=>b.onclick=()=>{method=b.dataset.m;store('lr.method',method);open(cur)});
+}
+loadLogs().then(()=>{const h=decodeURIComponent(location.hash.slice(1));if(h&&LOGS.some(l=>l.name===h))open(h)});
+</script>
+</body></html>
