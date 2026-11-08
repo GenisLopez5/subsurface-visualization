@@ -20,35 +20,19 @@
 .explorer .primary:hover { background-color: #6c1cc4; }
 .actions { margin-bottom: 14px; color: #81728d; min-height: 36px; }
 .grow { flex-grow: 1; }
-.library-content { flex-grow: 1; min-height: 0; flex-direction: row; align-items: stretch; }
-.file-card { flex-grow: 1; min-width: 0; margin-right: 16px; background-color: white; border-width: 1px; border-color: #e7e0ee; border-radius: 12px; overflow: hidden; }
-.file-header { height: 46px; padding: 0 18px; border-bottom-width: 1px; border-bottom-color: #ebe5f1; color: #91839b; }
+.file-card { flex-grow: 1; background-color: white; border-width: 1px; border-color: #e7e0ee; border-radius: 12px; overflow: hidden; }
+.file-header { height: 36px; padding: 0 14px; border-bottom-width: 1px; border-bottom-color: #ebe5f1; color: #91839b; }
 .name { flex-grow: 1; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
 .file-header .name { margin-left: 0; padding-left: 0; background-color: transparent; color: #81728d; }
+.created { width: 160px; flex-shrink: 0; margin-left: 16px; white-space: nowrap; -unity-text-align: middle-right; }
+.file-row .created { color: #81728d; font-size: 11px; }
+.file-header .sort-column { margin: 0; padding: 4px 0; background-color: transparent; border-radius: 3px; font-size: 11px; }
+.file-header .sort-column:hover, .file-header .sort-column:focus { background-color: #f0e9f9; color: #5300b6; }
+.file-header .sort-active { color: #5300b6; -unity-font-style: bold; }
 .file-list { flex-grow: 1; }
-.file-row { min-height: 66px; padding: 12px 18px; border-bottom-width: 1px; border-bottom-color: #f0ebf5; }
+.file-row { height: 36px; flex-shrink: 0; padding: 5px 14px; border-bottom-width: 1px; border-bottom-color: #f0ebf5; }
 .file-row:hover { background-color: #f7f3fc; }
-.file-row:focus { background-color: #f7f3fc; border-left-width: 3px; border-left-color: #8d72aa; padding-left: 15px; }
-.file-row.selected { background-color: #ede4fb; border-left-width: 3px; border-left-color: #5300b6; padding-left: 15px; }
-.row-location-marker { width: 10px; height: 10px; flex-shrink: 0; margin-left: 12px; border-width: 3px; border-color: #5300b6; border-radius: 10px; background-color: #78ff00; }
-.location-card { width: 310px; flex-shrink: 0; padding: 17px; background-color: #eeeaf4; border-width: 1px; border-color: #ded4e8; border-radius: 12px; }
-.location-header { height: 24px; flex-direction: row; align-items: center; justify-content: space-between; }
-.location-kicker { color: #81728d; font-size: 9px; -unity-font-style: bold; letter-spacing: 1.7px; }
-.location-live-dot { width: 7px; height: 7px; border-radius: 7px; background-color: #bdb2c7; }
-.location-card.has-location .location-live-dot { background-color: #78ff00; border-width: 1px; border-color: #5300b6; }
-.world-map { flex-grow: 1; min-height: 150px; max-height: 270px; margin-top: 6px; margin-bottom: 10px; background-color: #f8f6fa; border-width: 1px; border-color: #ded5e7; border-radius: 9px; overflow: hidden; }
-.location-card.has-location .world-map { background-color: #fbfff8; border-color: #b8df9a; }
-.location-title { color: #35263f; font-size: 15px; -unity-font-style: bold; white-space: normal; margin-bottom: 4px; }
-.location-coordinates { color: #5300b6; font-size: 11px; -unity-font-style: bold; margin-bottom: 5px; }
-.location-description { color: #84758f; font-size: 10px; white-space: normal; }
-.library-content.compact { flex-direction: column; }
-.library-content.compact .file-card { margin-right: 0; margin-bottom: 12px; min-height: 220px; }
-.library-content.compact .location-card { width: auto; height: 205px; flex-direction: row; align-items: center; }
-.library-content.compact .location-header { width: 70px; align-self: stretch; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding-top: 5px; }
-.library-content.compact .location-live-dot { margin-top: 8px; }
-.library-content.compact .world-map { width: 45%; min-width: 220px; height: 165px; min-height: 165px; margin: 0 16px 0 0; }
-.library-content.compact .location-title { width: 25%; }
-.library-content.compact .location-coordinates, .library-content.compact .location-description { width: 22%; margin-left: 12px; }
+.file-row.selected { background-color: #ede4fb; border-left-width: 3px; border-left-color: #5300b6; padding-left: 11px; }
 .feedback { min-height: 34px; padding-top: 8px; }
 .message { flex-grow: 1; white-space: normal; color: #84758f; font-size: 11px; }
 .message-error { color: #b32642; }

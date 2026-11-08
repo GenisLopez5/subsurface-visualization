@@ -63,6 +63,16 @@ namespace Subsurface.Lithology
             float detailScale=r.grain*r.exaggeration*(s!=null?s.detailTileMetres/.01f:1);
             if(s!=null&&(s.stableId=="B06"||s.stableId=="B07"))detailScale=r.structure.clastSpacingMetres*7;
             m.SetFloat("_GrainScale",Mathf.Max(.00001f,detailScale));
+            float minPixels=24,maxPixels=0,reliefGain=1.8f,contrast=1.65f,grainSize=3,fineSurface=r.schematic?.55f:0;
+            switch(s!=null?s.stableId:"")
+            {
+                case "B01":minPixels=10;maxPixels=32;reliefGain=.7f;contrast=1.65f;grainSize=1.5f;fineSurface=.65f;break;
+                case "B02":minPixels=12;maxPixels=40;reliefGain=.7f;contrast=1.6f;grainSize=1.5f;fineSurface=.45f;break;
+                case "B03":minPixels=10;maxPixels=32;reliefGain=.85f;contrast=2.2f;grainSize=1.5f;fineSurface=.8f;break;
+                case "B04":minPixels=8;maxPixels=28;reliefGain=.42f;contrast=1.25f;grainSize=1.25f;break;
+                case "B05":minPixels=12;maxPixels=48;reliefGain=.85f;contrast=1.4f;grainSize=1.75f;break;
+            }
+            m.SetFloat("_MinimumGrainPixels",minPixels);m.SetFloat("_MaximumGrainPixels",maxPixels);m.SetFloat("_ReliefGain",reliefGain);m.SetFloat("_RockContrast",contrast);m.SetFloat("_RockGrainSize",grainSize);m.SetFloat("_FineSurfaceStrength",fineSurface);
             m.SetFloat("_DetailStrength",s!=null&&s.independentGrainScale?s.detailColorStrength:0);
             m.SetFloat("_DetailEnabled",s!=null&&s.independentGrainScale?1:0);
             m.SetFloat("_NormalStrength",r.normal); m.SetFloat("_HasNormal",s!=null&&s.normal!=null?1:0);m.SetFloat("_HasDetailNormal",s!=null&&s.detailNormal!=null&&s.independentGrainScale?1:0);
