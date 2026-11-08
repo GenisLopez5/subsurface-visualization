@@ -1,4 +1,4 @@
-<img width="128" height="128" alt="logo_subsurface_transparent" src="https://github.com/user-attachments/assets/330456a7-96e8-491a-b5c0-d87fad45bd4d" /> \
+<img width="128" height="128" alt="logo_subsurface_transparent" src="https://github.com/user-attachments/assets/330456a7-96e8-491a-b5c0-d87fad45bd4d" /> 
 
 # HackTheBurgh 2026 🏴󠁧󠁢󠁳󠁣󠁴󠁿 - Viridien Challenge 🪨🌍
 Our team took part in **HackTheBurgh 2026** in Edinburgh, where we built a solution for the challenge set by
