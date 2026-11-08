@@ -83,8 +83,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"],
                            allow_credentials="*" not in s.cors_origins, expose_headers=["Content-Disposition", "ETag", *drawing.LAYOUT_HEADERS])
     from . import files_api
+    from .annotations import load_detector
 
-    hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store)
+    detector = None
+    try:
+        detector = load_detector(s.detector)
+    except Exception as e:
+        print(f"LITHO_DETECTOR could not be loaded ({type(e).__name__}: {e}); continuing without it")
+    if detector is not None:
+        print(f"bounding boxes: automatic detection ({s.detector}), dataset JSONs as fallback")
+        if hasattr(detector, "warm_up"):  # load the models in the background, not on the first upload
+            import threading
+            threading.Thread(target=detector.warm_up, daemon=True).start()
+    hooks["start"], hooks["stop"] = files_api.setup(app, s, jobs.lock, store, detector)
     from . import legend_review
 
     app.include_router(legend_review.make_router(s, store, images, jobs.lock))
@@ -132,7 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return err(f"Unsupported file type: {p.name}")
         if img and not ann_path:
             try:
-                ann_path, how = resolve_annotation(img, store)
+                ann_path, how = resolve_annotation(img, store, detector)
             except AnnotationNotFound as e:
                 return err(str(e), need="json", keep=upload_token(img) if img.is_relative_to(s.uploads) else None)
             notes.append(f"annotation: {ann_path.name}" + (f" ({how})" if how else ""))

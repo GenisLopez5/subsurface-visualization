@@ -88,6 +88,23 @@ def scaled_layout(layout: dict, width: int) -> dict:
 
 LAYOUT_HEADERS = ("X-Legend-Height", "X-Scale", "X-Y-Start")
 
+# One sentence for the OpenAPI docs (/docs) of the endpoints that send the layout
+LAYOUT_DOC = ("The colour key is added on top of the drawn image, so its rows are shifted down: "
+              "`y_drawn = legend_height_px + (y_original - y_start) * scale`.")
+LAYOUT_OPENAPI_HEADERS = {
+    "X-Legend-Height": {"description": "height of the colour key bar on top of the image, in px of this image "
+                                       "(the y shift)", "schema": {"type": "integer"}},
+    "X-Scale": {"description": "px of this image per original-image px", "schema": {"type": "number"}},
+    "X-Y-Start": {"description": "first original-image row drawn (0 unless the image is a strip)",
+                  "schema": {"type": "integer"}},
+}
+
+
+def image_response_doc(media_type: str, note: str = "") -> dict:
+    """`responses=` for an image endpoint: its media type and the layout headers it sends."""
+    return {200: {"content": {media_type: {}}, "headers": LAYOUT_OPENAPI_HEADERS,
+                  "description": "the image; its layout is in the headers" + (f" ({note})" if note else "")}}
+
 
 def layout_headers(layout: dict | None) -> dict:
     """Response headers for an image endpoint, so the layout comes with the picture itself."""
@@ -267,9 +284,11 @@ def _intervals_for(result, y_shift=0, y_clip=None):
     return out
 
 
-def render_tif(page, annotation_path, result, out_path, y_range=None, colors=None):
+def render_tif(page, annotation_path, result, out_path, y_range=None, colors=None, key_path=None):
     """Draw the results on the page (or the strip y_range of it) at full resolution and save a
     Deflate-compressed TIF that keeps the source DPI, chunk by chunk (low memory, see above).
+    key_path: also save the colour key bar on its own (the exact bar on top of the TIF, same width,
+    height = legend_height_px) as a PNG there.
     Returns the layout (see make_layout), which is also saved next to the TIF."""
     from PIL import ImageDraw
 
@@ -304,6 +323,20 @@ def render_tif(page, annotation_path, result, out_path, y_range=None, colors=Non
         x += w
     bar = row_h * (row + 1)
     out_h = bar + H
+
+    def draw_key(draw, dy):
+        """The colour key bar, drawn with its top at row dy of `draw`'s image."""
+        draw.rectangle([0, dy, W, bar - 1 + dy], fill=(255, 255, 255))
+        for n, x, row in slots:
+            y = row * row_h + dy
+            draw.rectangle([x, y + px(8), x + px(18), y + px(26)], fill=colors[n], outline=(0, 0, 0), width=px(1))
+            draw.text((x + px(26), y + px(17)), texts[n], fill=(0, 0, 0), font=key_font, anchor="lm")
+
+    if key_path is not None:
+        key = Image.new("RGB", (W, bar), (255, 255, 255))
+        draw_key(ImageDraw.Draw(key), 0)
+        key.save(key_path, dpi=dpi) if dpi else key.save(key_path)
+        del key
 
     # everything in output-image coordinates (bar on top, then the page from y0 down)
     S = lambda v: v * scale                  # noqa: E731  page px -> output px
@@ -367,12 +400,7 @@ def render_tif(page, annotation_path, result, out_path, y_range=None, colors=Non
 
             # colour key (top bar)
             if cs < bar:
-                draw.rectangle([0, 0, W, bar - 1 - cs], fill=(255, 255, 255))
-                for n, x, row in slots:
-                    y = row * row_h - cs
-                    draw.rectangle([x, y + px(8), x + px(18), y + px(26)], fill=colors[n], outline=(0, 0, 0),
-                                   width=px(1))
-                    draw.text((x + px(26), y + px(17)), texts[n], fill=(0, 0, 0), font=key_font, anchor="lm")
+                draw_key(draw, -cs)
             writer.add(img)
             del img, draw
     except BaseException:
@@ -381,3 +409,23 @@ def render_tif(page, annotation_path, result, out_path, y_range=None, colors=Non
         raise
     writer.close()
     return save_layout(out_path, make_layout(page.width, page.height, y0, y1, scale, W, out_h))
+
+
+def crop_legend(page, annotation_path, out_path):
+    """Cut the log's own legend (the `lithology_legend` box) out of the original page, at full
+    resolution, and save it as a PNG. Returns the box used (original-image px), or None if the
+    annotation has no usable legend box."""
+    page = page if isinstance(page, Image.Image) else Image.open(page)
+    box = json.loads(Path(annotation_path).read_text())["bounding_boxes"].get("lithology_legend")
+    if not box:
+        return None
+    x0, y0 = max(0, int(box[0])), max(0, int(box[1]))
+    x1, y1 = min(page.width, int(round(box[2]))), min(page.height, int(round(box[3])))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    crop = page.crop((x0, y0, x1, y1))
+    if crop.mode not in ("RGB", "L", "1"):
+        crop = crop.convert("RGB")
+    dpi = page.info.get("dpi")
+    crop.save(out_path, dpi=dpi) if dpi else crop.save(out_path)
+    return [x0, y0, x1, y1]

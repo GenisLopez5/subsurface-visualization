@@ -26,7 +26,7 @@ class LegendDetector(Protocol):
 class UltralyticsLegendDetector:
     def __init__(self, weights: str | Path):
         weights = Path(weights)
-        if not weights.is_file():
+        if not weights.exists():
             raise FileNotFoundError(f"Legend weights do not exist: {weights}")
         try:
             from ultralytics import YOLO

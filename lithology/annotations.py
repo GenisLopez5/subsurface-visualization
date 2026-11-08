@@ -1,9 +1,9 @@
 """
 Getting the bounding boxes (depth column, lithology column, legend) for an image.
 
-Today they come from existing annotation JSONs, matched by file name (`AnnotationStore`).
-Automatic detection will plug in as a `BoxDetector`: `resolve_annotation` tries the store
-first and falls back to the detector, so callers (API, batch) don't change.
+Automatic detection (`BoxDetector`, by default the int8 models in bbox_detector.py) comes first;
+existing annotation JSONs matched by file name (`AnnotationStore`) are the fallback. A JSON sent
+along with the image always wins.
 """
 from __future__ import annotations
 
@@ -119,9 +119,18 @@ class BoxDetector(Protocol):
 
 def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector | None = None,
                        out_dir: Path | None = None) -> tuple[Path, str]:
-    """Annotation JSON for an image: existing JSON first, then the detector (if any).
-    A detected annotation is written to out_dir so the rest of the pipeline can use a file."""
+    """Annotation JSON for an image: the detector first (if any), then an existing JSON from the store
+    (also used when the detector fails). A detected annotation is written to out_dir as a file."""
     image_path = Path(image_path)
+    failure = ""
+    if detector is not None:
+        try:
+            ann = validate_annotation(detector.detect(image_path))
+            out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
+            out.write_text(json.dumps(ann, indent=2))
+            return out, "bounding boxes detected automatically"
+        except Exception as e:
+            failure = f"detector failed: {type(e).__name__}: {e}"
     size = None
     if image_path.suffix.lower() != ".pdf":
         from PIL import Image
@@ -129,22 +138,18 @@ def resolve_annotation(image_path, store: AnnotationStore, detector: BoxDetector
         with Image.open(image_path) as im:
             size = im.size
     try:
-        return store.find(image_path.name, size)
-    except AnnotationNotFound:
-        if detector is None:
-            raise
-    ann = detector.detect(image_path)
-    out = Path(out_dir or image_path.parent) / f"{image_path.stem}.detected.json"
-    out.write_text(json.dumps(ann, indent=2))
-    return out, "bounding boxes detected automatically"
+        path, how = store.find(image_path.name, size)
+        return path, "; ".join(x for x in (how, failure) if x)
+    except AnnotationNotFound as e:
+        raise AnnotationNotFound(f"{e}" + (f" ({failure})" if failure else "")) from None
 
 
 # ---------------------------------------------------------------------------------------------
 # Annotation for an uploaded image (the /api/v1 file API). Sources, first match wins:
 #   uploaded  a JSON file sent in the same upload, paired by its image_name or by file name
 #   provided  annotation JSON sent as data (e.g. by an external box-extraction algorithm)
-#   dataset   an existing JSON from the annotation folders (AnnotationStore)
 #   detector  the configured BoxDetector (LITHO_DETECTOR="module:object")
+#   dataset   an existing JSON from the annotation folders (AnnotationStore), if the detector fails
 
 def annotation_matches(ann: dict, image_name: str, json_name: str = "") -> bool:
     return bool(_name_keys(Path(image_name).name) & _name_keys(ann.get("image_name", ""), json_name))
@@ -183,16 +188,17 @@ def resolve_upload_annotation(image_name: str, image_path: Path, uploaded: list[
             return ann, "uploaded", json_name
     if provided is not None:
         return validate_annotation(provided), "provided", ""
+    failure = ""
+    if detector is not None:
+        try:
+            return validate_annotation(detector.detect(Path(image_path))), "detector", ""
+        except Exception as e:  # a failing detector falls back to the dataset JSONs
+            failure = f"detector failed: {type(e).__name__}: {e}"
     if store is not None:
         try:
             path, how = resolve_annotation(image_path, store)
             ann = load_annotation(path)
-            return ann, "dataset", path.name + (f" ({how})" if how else "")
+            return ann, "dataset", "; ".join(x for x in (path.name + (f" ({how})" if how else ""), failure) if x)
         except AnnotationNotFound:
             pass
-    if detector is not None:
-        try:
-            return validate_annotation(detector.detect(Path(image_path))), "detector", ""
-        except Exception as e:  # a failing detector just means "no annotation yet"
-            return None, None, f"detector failed: {type(e).__name__}: {e}"
-    return None, None, "no annotation JSON uploaded, provided or found in the dataset"
+    return None, None, failure or "no annotation JSON uploaded, provided or found in the dataset"

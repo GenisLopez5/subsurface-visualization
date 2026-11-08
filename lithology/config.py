@@ -20,6 +20,9 @@ def _paths(value: str | None) -> list[Path]:
     return [Path(p).expanduser().resolve() for p in (value or "").split(os.pathsep) if p]
 
 
+DEFAULT_DETECTOR = "lithology.bbox_detector:detector"
+
+
 @dataclass
 class Settings:
     # Where existing bounding-box JSONs are looked up for an uploaded image (until automatic
@@ -42,8 +45,9 @@ class Settings:
     cors_origins: list[str] = field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
     # Largest accepted upload, per file.
     max_upload_mb: int = 200
-    # Optional automatic bounding-box detector, "module:object" (see annotations.BoxDetector).
-    detector: str | None = None
+    # Automatic bounding-box detector, "module:object" (see annotations.BoxDetector). Default: the int8
+    # OpenVINO models of bbox-final. LITHO_DETECTOR=none turns it off (only uploaded/dataset JSONs are used).
+    detector: str | None = DEFAULT_DETECTOR
 
     @property
     def uploads(self) -> Path:
@@ -80,5 +84,5 @@ class Settings:
             cors_origins=[o.strip() for o in e("LITHO_CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
                           if o.strip()],
             max_upload_mb=int(e("LITHO_MAX_UPLOAD_MB", "200")),
-            detector=e("LITHO_DETECTOR") or None,
+            detector=None if e("LITHO_DETECTOR", DEFAULT_DETECTOR).lower() in ("", "none", "0", "off") else e("LITHO_DETECTOR", DEFAULT_DETECTOR),
         )

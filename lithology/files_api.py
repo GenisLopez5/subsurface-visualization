@@ -2,14 +2,14 @@
 /api/v1: file management for a separate frontend (uploads, status, results), stored in Postgres.
 
     POST   /api/v1/uploads                       one or more images (+ optional JSONs / annotation data)
-    GET    /api/v1/batches                       uploads, newest first, with counts per status
-    GET    /api/v1/batches/{id}                  one upload and its files
-    DELETE /api/v1/batches/{id}
-    GET    /api/v1/files                         ?status=&batch_id=&q=&limit=&offset=
-    GET    /api/v1/files/{id}                    status, which outputs exist, stats, links
+    GET    /api/v1/files                         ?status=&q=&limit=&offset=  newest first
+    GET    /api/v1/files/{id}                    status, which outputs exist, stats, download/preview links
     GET    /api/v1/status?ids=a,b,c              light status of many files (for polling)
-    GET    /api/v1/files/{id}/download/{kind}    original | annotation | result_tif | result_csv | result_json
-    GET    /api/v1/files/{id}/preview/{kind}     PNG of original | result_tif for <img> (?width=)
+    GET    /api/v1/files/{id}/download           ZIP of the original, the result TIF and the result CSV
+    GET    /api/v1/download?ids=a,b,c            ZIP with one folder per file, each holding those three
+    GET    /api/v1/download/all                  the same for every file in the database
+    GET    /api/v1/files/{id}/preview/{kind}     PNG of original | result_tif | legend_original |
+                                                 legend_generated for <img> (?width=)
     PUT    /api/v1/files/{id}/annotation         set/replace the bounding boxes, then (re)process
     POST   /api/v1/files/{id}/reprocess          compute again (?force=true ignores the extraction cache)
     DELETE /api/v1/files/{id}                    any status (a running job's results are discarded)
@@ -17,8 +17,8 @@
     GET    /api/v1/health
 
 The result TIF has the colour key added on top, so it is taller than the original. Its layout is in
-stats.layout of the file (and "layout" in result_json); download/result_tif and preview/result_tif also
-send it as X-Legend-Height / X-Scale / X-Y-Start headers (for the preview: at the preview's size):
+stats.layout of the file; preview/result_tif also sends it as X-Legend-Height / X-Scale / X-Y-Start
+headers (at the preview's size):
 
     y_in_result_tif = legend_height_px + y_in_original * scale
 
@@ -27,32 +27,35 @@ File status: uploading -> queued (or needs_annotation) -> processing -> done | e
 """
 from __future__ import annotations
 
+import base64
 import io
 import json
 import shutil
+import tempfile
 import threading
 import uuid
+import zipfile
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from urllib.parse import quote
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import Response
-from pydantic import BaseModel
+from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from .annotations import (IMAGE_EXT, AnnotationStore, BoxDetector, annotation_matches, resolve_upload_annotation,
                           validate_annotation)
 from .config import Settings
 from . import drawing
 from .db import BLOB_KINDS, DB, STATUSES, dumps
-from .worker import CONTENT_TYPES, Uploader, Worker, safe_name, spool_dir
+from .worker import CONTENT_TYPES, Uploader, Worker, display_name, result_filename, safe_name, spool_dir
 
 MAX_JSON_BYTES = 5 * 1024 * 1024
 
-Kind = Literal["original", "annotation", "result_tif", "result_csv", "result_json"]
-PREVIEW_KINDS = ("original", "result_tif")
+PREVIEW_KINDS = ("original", "result_tif", "legend_original", "legend_generated")
 
 
 # ------------------------------------------------------------------ response models
@@ -62,7 +65,6 @@ class BlobInfo(BaseModel):
     size: int
     content_type: str
     created_at: datetime
-    url: str
 
 
 class Outputs(BaseModel):
@@ -71,21 +73,77 @@ class Outputs(BaseModel):
     result_tif: bool
     result_csv: bool
     result_json: bool
+    legend_original: bool = False   # the log's own legend, cut from the original image (PNG)
+    legend_generated: bool = False  # the colour key drawn on top of the result TIF (PNG)
+
+
+class Layout(BaseModel):
+    """Where the original image sits in the result TIF: y_tif = legend_height_px + (y_original - y_start) * scale."""
+    model_config = ConfigDict(extra="allow")
+    legend_height_px: int = Field(description="height of the colour key bar on top of the result TIF, in TIF px "
+                                              "(the y shift)")
+    scale: float = Field(description="result-TIF px per original-image px (1: full resolution)")
+    y_start: int = Field(0, description="first original-image row drawn (0: the whole page)")
+    original_width: int
+    original_height: int
+    image_width: int = Field(description="result TIF width")
+    image_height: int = Field(description="result TIF height = legend_height_px + drawn page height")
+
+
+class Stats(BaseModel):
+    """Extraction summary of a processed file (other keys may be added)."""
+    model_config = ConfigDict(extra="allow")
+    layout: Layout | None = Field(None, description="layout of the result TIF: the y shift between it and the "
+                                                    "original image")
+
+
+class Offset(BaseModel):
+    """How the result TIF lines up with the original image."""
+    offset_y_px: int = Field(description="result TIF height - original height: the colour key bar added on top. "
+                                         "y_result = offset_y_px + y_original * scale")
+    offset_x_px: int = Field(0, description="always 0: nothing is added on the sides")
+    scale: float = Field(description="result-TIF px per original px (1: same resolution)")
+    original_width: int
+    original_height: int
+    result_width: int
+    result_height: int
+    legend_original_box: list[int] | None = Field(None, description="[x0, y0, x1, y1] of the original legend "
+                                                                    "(legend_original) in the original image, px")
+
+
+class ResultFile(BaseModel):
+    filename: str
+    content_type: str
+    content: str | None = Field(None, description="the file as text (CSV)")
+    base64: str | None = Field(None, description="the file as base64 (TIF, PNG)")
+
+
+class ResultOut(BaseModel):
+    id: UUID
+    name: str
+    offset: Offset
+    csv: ResultFile
+    result_tif: ResultFile
+    legend_original: ResultFile | None = Field(None, description="PNG: the log's own legend, cut from the "
+                                                                 "original image (null for older results)")
+    legend_generated: ResultFile | None = Field(None, description="PNG: the colour key drawn on top of the result "
+                                                                  "TIF, same width, height = offset_y_px (null "
+                                                                  "for older results)")
 
 
 class FileOut(BaseModel):
     id: UUID
-    batch_id: UUID
     name: str
     status: Literal["uploading", "needs_annotation", "queued", "processing", "done", "error"]
     computed: bool  # result TIF and CSV are both stored
     outputs: Outputs
     files: dict[str, BlobInfo]
     preview: dict[str, str]
+    download: str | None = None  # ZIP of original + result TIF + result CSV, once all three exist
     annotation_source: str | None = None
     note: str | None = None
     error: str | None = None
-    stats: dict[str, Any] | None = None
+    stats: Stats | None = None
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None = None
@@ -111,23 +169,12 @@ class FileList(BaseModel):
     items: list[FileOut]
 
 
-class BatchOut(BaseModel):
-    id: UUID
-    name: str
-    created_at: datetime
-    file_count: int
-    counts: dict[str, int]
-    done: bool  # nothing left uploading, queued or processing
-    files: list[FileOut] | None = None
-
-
 class Rejected(BaseModel):
     filename: str
     reason: str
 
 
 class UploadOut(BaseModel):
-    batch: BatchOut
     files: list[FileOut]
     rejected: list[Rejected]
     unused_annotations: list[str]  # uploaded JSONs that matched none of the uploaded images
@@ -148,19 +195,14 @@ def file_out(row: dict) -> FileOut:
     fid = row["id"]
     blobs = row.get("blobs") or {}
     base = f"/api/v1/files/{fid}"
-    files = {k: BlobInfo(**v, url=f"{base}/download/{k}") for k, v in blobs.items()}
+    files = {k: BlobInfo(**v) for k, v in blobs.items()}
     outputs = Outputs(**{k: k in blobs for k in BLOB_KINDS})
     preview = {k: f"{base}/preview/{k}" for k in PREVIEW_KINDS if k in blobs}
-    return FileOut(**{k: row[k] for k in ("id", "batch_id", "name", "status", "annotation_source", "note", "error",
+    computed = outputs.result_tif and outputs.result_csv
+    return FileOut(**{k: row[k] for k in ("id", "name", "status", "annotation_source", "note", "error",
                                           "stats", "created_at", "updated_at", "started_at", "finished_at")},
-                   computed=outputs.result_tif and outputs.result_csv, outputs=outputs, files=files, preview=preview)
-
-
-def batch_out(row: dict, files: list[dict] | None = None) -> BatchOut:
-    counts = {k: v for k, v in (row.get("counts") or {}).items()}
-    return BatchOut(id=row["id"], name=row["name"], created_at=row["created_at"], file_count=sum(counts.values()),
-                    counts=counts, done=not any(counts.get(k) for k in ("uploading", "queued", "processing")),
-                    files=[file_out(f) for f in files] if files is not None else None)
+                   computed=computed, outputs=outputs, files=files, preview=preview,
+                   download=f"{base}/download" if computed and outputs.original else None)
 
 
 def _provided_for(provided, image_name: str, n_images: int):
@@ -309,6 +351,65 @@ def _shrink_strips(strips, w, h, width):
 
 # ------------------------------------------------------------------ router
 
+BUNDLE_KINDS = ("original", "result_tif", "result_csv")
+
+
+def _bundle_blobs(db: DB, fid) -> dict[str, dict] | None:
+    """The original, result TIF and result CSV of a file, or None if any of them is missing."""
+    blobs = {k: db.get_blob(fid, k) for k in BUNDLE_KINDS}
+    return blobs if all(blobs.values()) else None
+
+
+def _bundle_names(image_name: str, blobs: dict[str, dict]) -> dict[str, str]:
+    """ZIP entry names, from the file's name as uploaded (spaces kept): <name>.<ext> for the original,
+    <name>_solved.tif / <name>_solved.csv for the results. Named here, not from the stored blob names,
+    so results computed before the _solved naming come out the same."""
+    names = {}
+    for k, b in blobs.items():
+        if k == "original":
+            ext = Path(b["filename"]).suffix or Path(image_name).suffix
+            names[k] = display_name(Path(image_name).stem) + ext
+        else:
+            names[k] = result_filename(image_name, k)
+    return names
+
+
+def content_disposition(filename: str, disposition: str = "attachment") -> str:
+    """Content-Disposition that survives any file name: an ASCII fallback plus the real name (RFC 6266),
+    since HTTP headers can't carry non-Latin-1 text and a quote would end the filename early."""
+    fallback = safe_name(filename)
+    return f"{disposition}; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
+
+
+def _write_bundle(z: zipfile.ZipFile, blobs: dict[str, dict], image_name: str, folder: str = ""):
+    used: set[str] = set()
+    names = _bundle_names(image_name, blobs)
+    for k, b in blobs.items():
+        name = names[k]
+        if name in used:  # e.g. an original already named like a result
+            name = f"{k}_{name}"
+        used.add(name)
+        # TIFs are already compressed: store them, deflate only the CSV
+        method = zipfile.ZIP_DEFLATED if k == "result_csv" else zipfile.ZIP_STORED
+        z.writestr(folder + name, bytes(b["data"]), compress_type=method)
+
+
+def _zip_response(fh, filename: str) -> StreamingResponse:
+    """Stream a finished ZIP from a temp file, closing (and so deleting) it afterwards."""
+    size = fh.tell()
+    fh.seek(0)
+
+    def chunks():
+        try:
+            while chunk := fh.read(1 << 20):
+                yield chunk
+        finally:
+            fh.close()
+
+    return StreamingResponse(chunks(), media_type="application/zip", headers={
+        "Content-Disposition": content_disposition(filename), "Content-Length": str(size)})
+
+
 def make_router(settings: Settings, state: dict, store: AnnotationStore, detector: BoxDetector | None) -> APIRouter:
     """state holds "db" (DB | None), "worker" (Worker | None) and "db_error" (str | None),
     filled in when the app starts."""
@@ -351,10 +452,9 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
     # ---------------- uploads
 
     @r.post("/uploads", response_model=UploadOut, status_code=201,
-            summary="Upload one image or a batch; each image is queued for processing")
+            summary="Upload one or more images; each becomes its own file and is queued for processing")
     def upload(files: list[UploadFile] = File(..., description="log images (.tif/.tiff/.pdf/.png/.jpg) and, "
                                                                "optionally, their bounding-box JSONs"),
-               name: str | None = Form(None, description="batch name (default: the first file name)"),
                annotations: str | None = Form(None, description="bounding boxes as JSON data, e.g. from an "
                                               "extraction algorithm: one annotation object, "
                                               "{\"<image file name>\": annotation}, or a list matched by image_name"),
@@ -404,8 +504,6 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                 raise HTTPException(422, {"error": "no image in the upload",
                                           "rejected": [x.model_dump() for x in rejected]})
 
-            batch = db.create_batch(name or (images[0][0] if len(images) == 1
-                                             else f"{images[0][0]} + {len(images) - 1} more"))
             created, used_json = [], set()
             for fname, path in images:
                 try:
@@ -422,46 +520,24 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
                 dest = spool_dir(settings, fid)  # the image goes to Postgres in the background
                 dest.mkdir(parents=True)
                 shutil.move(path, dest / path.name)
-                created.append(db.create_file(batch["id"], fname, "uploading", annotation_source=source,
+                created.append(db.create_file(fname, "uploading", annotation_source=source,
                                               note=note or None, blobs=blobs, file_id=fid))
                 state["uploader"].submit(fid, CONTENT_TYPES.get(Path(fname).suffix.lower()))
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
-        return UploadOut(batch=batch_out(db.get_batch(batch["id"])), files=[file_out(f) for f in created],
+        return UploadOut(files=[file_out(f) for f in created],
                          rejected=rejected, unused_annotations=[n for n, _ in jsons if n not in used_json])
-
-    # ---------------- batches
-
-    @r.get("/batches", response_model=list[BatchOut])
-    def list_batches(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0), db: DB = Depends(get_db)):
-        return [batch_out(b) for b in db.list_batches(limit, offset)]
-
-    @r.get("/batches/{bid}", response_model=BatchOut)
-    def get_batch(bid: UUID, db: DB = Depends(get_db)):
-        b = db.get_batch(bid)
-        if not b:
-            raise HTTPException(404, "unknown batch")
-        rows, _ = db.list_files(batch_id=bid, limit=10_000)
-        return batch_out(b, sorted(rows, key=lambda x: x["name"]))
-
-    @r.delete("/batches/{bid}", status_code=204, summary="Delete a batch with all its files and results")
-    def delete_batch(bid: UUID, db: DB = Depends(get_db)):
-        ids = db.delete_batch(bid)
-        if ids is None:
-            raise HTTPException(404, "unknown batch")
-        drop_local(ids)
-        return Response(status_code=204)
 
     # ---------------- files
 
     @r.get("/files", response_model=FileList)
     def list_files(status: list[str] | None = Query(None, description=f"any of {', '.join(STATUSES)}"),
-                   batch_id: UUID | None = None, q: str | None = Query(None, description="name contains"),
+                   q: str | None = Query(None, description="name contains"),
                    limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), db: DB = Depends(get_db)):
         bad = [x for x in status or [] if x not in STATUSES]
         if bad:
             raise HTTPException(422, f"unknown status {bad}; use {list(STATUSES)}")
-        rows, total = db.list_files(status, batch_id, q, limit, offset)
+        rows, total = db.list_files(status, q, limit, offset)
         return FileList(total=total, items=[file_out(x) for x in rows])
 
     @r.get("/status", response_model=list[StatusOut],
@@ -507,22 +583,149 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
         gone = set(deleted)
         return DeleteOut(deleted=deleted, not_found=[x for x in wanted if x not in gone])
 
-    @r.get("/files/{fid}/download/{kind}", responses={200: {"content": {"application/octet-stream": {}}}})
-    def download(fid: UUID, kind: Kind, inline: bool = Query(False, description="show in the browser instead "
-                                                                              "of downloading"),
-                 db: DB = Depends(get_db)):
-        b = db.get_blob(fid, kind)
-        if not b:
-            file_or_404(db, fid)
-            raise HTTPException(404, f"{kind} not available yet")
-        disp = "inline" if inline else "attachment"
-        headers = {"Content-Disposition": f'{disp}; filename="{b["filename"]}"', "ETag": b["sha256"]}
-        if kind == "result_tif":
-            headers.update(drawing.layout_headers(result_layout(db, fid)))
-        return Response(bytes(b["data"]), media_type=b["content_type"], headers=headers)
+    @r.get("/files/{fid}/download", responses={200: {"content": {"application/zip": {}}}},
+           summary="Download the original image, the result TIF and the result CSV together as one ZIP")
+    def download_bundle(fid: UUID, db: DB = Depends(get_db)):
+        row = file_or_404(db, fid)
+        blobs = {k: db.get_blob(fid, k) for k in BUNDLE_KINDS}
+        missing = [k for k, b in blobs.items() if not b]
+        if missing:
+            raise HTTPException(404, f"not available yet: {', '.join(missing)}")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            _write_bundle(z, blobs, row["name"])
+        zip_name = f"{display_name(Path(row['name']).stem)}_solved.zip"
+        return Response(buf.getvalue(), media_type="application/zip",
+                        headers={"Content-Disposition": content_disposition(zip_name)})
 
-    @r.get("/files/{fid}/preview/{kind}", responses={200: {"content": {"image/png": {}}}})
-    def preview(fid: UUID, kind: Literal["original", "result_tif"], request: Request,
+    def result_offset(db: DB, fid, tif_blob: dict) -> Offset:
+        """The y offset of the result TIF over the original: from the stored layout, or for results made
+        before layouts were stored, measured from the two images' sizes (v1 draws at scale 1)."""
+        lay = result_layout(db, fid)
+        if lay:
+            return Offset(offset_y_px=lay["legend_height_px"], scale=lay["scale"],
+                          original_width=lay["original_width"], original_height=lay["original_height"],
+                          result_width=lay["image_width"], result_height=lay["image_height"],
+                          legend_original_box=lay.get("legend_original_box"))
+        orig = db.get_blob(fid, "original")
+        if not orig:
+            raise HTTPException(404, "original not available, cannot measure the offset")
+        from PIL import Image
+        Image.MAX_IMAGE_PIXELS = None
+        with Image.open(io.BytesIO(bytes(orig["data"]))) as o, Image.open(io.BytesIO(bytes(tif_blob["data"]))) as t:
+            (ow, oh), (tw, th) = o.size, t.size  # header only, pixels are not decoded
+        return Offset(offset_y_px=th - oh, scale=tw / ow, original_width=ow, original_height=oh,
+                      result_width=tw, result_height=th)
+
+    @r.get("/files/{fid}/result",
+           summary="The result TIF, the result CSV, the two legends and the offset between the result TIF and "
+                   "the original",
+           description="`format=zip` (default): `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, "
+                       "`<name>_offset.json`, `<name>_legend_original.png` (the log's own legend, cut from the "
+                       "original image) and `<name>_legend_generated.png` (the colour key drawn on top of the "
+                       "result TIF); the offset is also in the `X-Offset-Y` header. The legend PNGs are missing "
+                       "for results computed before they existed (reprocess to get them).\n\n"
+                       "`format=json`: everything in one JSON (`ResultOut`): the offset, the CSV as text and the "
+                       "TIF and legend PNGs as base64 (about 4/3 of their size).\n\n"
+                       "**The offset** is how many px the result TIF is taller than the original: the colour key "
+                       "bar added on top. Rows of the CSV (`top_y`, `bottom_y`) are original-image px; in the "
+                       "result TIF they are at `y_result = offset_y_px + y_original * scale` (`scale` is 1, no "
+                       "x offset).\n\n404 until the result TIF and CSV exist.",
+           responses={200: {"model": ResultOut, "content": {"application/zip": {}},
+                            "headers": {"X-Offset-Y": {"description": "offset_y_px: result TIF height - original "
+                                                                      "height (the colour key bar on top)",
+                                                       "schema": {"type": "integer"}},
+                                        **drawing.LAYOUT_OPENAPI_HEADERS}}})
+    def get_result(fid: UUID, format: Literal["zip", "json"] = Query("zip", description="zip or json"),
+                   db: DB = Depends(get_db)):
+        row = file_or_404(db, fid)
+        tif, csv = db.get_blob(fid, "result_tif"), db.get_blob(fid, "result_csv")
+        if not (tif and csv):
+            raise HTTPException(404, f"result not available yet (status: {row['status']})")
+        off = result_offset(db, fid, tif)
+        headers = {"X-Offset-Y": str(off.offset_y_px), "X-Legend-Height": str(off.offset_y_px),
+                   "X-Scale": f"{off.scale:.8g}", "X-Y-Start": "0"}
+        tif_name, csv_name = result_filename(row["name"], "result_tif"), result_filename(row["name"], "result_csv")
+        legends = {k: b for k in ("legend_original", "legend_generated") if (b := db.get_blob(fid, k))}
+        if format == "json":
+            b64 = lambda data: base64.b64encode(bytes(data)).decode("ascii")  # noqa: E731
+            return ResultOut(id=row["id"], name=row["name"], offset=off,
+                             csv=ResultFile(filename=csv_name, content_type="text/csv",
+                                            content=bytes(csv["data"]).decode("utf-8")),
+                             result_tif=ResultFile(filename=tif_name, content_type="image/tiff", base64=b64(tif["data"])),
+                             **{k: ResultFile(filename=result_filename(row["name"], k), content_type="image/png",
+                                              base64=b64(b["data"])) for k, b in legends.items()})
+        stem = display_name(Path(row["name"]).stem)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr(tif_name, bytes(tif["data"]), compress_type=zipfile.ZIP_STORED)
+            z.writestr(csv_name, bytes(csv["data"]), compress_type=zipfile.ZIP_DEFLATED)
+            z.writestr(f"{stem}_offset.json", off.model_dump_json(indent=2), compress_type=zipfile.ZIP_DEFLATED)
+            for k, b in legends.items():  # PNGs are already compressed
+                z.writestr(result_filename(row["name"], k), bytes(b["data"]), compress_type=zipfile.ZIP_STORED)
+        return Response(buf.getvalue(), media_type="application/zip",
+                        headers={"Content-Disposition": content_disposition(f"{stem}_solved.zip"), **headers})
+
+    def zip_many(db: DB, rows: list[dict], zip_name: str) -> StreamingResponse:
+        """One folder per file (original + result TIF + CSV). Files without all three are left out and
+        listed in skipped.txt; 404 if none qualifies. Built in a temp file, so big exports don't sit in RAM."""
+        fh = tempfile.TemporaryFile()
+        try:
+            folders: set[str] = set()
+            skipped, added = [], 0
+            with zipfile.ZipFile(fh, "w") as z:
+                for row in rows:
+                    blobs = _bundle_blobs(db, row["id"])
+                    if blobs is None:
+                        skipped.append(f"{row['name']}\t{row['id']}\t{row['status']}")
+                        continue
+                    folder = display_name(Path(row["name"]).stem)
+                    if folder in folders:  # same name uploaded twice
+                        folder = f"{folder}_{str(row['id'])[:8]}"
+                    folders.add(folder)
+                    _write_bundle(z, blobs, row["name"], folder + "/")
+                    added += 1
+                if skipped:
+                    z.writestr("skipped.txt", "files without a finished result (name, id, status):\n"
+                               + "\n".join(skipped) + "\n", compress_type=zipfile.ZIP_DEFLATED)
+            if not added:
+                raise HTTPException(404, "none of these files has finished results yet")
+        except BaseException:
+            fh.close()
+            raise
+        return _zip_response(fh, zip_name)
+
+    @r.get("/download", responses={200: {"content": {"application/zip": {}}}},
+           summary="ZIP of several files: ?ids=<id>,<id>,... — one folder per file with the original, "
+                   "the result TIF and the result CSV (unfinished files are listed in skipped.txt)")
+    def download_many(ids: str = Query(..., description="comma-separated file ids"), db: DB = Depends(get_db)):
+        try:
+            wanted = list(dict.fromkeys(UUID(x.strip()) for x in ids.split(",") if x.strip()))
+        except ValueError:
+            raise HTTPException(422, "ids must be comma-separated file ids")
+        if not wanted:
+            raise HTTPException(422, "no ids given")
+        if len(wanted) > 1000:
+            raise HTTPException(422, "at most 1000 ids")
+        rows = db.file_names(wanted)
+        unknown = set(wanted) - {r_["id"] for r_ in rows}
+        if unknown:
+            raise HTTPException(404, f"unknown file ids: {', '.join(map(str, unknown))}")
+        return zip_many(db, rows, "lithology_selection.zip")
+
+    @r.get("/download/all", responses={200: {"content": {"application/zip": {}}}},
+           summary="ZIP of every file in the database — one folder per file with the original, the result TIF "
+                   "and the result CSV (unfinished files are listed in skipped.txt)")
+    def download_all(db: DB = Depends(get_db)):
+        return zip_many(db, db.file_names(), f"lithology_all_{datetime.now():%Y%m%d_%H%M}.zip")
+
+    @r.get("/files/{fid}/preview/{kind}",
+           description="PNG preview for an `<img>`. For `result_tif`, the layout headers are already scaled to "
+                       "the preview's width.\n\n" + drawing.LAYOUT_DOC,
+           responses={200: {"content": {"image/png": {}}, "headers": drawing.LAYOUT_OPENAPI_HEADERS,
+                            "description": "PNG (layout headers for `result_tif` only, at the preview's size)"}})
+    def preview(fid: UUID, kind: Literal["original", "result_tif", "legend_original", "legend_generated"],
+                request: Request,
                 width: int = Query(1200, ge=64, le=4000), db: DB = Depends(get_db)):
         meta = db.blob_meta(fid, kind)
         if not meta:
@@ -586,16 +789,10 @@ def make_router(settings: Settings, state: dict, store: AnnotationStore, detecto
     return r
 
 
-def setup(app, settings: Settings, lock: threading.Lock, store: AnnotationStore):
+def setup(app, settings: Settings, lock: threading.Lock, store: AnnotationStore,
+          detector: BoxDetector | None = None):
     """Mount /api/v1 and hook DB + worker start/stop into the app's lifespan."""
-    from .annotations import load_detector
-
     state: dict = {"db": None, "worker": None, "uploader": None, "db_error": None}
-    detector = None
-    try:
-        detector = load_detector(settings.detector)
-    except Exception as e:
-        print(f"LITHO_DETECTOR could not be loaded ({type(e).__name__}: {e}); continuing without it")
     app.include_router(make_router(settings, state, store, detector))
     app.state.v1 = state
 

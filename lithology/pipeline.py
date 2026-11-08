@@ -88,8 +88,10 @@ def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_r
             force=False, log=print, debug_dir: Path | None = None) -> dict:
     """Extract + draw one log.
 
-    Writes out_dir/<name>.csv and out_dir/<name>.tif (full resolution, Deflate-compressed) and, if
-    debug_dir is given, debug_dir/<name>.json. Returns a summary dict including the file paths and
+    Writes out_dir/<name>.csv and out_dir/<name>.tif (full resolution, Deflate-compressed), the two
+    legends as PNGs: out_dir/<name>_legend_original.png (the log's own legend, cut from the page) and
+    out_dir/<name>_legend_generated.png (the colour key drawn on top of the TIF), and, if debug_dir is
+    given, debug_dir/<name>.json. Returns a summary dict including the file paths and
     the TIF's layout (legend bar height on top, scale: see drawing.make_layout).
     """
     t0 = time.time()
@@ -106,7 +108,12 @@ def process(img_path, ann_path, out_dir: Path, name: str, cache_dir: Path, tmp_r
     try:
         page, image = page_for_notebook(img_path, result, tmp, log)
         log("drawing")
-        layout = drawing.render_tif(image, ann_path, result, files["tif"])
+        files["legend_generated"] = out_dir / f"{name}_legend_generated.png"
+        layout = drawing.render_tif(image, ann_path, result, files["tif"], key_path=files["legend_generated"])
+        legend_box = drawing.crop_legend(image, ann_path, out_dir / f"{name}_legend_original.png")
+        if legend_box is not None:
+            files["legend_original"] = out_dir / f"{name}_legend_original.png"
+            layout = {**layout, "legend_original_box": legend_box}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return {"status": "done", "seconds": round(time.time() - t0), **stats(result),

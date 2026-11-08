@@ -36,6 +36,12 @@ status by file, ZIP downloads, previews, delete; everything stored in Postgres).
 The same settings can be set with environment variables: `LITHO_ANNOTATION_DIRS`, `LITHO_IMAGE_DIRS`
 (separated by `:`), `LITHO_DATA_DIR`, `LITHO_UI_DIR`, `LITHO_SPLIT_FILE`, `LITHO_DESKTOP=1`.
 
+**Bounding boxes are detected automatically** from the uploaded image with the int8 OpenVINO models in
+`bbox-final/` (two YOLO11s detectors: depth column + lithology column, then a legend specialist; CPU,
+~5–10 s per log). Order: a JSON sent with the image wins, then the detector, then a matching JSON from
+`--annotations` if detection fails. `LITHO_DETECTOR=none` turns detection off; `LITHO_BBOX_DIR` points to
+another `bbox-final` folder.
+
 `LITHO_LEGEND_METHOD` picks the legend parser used for extraction: `grid` (default), `boxes`, `xycut`
 or `old`. It is a server setting only (API users can't choose it). Changing it doesn't reuse cached
 results. Compare the methods on the review page, `/legend.html`.
@@ -137,7 +143,7 @@ curl -OJ http://127.0.0.1:8000/api/v1/download/all                   # every fil
 
 File status: `uploading` → `queued` (or `needs_annotation`) → `processing` → `done` | `error`.
 `computed` is true once the result TIF and CSV are stored. Every file response also has
-`outputs` (which of `original`, `annotation`, `result_tif`, `result_csv`, `result_json` exist), `preview` URLs and `download` (the URL of its ZIP, `null` until finished).
+`outputs` (which of `original`, `annotation`, `result_tif`, `result_csv`, `result_json`, `legend_original`, `legend_generated` exist), `preview` URLs and `download` (the URL of its ZIP, `null` until finished).
 
 | | |
 |---|---|
@@ -145,11 +151,11 @@ File status: `uploading` → `queued` (or `needs_annotation`) → `processing` �
 | `GET /api/v1/status?ids=a,b,c` | light status of many files, for polling |
 | `GET /api/v1/files/{id}` | full detail: status, error, stats, outputs, download and preview URLs |
 | `GET /api/v1/files?status=&q=&limit=&offset=` | list/search files, newest first |
-| `GET /api/v1/files/{id}/result` | the result TIF, the result CSV and the **offset** (result TIF height − original height: the colour key bar on top; `y_result = offset_y_px + y_original`). Default: `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, `<name>_offset.json`, plus an `X-Offset-Y` header. `?format=json`: `{id, name, offset, csv: {filename, content}, result_tif: {filename, base64}}`. 404 until finished. |
+| `GET /api/v1/files/{id}/result` | the result TIF, the result CSV and the **offset** (result TIF height − original height: the colour key bar on top; `y_result = offset_y_px + y_original`). Default: `<name>_solved.zip` with `<name>_solved.tif`, `<name>_solved.csv`, `<name>_offset.json`, `<name>_legend_original.png` (the log's own legend, cut from the original at the `lithology_legend` box, given as `offset.legend_original_box`) and `<name>_legend_generated.png` (the colour key bar on top of the result TIF: same width, height = `offset_y_px`), plus an `X-Offset-Y` header. `?format=json`: `{id, name, offset, csv: {filename, content}, result_tif, legend_original, legend_generated: {filename, base64}}`. The legends are missing/`null` for results computed before they existed (reprocess). 404 until finished. |
 | `GET /api/v1/files/{id}/download` | `<name>_solved.zip` with the original image `<name>.tif`, the result TIF `<name>_solved.tif` and the result CSV `<name>_solved.csv` (404 until all three exist). `<name>` is the file name as uploaded, spaces included. |
 | `GET /api/v1/download?ids=a,b,c` | ZIP with one folder per file (named after the file), each holding its original image, result TIF and result CSV. Files without finished results are left out and listed in `skipped.txt`; 404 if an id is unknown or none is finished. At most 1000 ids. |
 | `GET /api/v1/download/all` | the same for every file in the database |
-| `GET /api/v1/files/{id}/preview/{kind}?width=1200` | PNG of `original` or `result_tif` for an `<img>` (browsers can't show TIFs) |
+| `GET /api/v1/files/{id}/preview/{kind}?width=1200` | PNG of `original`, `result_tif`, `legend_original` or `legend_generated` for an `<img>` (browsers can't show TIFs) |
 | `PUT /api/v1/files/{id}/annotation` | set/replace the bounding boxes (JSON body, or a JSON `file` in multipart) and process again |
 | `POST /api/v1/files/{id}/reprocess?force=` | compute again (`force=true` also ignores the extraction cache) |
 | `DELETE /api/v1/files/{id}` · `DELETE /api/v1/files?ids=a,b` | delete files (any status, even while processing) with all their data |

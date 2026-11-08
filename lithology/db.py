@@ -1,9 +1,9 @@
 """
 Postgres storage for the /api/v1 file API (works with any Postgres, e.g. Tiger Data).
 
-    litho_batches   one row per upload (a single file is a batch of one)
     litho_files     one row per log image: status, where its annotation came from, stats, error
-    litho_blobs     the files themselves (bytea): original, annotation, result_tif, result_csv, result_json
+    litho_blobs     the files themselves (bytea): original, annotation, result_tif, result_csv, result_json,
+                    legend_original (legend cut from the original), legend_generated (the colour key)
 
 Which results exist is read from litho_blobs, so "is it computed?" is always the truth on disk.
 """
@@ -18,18 +18,12 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 STATUSES = ("uploading", "needs_annotation", "queued", "processing", "done", "error")
-BLOB_KINDS = ("original", "annotation", "result_tif", "result_csv", "result_json")
-RESULT_KINDS = ("result_tif", "result_csv", "result_json")
+RESULT_KINDS = ("result_tif", "result_csv", "result_json", "legend_original", "legend_generated")
+BLOB_KINDS = ("original", "annotation", *RESULT_KINDS)
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS litho_batches (
-    id          uuid PRIMARY KEY,
-    name        text NOT NULL,
-    created_at  timestamptz NOT NULL DEFAULT now()
-);
 CREATE TABLE IF NOT EXISTS litho_files (
     id                 uuid PRIMARY KEY,
-    batch_id           uuid NOT NULL REFERENCES litho_batches(id) ON DELETE CASCADE,
     name               text NOT NULL,
     status             text NOT NULL,
     annotation_source  text CHECK (annotation_source IN ('uploaded','provided','dataset','detector')),
@@ -46,7 +40,9 @@ ALTER TABLE litho_files DROP CONSTRAINT IF EXISTS litho_files_status_check;
 ALTER TABLE litho_files ADD CONSTRAINT litho_files_status_check
     CHECK (status IN ('uploading','needs_annotation','queued','processing','done','error'));
 CREATE INDEX IF NOT EXISTS litho_files_status_idx ON litho_files (status, created_at);
-CREATE INDEX IF NOT EXISTS litho_files_batch_idx ON litho_files (batch_id, created_at);
+-- files used to be grouped into upload batches: drop that from older databases (the files stay)
+ALTER TABLE litho_files DROP COLUMN IF EXISTS batch_id;
+DROP TABLE IF EXISTS litho_batches;
 CREATE TABLE IF NOT EXISTS litho_blobs (
     file_id       uuid NOT NULL REFERENCES litho_files(id) ON DELETE CASCADE,
     kind          text NOT NULL CHECK (kind IN ('original','annotation','result_tif','result_csv','result_json')),
@@ -58,11 +54,15 @@ CREATE TABLE IF NOT EXISTS litho_blobs (
     created_at    timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (file_id, kind)
 );
+-- new blob kinds (the two legends): widen the kind check on older databases
+ALTER TABLE litho_blobs DROP CONSTRAINT IF EXISTS litho_blobs_kind_check;
+ALTER TABLE litho_blobs ADD CONSTRAINT litho_blobs_kind_check
+    CHECK (kind IN ('original','annotation','result_tif','result_csv','result_json','legend_original','legend_generated'));
 """
 
 # file row + which blobs it has (never the blob data itself)
 _FILE_COLS = """
-    f.id, f.batch_id, f.name, f.status, f.annotation_source, f.note, f.error, f.stats,
+    f.id, f.name, f.status, f.annotation_source, f.note, f.error, f.stats,
     f.created_at, f.updated_at, f.started_at, f.finished_at,
     COALESCE((SELECT jsonb_object_agg(b.kind, jsonb_build_object('filename', b.filename, 'size', b.size,
               'content_type', b.content_type, 'created_at', b.created_at))
@@ -87,50 +87,16 @@ class DB:
         with self.pool.connection() as c:
             return c.execute("SELECT 1 AS ok").fetchone()["ok"] == 1
 
-    # ---------------- batches
-
-    def create_batch(self, name: str) -> dict:
-        with self.pool.connection() as c:
-            return c.execute("INSERT INTO litho_batches (id, name) VALUES (%s, %s) RETURNING *",
-                             (uuid.uuid4(), name)).fetchone()
-
-    def list_batches(self, limit=50, offset=0) -> list[dict]:
-        with self.pool.connection() as c:
-            return c.execute("""
-                SELECT bt.*,
-                       COALESCE((SELECT jsonb_object_agg(status, n) FROM
-                                 (SELECT status, count(*) AS n FROM litho_files WHERE batch_id = bt.id
-                                  GROUP BY status) s), '{}'::jsonb) AS counts
-                FROM litho_batches bt ORDER BY bt.created_at DESC LIMIT %s OFFSET %s""", (limit, offset)).fetchall()
-
-    def get_batch(self, batch_id) -> dict | None:
-        with self.pool.connection() as c:
-            b = c.execute("SELECT * FROM litho_batches WHERE id = %s", (batch_id,)).fetchone()
-            if b:
-                b["counts"] = {r["status"]: r["n"] for r in c.execute(
-                    "SELECT status, count(*) AS n FROM litho_files WHERE batch_id = %s GROUP BY status",
-                    (batch_id,)).fetchall()}
-                b["file_count"] = sum(b["counts"].values())
-            return b
-
-    def delete_batch(self, batch_id) -> list | None:
-        """Delete a batch with all its files and blobs. Returns the deleted file ids (None: unknown batch)."""
-        with self.pool.connection() as c, c.transaction():
-            ids = [r["id"] for r in c.execute("SELECT id FROM litho_files WHERE batch_id = %s", (batch_id,))]
-            if not c.execute("DELETE FROM litho_batches WHERE id = %s", (batch_id,)).rowcount:
-                return None
-            return ids
-
     # ---------------- files
 
-    def create_file(self, batch_id, name: str, status: str, annotation_source=None, note=None, error=None,
+    def create_file(self, name: str, status: str, annotation_source=None, note=None, error=None,
                     blobs: dict[str, tuple[str, str, bytes]] | None = None, file_id=None) -> dict:
         """blobs: {kind: (filename, content_type, data)}; everything in one transaction."""
         fid = file_id or uuid.uuid4()
         with self.pool.connection() as c, c.transaction():
-            c.execute("""INSERT INTO litho_files (id, batch_id, name, status, annotation_source, note, error)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                      (fid, batch_id, name, status, annotation_source, note, error))
+            c.execute("""INSERT INTO litho_files (id, name, status, annotation_source, note, error)
+                         VALUES (%s, %s, %s, %s, %s, %s)""",
+                      (fid, name, status, annotation_source, note, error))
             for kind, blob in (blobs or {}).items():
                 self._put_blob(c, fid, kind, *blob)
         return self.get_file(fid)
@@ -139,14 +105,11 @@ class DB:
         with self.pool.connection() as c:
             return c.execute(f"SELECT {_FILE_COLS} FROM litho_files f WHERE f.id = %s", (file_id,)).fetchone()
 
-    def list_files(self, status=None, batch_id=None, q=None, limit=100, offset=0) -> tuple[list[dict], int]:
+    def list_files(self, status=None, q=None, limit=100, offset=0) -> tuple[list[dict], int]:
         where, args = [], []
         if status:
             where.append("f.status = ANY(%s)")
             args.append(list(status))
-        if batch_id:
-            where.append("f.batch_id = %s")
-            args.append(batch_id)
         if q:
             where.append("f.name ILIKE %s")
             args.append(f"%{q}%")
@@ -157,6 +120,12 @@ class DB:
                              f"LIMIT %s OFFSET %s", [*args, limit, offset]).fetchall()
         return rows, total
 
+    def file_names(self, ids=None) -> list[dict]:
+        """id, name and status of the given files (all files when ids is None), oldest first."""
+        w, args = ("WHERE id = ANY(%s)", (list(ids),)) if ids is not None else ("", ())
+        with self.pool.connection() as c:
+            return c.execute(f"SELECT id, name, status FROM litho_files {w} ORDER BY created_at, name", args).fetchall()
+
     def statuses(self, ids) -> list[dict]:
         with self.pool.connection() as c:
             return c.execute("""
@@ -166,14 +135,9 @@ class DB:
                 FROM litho_files f WHERE f.id = ANY(%s)""", (list(ids),)).fetchall()
 
     def delete_files(self, ids) -> list:
-        """Delete files (any status) with their blobs; batches left empty are removed too.
-        Returns the ids that existed."""
-        with self.pool.connection() as c, c.transaction():
-            rows = c.execute("DELETE FROM litho_files WHERE id = ANY(%s) RETURNING id, batch_id", (list(ids),)).fetchall()
-            batches = list({r["batch_id"] for r in rows})
-            if batches:
-                c.execute("""DELETE FROM litho_batches bt WHERE bt.id = ANY(%s)
-                             AND NOT EXISTS (SELECT 1 FROM litho_files f WHERE f.batch_id = bt.id)""", (batches,))
+        """Delete files (any status) with their blobs. Returns the ids that existed."""
+        with self.pool.connection() as c:
+            rows = c.execute("DELETE FROM litho_files WHERE id = ANY(%s) RETURNING id", (list(ids),)).fetchall()
             return [r["id"] for r in rows]
 
     def set_annotation(self, file_id, data: bytes, filename: str, source: str, note: str = "") -> bool:
